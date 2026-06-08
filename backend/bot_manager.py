@@ -2073,6 +2073,20 @@ class BotInstance:
 
     # ── Status público ────────────────────────────────────────────────────────
 
+    @staticmethod
+    def _to_json(v):
+        """Converte tipos numpy/pandas para primitivos Python serializáveis pelo FastAPI."""
+        t = type(v).__module__
+        if t == 'numpy' or (t and t.startswith('numpy')):
+            import numpy as _np
+            if isinstance(v, _np.bool_):   return bool(v)
+            if isinstance(v, _np.integer): return int(v)
+            if isinstance(v, _np.floating):return float(v)
+            if isinstance(v, _np.ndarray): return v.tolist()
+        if isinstance(v, dict):  return {k: BotInstance._to_json(val) for k, val in v.items()}
+        if isinstance(v, list):  return [BotInstance._to_json(i) for i in v]
+        return v
+
     def get_status(self) -> dict:
         # Preço atual vindo do último candle
         last_price = self._candles[-1].close if self._candles else 0.0
@@ -2096,8 +2110,8 @@ class BotInstance:
                 "losses":      self._losses,
                 "halted":      self._halted,
                 "hold_reason": self._hold_reason,
-                "last_indicators": self._last_indicators,
-                "order_criteria":  self._last_order_criteria,
+                "last_indicators": self._to_json(self._last_indicators),
+                "order_criteria":  self._to_json(self._last_order_criteria),
                 "last_order_error": self._last_order_error,
                 "maintenance":     self._maintenance,
                 "last_update": datetime.now(timezone.utc).isoformat(),
@@ -2130,8 +2144,8 @@ class BotInstance:
             "losses":      self._losses,
             "halted":      self._halted,
             "hold_reason":     self._hold_reason,
-            "last_indicators": self._last_indicators,
-            "order_criteria":  self._last_order_criteria,
+            "last_indicators": self._to_json(self._last_indicators),
+            "order_criteria":  self._to_json(self._last_order_criteria),
             "last_order_error": self._last_order_error,
             "maintenance":     self._maintenance,
             "started_at":      self._started_at,
