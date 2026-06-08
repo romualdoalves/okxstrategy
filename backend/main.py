@@ -1951,7 +1951,7 @@ async def run_category_backtest(req: CategoryBacktestRequest):
 
     results.sort(key=lambda x: (
         _VERDICT_ORDER.get(x["recommendation"]["verdict"], 9),
-        -(x.get("profit_factor") or 0),
+        -(x["recommendation"].get("score") or 0),
     ))
 
     return {"category": prefix, "symbol": req.symbol, "results": results, "total": len(results)}
