@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Activity, TrendingUp, TrendingDown, Minus, AlertTriangle, Clock } from 'lucide-react'
+import { Activity, TrendingUp, TrendingDown, Minus, AlertTriangle, Clock, Zap } from 'lucide-react'
 
 const API = import.meta.env.VITE_API_URL || ''
 
@@ -8,6 +8,8 @@ export default function Monitor() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [lastUpdate, setLastUpdate] = useState(null)
+  const [liquidating, setLiquidating] = useState(null)
+  const [liquidateMsg, setLiquidateMsg] = useState(null)
 
   const fetchData = async () => {
     try {
@@ -29,6 +31,25 @@ export default function Monitor() {
     const interval = setInterval(fetchData, 5000) // atualiza a cada 5s
     return () => clearInterval(interval)
   }, [])
+
+  const handleLiquidate = async (bot) => {
+    if (!window.confirm(`Liquidar posição de ${bot.name} (${bot.symbol})?\nIsso envia uma ordem de venda imediata na OKX.`)) return
+    setLiquidating(bot.bot_id)
+    setLiquidateMsg(null)
+    try {
+      const res = await fetch(`${API}/api/bots/${bot.bot_id}/liquidate`, { method: 'POST' })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.detail || `HTTP ${res.status}`)
+      }
+      setLiquidateMsg({ type: 'ok', text: `${bot.name} liquidado com sucesso.` })
+      setTimeout(fetchData, 1500)
+    } catch (e) {
+      setLiquidateMsg({ type: 'err', text: `Erro ao liquidar ${bot.name}: ${e.message}` })
+    } finally {
+      setLiquidating(null)
+    }
+  }
 
   const totalPnl = bots.reduce((sum, b) => sum + (b.pnl_usd || 0), 0)
   const openPositions = bots.filter(b => b.direction !== 'FLAT')
@@ -95,6 +116,17 @@ export default function Monitor() {
         </div>
       </div>
 
+      {liquidateMsg && (
+        <div className={`mb-4 rounded-lg border p-3 text-sm ${
+          liquidateMsg.type === 'ok'
+            ? 'border-green-500/30 bg-green-500/10 text-green-300'
+            : 'border-red-500/30 bg-red-500/10 text-red-300'
+        }`}>
+          {liquidateMsg.text}
+          <button onClick={() => setLiquidateMsg(null)} className="ml-3 opacity-60 hover:opacity-100">✕</button>
+        </div>
+      )}
+
       {syncAlerts.length > 0 && (
         <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
           <div className="font-semibold flex items-center gap-2 mb-2">
@@ -156,6 +188,7 @@ export default function Monitor() {
               <th className="p-3">PnL $</th>
               <th className="p-3">App/OKX</th>
               <th className="p-3">Status</th>
+              <th className="p-3">Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -237,6 +270,21 @@ export default function Monitor() {
                     <span className="px-2 py-1 rounded bg-yellow-500/20 text-yellow-400 text-xs">
                       {bot.hold_reason || 'Aguardando'}
                     </span>
+                  )}
+                </td>
+                <td className="p-3">
+                  {bot.direction !== 'FLAT' && (
+                    <button
+                      onClick={() => handleLiquidate(bot)}
+                      disabled={liquidating === bot.bot_id}
+                      className="flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold bg-red-500/20 text-red-400 hover:bg-red-500/40 border border-red-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {liquidating === bot.bot_id
+                        ? <div className="w-3 h-3 border border-red-400 border-t-transparent rounded-full animate-spin" />
+                        : <Zap size={11} />
+                      }
+                      Liquidar
+                    </button>
                   )}
                 </td>
               </tr>

@@ -21,6 +21,13 @@ description: |
 
 ## Changelog Recente
 
+### 2026-06-08 — feat: Botão Liquidar na página Monitor
+- Coluna "Ações" adicionada à tabela de bots em `Monitor.jsx`.
+- Botão "Liquidar" visível apenas para bots com `direction !== 'FLAT'`.
+- Chama `POST /api/bots/{bot_id}/liquidate` (endpoint já existia no backend).
+- Loading por linha (não bloqueia outros bots), banner de feedback verde/vermelho.
+- Confirmação via `window.confirm` antes de enviar a ordem.
+
 ### 2026-06-08 — feat: Recomendação automática pós-backtest
 - `BotDetail.jsx` — `getBacktestRecommendation()` exibe badge colorido após backtest.
 - **INICIAR** (verde): PnL > 0, PF ≥ 1.2, ≥ 3 trades, drawdown ≤ lucro.
