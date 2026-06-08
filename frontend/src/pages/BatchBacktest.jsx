@@ -173,14 +173,16 @@ export default function BatchBacktest() {
           <label className="text-xs text-muted uppercase tracking-wider mb-2 block">Categoria</label>
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
             {CATEGORIES.map(cat => {
-              const count = strategyCounts[cat.id] ?? 0
+              const count    = strategyCounts[cat.id] ?? 0
+              const catBots  = bots.filter(b => (b.strategy_id || '').startsWith(cat.id))
+              const isActive = category === cat.id
               return (
                 <button
                   key={cat.id}
                   onClick={() => setCategory(cat.id)}
                   title={cat.description}
                   className={`px-3 py-2 rounded-lg text-sm font-bold border transition-all ${
-                    category === cat.id
+                    isActive
                       ? 'bg-accent/20 border-accent/50 text-accent'
                       : 'bg-white/5 border-white/10 text-muted hover:text-white hover:border-white/20'
                   }`}
@@ -188,8 +190,18 @@ export default function BatchBacktest() {
                   {cat.id}
                   <div className="text-[9px] font-normal opacity-70 truncate">{cat.label}</div>
                   {count > 0 && (
-                    <div className={`text-[9px] font-bold mt-0.5 ${category === cat.id ? 'text-accent/80' : 'text-muted/60'}`}>
+                    <div className={`text-[9px] font-bold mt-0.5 ${isActive ? 'text-accent/80' : 'text-muted/60'}`}>
                       {count} {count === 1 ? 'estratégia' : 'estratégias'}
+                    </div>
+                  )}
+                  {catBots.length > 0 && (
+                    <div className="mt-1 pt-1 border-t border-white/10 text-left">
+                      <span className={`text-[8px] font-bold ${isActive ? 'text-green-400/90' : 'text-green-400/60'}`}>
+                        {catBots.length} bot{catBots.length > 1 ? 's' : ''}
+                      </span>
+                      <div className={`text-[8px] font-mono leading-tight truncate ${isActive ? 'text-white/60' : 'text-muted/50'}`}>
+                        {catBots.map(b => b.strategy_id).join(', ')}
+                      </div>
                     </div>
                   )}
                 </button>
