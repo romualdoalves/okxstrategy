@@ -171,25 +171,65 @@ class BacktestEngine:
         }
 
 
-def backtest_recommendation(r: dict) -> dict:
+def backtest_score(r: dict) -> float:
     """
-    Deriva o veredicto INICIAR / CUIDADO / NÃO INICIAR / N/A a partir dos
-    resultados brutos de BacktestEngine.run(). Espelha a lógica de
-    getBacktestRecommendation() no frontend (BotDetail.jsx).
+    Converte os resultados brutos do backtest em uma pontuação contínua 0–10.00.
+    Zonas: NÃO INICIAR 0–3.33 · CUIDADO 3.33–6.67 · INICIAR 6.67–10.
+    PF é o driver principal; trades, drawdown e win-rate ajustam ±1.8 no máximo.
     """
     pf = r.get("profit_factor") or 0.0
     tc = r.get("trades_count") or 0
     tp = r.get("total_profit") or 0.0
     dd = r.get("max_drawdown") or 0.0
+    wr = r.get("win_rate") or 0.0
 
     if tc == 0:
-        return {"verdict": "NÃO INICIAR", "level": "danger",
+        return 0.0
+    if tp <= 0:
+        return 1.0
+    if pf < 1.0:
+        return round(1.0 + pf * 1.5, 2)
+
+    # PF: 1.0→3.0, 1.5→4.25, 2.0→5.5, 3.0→8.0, ≥4.6→9.0
+    pf_score = min(3.0 + (pf - 1.0) * 2.5, 9.0)
+
+    adj = 0.0
+    if tc >= 10:     adj += 1.0
+    elif tc >= 5:    adj += 0.5
+    elif tc < 3:     adj -= 0.5
+
+    dd_ratio = dd / tp if tp > 0 else 999.0
+    if dd_ratio <= 0.3:    adj += 0.5
+    elif dd_ratio <= 0.5:  adj += 0.2
+    elif dd_ratio > 1.0:   adj -= 0.5
+
+    if wr >= 60:    adj += 0.3
+    elif wr < 40:   adj -= 0.2
+
+    return round(max(0.0, min(10.0, pf_score + adj)), 2)
+
+
+def backtest_recommendation(r: dict) -> dict:
+    """
+    Deriva o veredicto INICIAR / CUIDADO / NÃO INICIAR / N/A a partir dos
+    resultados brutos de BacktestEngine.run(). Espelha a lógica de
+    getBacktestRecommendation() no frontend (BotDetail.jsx).
+    Inclui o campo `score` (0–10.00) calculado por backtest_score().
+    """
+    pf = r.get("profit_factor") or 0.0
+    tc = r.get("trades_count") or 0
+    tp = r.get("total_profit") or 0.0
+    dd = r.get("max_drawdown") or 0.0
+    score = backtest_score(r)
+
+    if tc == 0:
+        return {"verdict": "NÃO INICIAR", "level": "danger", "score": score,
                 "reasons": ["Nenhum trade fechado no período."]}
     if tp <= 0:
-        return {"verdict": "NÃO INICIAR", "level": "danger",
+        return {"verdict": "NÃO INICIAR", "level": "danger", "score": score,
                 "reasons": [f"PnL negativo ({tp:.2f} USD) — estratégia perdedora neste período."]}
     if pf < 1.0:
-        return {"verdict": "NÃO INICIAR", "level": "danger",
+        return {"verdict": "NÃO INICIAR", "level": "danger", "score": score,
                 "reasons": [f"Profit Factor {pf:.2f}: perdas superam ganhos brutos."]}
 
     issues: list[str] = []
@@ -218,5 +258,5 @@ def backtest_recommendation(r: dict) -> dict:
         issues.append(f"Drawdown ${dd:.2f} supera o lucro total — risco muito elevado.")
 
     if issues:
-        return {"verdict": "CUIDADO", "level": "warning", "reasons": highlights + issues}
-    return {"verdict": "INICIAR", "level": "success", "reasons": highlights}
+        return {"verdict": "CUIDADO", "level": "warning", "score": score, "reasons": highlights + issues}
+    return {"verdict": "INICIAR", "level": "success", "score": score, "reasons": highlights}

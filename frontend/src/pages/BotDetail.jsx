@@ -8,6 +8,7 @@ import { useMarketStatus } from '../hooks/useMarketStatus'
 import { useLanguage } from '../i18n/LanguageContext'
 import Chart             from '../components/Chart'
 import TradeTable        from '../components/TradeTable'
+import BacktestLikert    from '../components/BacktestLikert'
 import StatCard          from '../components/StatCard'
 import GraphView         from '../components/GraphView'
 import StrategyChecklist from '../components/StrategyChecklist'
@@ -45,22 +46,53 @@ const CHART_SUBTITLE = {
   RG001: 'Markov Regime + EMA21',
 }
 
+function getBacktestScore(r) {
+  const pf = r.profit_factor ?? 0
+  const tc = r.trades_count ?? 0
+  const tp = r.total_profit ?? 0
+  const dd = r.max_drawdown ?? 0
+  const wr = r.win_rate ?? 0
+
+  if (tc === 0) return 0.0
+  if (tp <= 0)  return 1.0
+  if (pf < 1.0) return Math.round((1.0 + pf * 1.5) * 100) / 100
+
+  // PF: 1.0→3.0, 1.5→4.25, 2.0→5.5, 3.0→8.0, ≥4.6→9.0
+  const pfScore = Math.min(3.0 + (pf - 1.0) * 2.5, 9.0)
+
+  let adj = 0
+  if (tc >= 10)     adj += 1.0
+  else if (tc >= 5) adj += 0.5
+  else if (tc < 3)  adj -= 0.5
+
+  const ddRatio = tp > 0 ? dd / tp : 999
+  if (ddRatio <= 0.3)      adj += 0.5
+  else if (ddRatio <= 0.5) adj += 0.2
+  else if (ddRatio > 1.0)  adj -= 0.5
+
+  if (wr >= 60)      adj += 0.3
+  else if (wr < 40)  adj -= 0.2
+
+  return Math.round(Math.max(0, Math.min(10, pfScore + adj)) * 100) / 100
+}
+
 function getBacktestRecommendation(r) {
   const pf = r.profit_factor ?? 0
   const tc = r.trades_count ?? 0
   const tp = r.total_profit ?? 0
   const dd = r.max_drawdown ?? 0
+  const score = getBacktestScore(r)
 
   if (tc === 0) return {
-    verdict: 'NÃO INICIAR', level: 'danger',
+    verdict: 'NÃO INICIAR', level: 'danger', score,
     reasons: ['Nenhum trade fechado no período — impossível avaliar a estratégia.'],
   }
   if (tp <= 0) return {
-    verdict: 'NÃO INICIAR', level: 'danger',
+    verdict: 'NÃO INICIAR', level: 'danger', score,
     reasons: [`PnL negativo (${tp.toFixed(2)} USD) — estratégia perdedora neste período.`],
   }
   if (pf < 1.0) return {
-    verdict: 'NÃO INICIAR', level: 'danger',
+    verdict: 'NÃO INICIAR', level: 'danger', score,
     reasons: [`Profit Factor ${pf.toFixed(2)}: as perdas superam os ganhos brutos.`],
   }
 
@@ -95,9 +127,9 @@ function getBacktestRecommendation(r) {
   }
 
   if (issues.length === 0) {
-    return { verdict: 'INICIAR', level: 'success', reasons: highlights }
+    return { verdict: 'INICIAR', level: 'success', score, reasons: highlights }
   }
-  return { verdict: 'CUIDADO', level: 'warning', reasons: [...highlights, ...issues] }
+  return { verdict: 'CUIDADO', level: 'warning', score, reasons: [...highlights, ...issues] }
 }
 
 function useElapsed(startedAt) {
@@ -467,20 +499,18 @@ export default function BotDetail() {
           {(() => {
             const rec = getBacktestRecommendation(backtestResult)
             const cfg = {
-              success: { border: 'border-green-500/30', bg: 'bg-green-500/10', title: 'text-green-400', badge: 'bg-green-500/20 text-green-300', Icon: CheckCircle },
-              warning: { border: 'border-yellow-500/30', bg: 'bg-yellow-500/10', title: 'text-yellow-400', badge: 'bg-yellow-500/20 text-yellow-300', Icon: AlertTriangle },
-              danger:  { border: 'border-red-500/30',   bg: 'bg-red-500/10',   title: 'text-red-400',   badge: 'bg-red-500/20 text-red-300',   Icon: XCircle },
+              success: { border: 'border-green-500/30', bg: 'bg-green-500/10', title: 'text-green-400', Icon: CheckCircle },
+              warning: { border: 'border-yellow-500/30', bg: 'bg-yellow-500/10', title: 'text-yellow-400', Icon: AlertTriangle },
+              danger:  { border: 'border-red-500/30',   bg: 'bg-red-500/10',   title: 'text-red-400',   Icon: XCircle },
             }[rec.level]
             return (
               <div className={`mb-4 rounded-xl border ${cfg.border} ${cfg.bg} p-4`}>
                 <div className="flex items-center gap-2 mb-3">
                   <cfg.Icon size={16} className={cfg.title} />
                   <span className={`text-sm font-bold uppercase tracking-wide ${cfg.title}`}>Recomendação</span>
-                  <span className={`ml-auto px-3 py-0.5 rounded-full text-xs font-bold ${cfg.badge}`}>
-                    {rec.verdict}
-                  </span>
                 </div>
-                <ul className="space-y-1.5">
+                <BacktestLikert score={rec.score} />
+                <ul className="mt-3 space-y-1.5">
                   {rec.reasons.map((item, i) => (
                     <li key={i} className="text-xs text-white/75 flex gap-2">
                       <span className={`shrink-0 ${cfg.title}`}>·</span>

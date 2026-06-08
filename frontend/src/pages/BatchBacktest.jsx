@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { ScanSearch, Play, CheckCircle, AlertTriangle, XCircle, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react'
+import { ScanSearch, Play, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react'
+import BacktestLikert from '../components/BacktestLikert'
 
 const API = import.meta.env.VITE_API_URL || ''
 
@@ -16,10 +17,10 @@ const CATEGORIES = [
 const SYMBOLS = ['BTC-USDT', 'ETH-USDT', 'SOL-USDT', 'BNB-USDT', 'XRP-USDT', 'DOGE-USDT', 'ADA-USDT', 'AVAX-USDT']
 
 const VERDICT_CFG = {
-  INICIAR:      { color: 'text-green-400',  bg: 'bg-green-500/15',  border: 'border-green-500/30',  Icon: CheckCircle },
-  CUIDADO:      { color: 'text-yellow-400', bg: 'bg-yellow-500/15', border: 'border-yellow-500/30', Icon: AlertTriangle },
-  'NÃO INICIAR':{ color: 'text-red-400',    bg: 'bg-red-500/15',    border: 'border-red-500/30',    Icon: XCircle },
-  'N/A':        { color: 'text-gray-400',   bg: 'bg-white/5',       border: 'border-white/10',      Icon: HelpCircle },
+  INICIAR:       { color: 'text-green-400',  bg: 'bg-green-500/15',  border: 'border-green-500/30'  },
+  CUIDADO:       { color: 'text-yellow-400', bg: 'bg-yellow-500/15', border: 'border-yellow-500/30' },
+  'NÃO INICIAR': { color: 'text-red-400',    bg: 'bg-red-500/15',    border: 'border-red-500/30'    },
+  'N/A':         { color: 'text-gray-400',   bg: 'bg-white/5',       border: 'border-white/10'      },
 }
 
 function MetricPill({ label, value, positive }) {
@@ -36,27 +37,31 @@ function ResultCard({ r }) {
   const [open, setOpen] = useState(false)
   const rec = r.recommendation
   const cfg = VERDICT_CFG[rec.verdict] || VERDICT_CFG['N/A']
-  const { Icon } = cfg
   const hasMetrics = r.trades_count !== undefined
+  const isNA = rec.verdict === 'N/A'
 
   return (
     <div className={`rounded-xl border ${cfg.border} ${cfg.bg} p-4`}>
       {/* Header */}
-      <div className="flex items-center gap-3 mb-3">
-        <Icon size={16} className={cfg.color} />
+      <div className="flex items-center gap-3 mb-2">
         <div className="flex-1 min-w-0">
           <span className="font-bold text-white">{r.strategy_id}</span>
           <span className="ml-2 text-sm text-muted truncate">{r.strategy_name}</span>
         </div>
         <span className="text-[10px] text-muted font-mono shrink-0">{r.timeframe}</span>
-        <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${cfg.color} border ${cfg.border}`}>
-          {rec.verdict}
-        </span>
+        {isNA && (
+          <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold text-gray-400 border border-white/10">
+            <HelpCircle size={11} />N/A
+          </span>
+        )}
       </div>
+
+      {/* Likert scale (non-N/A strategies) */}
+      {!isNA && <BacktestLikert score={rec.score ?? 0} />}
 
       {/* Metrics row */}
       {hasMetrics && (
-        <div className="flex flex-wrap gap-2 mb-3">
+        <div className="flex flex-wrap gap-2 mt-2 mb-2">
           <MetricPill label="PnL" value={`${r.total_profit >= 0 ? '+' : ''}$${r.total_profit?.toFixed(2)}`} positive={r.total_profit > 0} />
           <MetricPill label="Trades" value={r.trades_count} />
           <MetricPill label="Win Rate" value={`${r.win_rate?.toFixed(1)}%`} positive={r.win_rate >= 50} />
@@ -69,7 +74,7 @@ function ResultCard({ r }) {
       {/* Reasons toggle */}
       <button
         onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-1 text-xs text-muted hover:text-white transition-colors"
+        className="flex items-center gap-1 text-xs text-muted hover:text-white transition-colors mt-1"
       >
         {open ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
         {open ? 'Ocultar detalhes' : 'Ver detalhes'}

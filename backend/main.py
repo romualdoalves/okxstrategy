@@ -46,7 +46,7 @@ from .database import (
     get_db,
 )
 from .bot_manager import manager
-from .backtest_engine import BacktestEngine, backtest_recommendation
+from .backtest_engine import BacktestEngine, backtest_recommendation, backtest_score
 from .optimizer import StrategyOptimizer
 from .exchanges.factory import build_exchange, get_default_demo_mode, get_exchange_provider, get_ranked_assets_universe, map_timeframe_for_history
 from .strategies.registry import list_strategies, get_strategy

@@ -21,6 +21,16 @@ description: |
 
 ## Changelog Recente
 
+### 2026-06-08 — feat: Escala Likert de recomendação de backtest
+- Substituiu o badge categórico isolado por uma escala visual contínua 0–10.00.
+- `backtest_score(r)` no backend (`backtest_engine.py`): PF como driver principal
+  (PF=1.0→3.0, 2.0→5.5, 3.0→8.0), ajustes por trades/drawdown/win-rate (±1.8 max).
+- `getBacktestScore(r)` no frontend (`BotDetail.jsx`): espelho exato da função Python.
+- `BacktestLikert.jsx` (componente compartilhado): track com 3 zonas coloridas
+  (NÃO INICIAR/CUIDADO/INICIAR), marcador branco na posição exata, score 2 decimais + badge.
+- `backtest_recommendation()` agora sempre inclui `score` no dict retornado.
+- Usado em `BotDetail.jsx` (backtest individual) e `BatchBacktest.jsx` (scanner).
+
 ### 2026-06-08 — feat: Scanner de Backtest por Categoria
 - Nova página `/batch-backtest` ("Scanner BT" no menu lateral).
 - Usuário escolhe categoria (TF/MR/PA/SC/RG/IF/NW) + ativo e clica em "Executar Backtest da Categoria".
