@@ -82,48 +82,54 @@ function getBacktestRecommendation(r) {
   const tp = r.total_profit ?? 0
   const dd = r.max_drawdown ?? 0
   const score = getBacktestScore(r)
+  const INITIAL_BALANCE = 1000
 
   if (tc === 0) return {
     verdict: 'NÃO INICIAR', level: 'danger', score,
-    reasons: ['Nenhum trade fechado no período — impossível avaliar a estratégia.'],
+    reasons: ['Nenhum trade fechado no período — impossível calcular PF, Win Rate ou Drawdown.'],
   }
   if (tp <= 0) return {
     verdict: 'NÃO INICIAR', level: 'danger', score,
-    reasons: [`PnL negativo (${tp.toFixed(2)} USD) — estratégia perdedora neste período.`],
+    reasons: [`PnL negativo (${tp.toFixed(2)} USD) em ${tc} trade(s) — estratégia perdedora neste período.`],
   }
   if (pf < 1.0) return {
     verdict: 'NÃO INICIAR', level: 'danger', score,
-    reasons: [`Profit Factor ${pf.toFixed(2)}: as perdas superam os ganhos brutos.`],
+    reasons: [`Profit Factor ${pf.toFixed(2)}: para cada $1,00 ganho, a estratégia perdeu $${(1 / pf).toFixed(2)} — saldo bruto negativo.`],
   }
 
   const highlights = []
   const issues = []
+  const ddRatio = tp > 0 ? dd / tp : 999
+  const pnlPct = (tp / INITIAL_BALANCE * 100).toFixed(2)
+  const avgTrade = r.avg_trade != null ? r.avg_trade : (tc > 0 ? tp / tc : 0)
 
-  highlights.push(`PnL positivo: +${tp.toFixed(2)} USD.`)
+  highlights.push(`PnL positivo: +${tp.toFixed(2)} USD (+${pnlPct}% do capital de $${INITIAL_BALANCE.toLocaleString()}; média de $${avgTrade.toFixed(2)}/trade).`)
 
   if (pf >= 1.5) {
-    highlights.push(`Profit Factor excelente: ${pf.toFixed(2)}.`)
+    highlights.push(`Profit Factor excelente: ${pf.toFixed(2)} — para cada $1,00 perdido, a estratégia retornou $${pf.toFixed(2)} em ganhos.`)
   } else if (pf >= 1.2) {
-    highlights.push(`Profit Factor adequado: ${pf.toFixed(2)} (idealmente acima de 1.5).`)
+    highlights.push(`Profit Factor adequado: ${pf.toFixed(2)} — para cada $1,00 perdido, retornou $${pf.toFixed(2)} (idealmente ≥ 1.5).`)
   } else {
-    issues.push(`Profit Factor ${pf.toFixed(2)} abaixo do mínimo recomendado (1.2).`)
+    issues.push(`Profit Factor ${pf.toFixed(2)} abaixo do mínimo recomendado (1.2) — para cada $1,00 perdido, retornou apenas $${pf.toFixed(2)}.`)
   }
 
-  if (tc >= 5) {
-    highlights.push(`${tc} trades fechados — amostra razoável.`)
+  if (tc >= 10) {
+    highlights.push(`${tc} trades fechados — amostra robusta; métricas são estatisticamente confiáveis.`)
+  } else if (tc >= 5) {
+    highlights.push(`${tc} trades fechados — amostra razoável; resultados tendem a se manter com mais dados.`)
   } else if (tc >= 3) {
-    highlights.push(`${tc} trades fechados (mínimo aceitável).`)
+    highlights.push(`${tc} trades fechados (mínimo aceitável) — amostra pequena; PF e Win Rate podem distorcer com mais histórico.`)
   } else {
-    issues.push(`Apenas ${tc} trade(s) fechado(s) — amostra insuficiente para confiança estatística.`)
+    issues.push(`Apenas ${tc} trade(s) fechado(s) — amostra insuficiente; qualquer métrica pode ser fruto do acaso.`)
   }
 
-  const ddRatio = tp > 0 ? dd / tp : 999
+  const ddCapPct = (dd / INITIAL_BALANCE * 100).toFixed(2)
   if (ddRatio <= 0.5) {
-    highlights.push(`Drawdown controlado: $${dd.toFixed(2)} (${(ddRatio * 100).toFixed(0)}% do lucro).`)
+    highlights.push(`Drawdown controlado: $${dd.toFixed(2)} (${(ddRatio * 100).toFixed(0)}% do lucro · ${ddCapPct}% do capital) — risco bem dimensionado.`)
   } else if (ddRatio <= 1.0) {
-    issues.push(`Drawdown de $${dd.toFixed(2)} representa ${(ddRatio * 100).toFixed(0)}% do lucro total — elevado.`)
+    issues.push(`Drawdown de $${dd.toFixed(2)} representa ${(ddRatio * 100).toFixed(0)}% do lucro (${ddCapPct}% do capital de $${INITIAL_BALANCE.toLocaleString()}) — o capital flutuou bastante antes de fechar no positivo.`)
   } else {
-    issues.push(`Drawdown de $${dd.toFixed(2)} supera o lucro total — risco muito elevado.`)
+    issues.push(`Drawdown de $${dd.toFixed(2)} supera o lucro total (${ddCapPct}% do capital de $${INITIAL_BALANCE.toLocaleString()}) — a estratégia ficou profundamente no vermelho antes de recuperar, risco muito elevado.`)
   }
 
   if (issues.length === 0) {

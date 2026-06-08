@@ -216,46 +216,55 @@ def backtest_recommendation(r: dict) -> dict:
     getBacktestRecommendation() no frontend (BotDetail.jsx).
     Inclui o campo `score` (0–10.00) calculado por backtest_score().
     """
-    pf = r.get("profit_factor") or 0.0
-    tc = r.get("trades_count") or 0
-    tp = r.get("total_profit") or 0.0
-    dd = r.get("max_drawdown") or 0.0
+    pf  = r.get("profit_factor") or 0.0
+    tc  = r.get("trades_count") or 0
+    tp  = r.get("total_profit") or 0.0
+    dd  = r.get("max_drawdown") or 0.0
+    avg = r.get("avg_trade") or (tp / tc if tc else 0.0)
     score = backtest_score(r)
+    INITIAL_BALANCE = 1_000.0
 
     if tc == 0:
         return {"verdict": "NÃO INICIAR", "level": "danger", "score": score,
-                "reasons": ["Nenhum trade fechado no período."]}
+                "reasons": ["Nenhum trade fechado no período — impossível calcular PF, Win Rate ou Drawdown."]}
     if tp <= 0:
         return {"verdict": "NÃO INICIAR", "level": "danger", "score": score,
-                "reasons": [f"PnL negativo ({tp:.2f} USD) — estratégia perdedora neste período."]}
+                "reasons": [f"PnL negativo ({tp:.2f} USD) em {tc} trade(s) — estratégia perdedora neste período."]}
     if pf < 1.0:
         return {"verdict": "NÃO INICIAR", "level": "danger", "score": score,
-                "reasons": [f"Profit Factor {pf:.2f}: perdas superam ganhos brutos."]}
+                "reasons": [f"Profit Factor {pf:.2f}: para cada $1,00 ganho, a estratégia perdeu ${1/pf:.2f} — saldo bruto negativo."]}
 
     issues: list[str] = []
-    highlights: list[str] = [f"PnL positivo: +{tp:.2f} USD."]
+    dd_ratio   = dd / tp if tp > 0 else 999.0
+    pnl_pct    = tp / INITIAL_BALANCE * 100
+    dd_cap_pct = dd / INITIAL_BALANCE * 100
+
+    highlights: list[str] = [
+        f"PnL positivo: +{tp:.2f} USD (+{pnl_pct:.2f}% do capital de ${INITIAL_BALANCE:,.0f}; média de ${avg:.2f}/trade)."
+    ]
 
     if pf >= 1.5:
-        highlights.append(f"Profit Factor excelente: {pf:.2f}.")
+        highlights.append(f"Profit Factor excelente: {pf:.2f} — para cada $1,00 perdido, a estratégia retornou ${pf:.2f} em ganhos.")
     elif pf >= 1.2:
-        highlights.append(f"Profit Factor adequado: {pf:.2f} (idealmente ≥ 1.5).")
+        highlights.append(f"Profit Factor adequado: {pf:.2f} — para cada $1,00 perdido, retornou ${pf:.2f} (idealmente ≥ 1.5).")
     else:
-        issues.append(f"Profit Factor {pf:.2f} abaixo do mínimo recomendado (1.2).")
+        issues.append(f"Profit Factor {pf:.2f} abaixo do mínimo recomendado (1.2) — para cada $1,00 perdido, retornou apenas ${pf:.2f}.")
 
-    if tc >= 5:
-        highlights.append(f"{tc} trades fechados — amostra razoável.")
+    if tc >= 10:
+        highlights.append(f"{tc} trades fechados — amostra robusta; métricas são estatisticamente confiáveis.")
+    elif tc >= 5:
+        highlights.append(f"{tc} trades fechados — amostra razoável; resultados tendem a se manter com mais dados.")
     elif tc >= 3:
-        highlights.append(f"{tc} trades fechados (mínimo aceitável).")
+        highlights.append(f"{tc} trades fechados (mínimo aceitável) — amostra pequena; PF e Win Rate podem distorcer com mais histórico.")
     else:
-        issues.append(f"Apenas {tc} trade(s) fechado(s) — amostra insuficiente.")
+        issues.append(f"Apenas {tc} trade(s) fechado(s) — amostra insuficiente; qualquer métrica pode ser fruto do acaso.")
 
-    dd_ratio = dd / tp if tp > 0 else 999.0
     if dd_ratio <= 0.5:
-        highlights.append(f"Drawdown controlado: ${dd:.2f} ({dd_ratio * 100:.0f}% do lucro).")
+        highlights.append(f"Drawdown controlado: ${dd:.2f} ({dd_ratio * 100:.0f}% do lucro · {dd_cap_pct:.2f}% do capital) — risco bem dimensionado.")
     elif dd_ratio <= 1.0:
-        issues.append(f"Drawdown ${dd:.2f} representa {dd_ratio * 100:.0f}% do lucro — elevado.")
+        issues.append(f"Drawdown de ${dd:.2f} representa {dd_ratio * 100:.0f}% do lucro ({dd_cap_pct:.2f}% do capital de ${INITIAL_BALANCE:,.0f}) — o capital flutuou bastante antes de fechar no positivo.")
     else:
-        issues.append(f"Drawdown ${dd:.2f} supera o lucro total — risco muito elevado.")
+        issues.append(f"Drawdown de ${dd:.2f} supera o lucro total ({dd_cap_pct:.2f}% do capital de ${INITIAL_BALANCE:,.0f}) — a estratégia ficou profundamente no vermelho antes de recuperar, risco muito elevado.")
 
     if issues:
         return {"verdict": "CUIDADO", "level": "warning", "score": score, "reasons": highlights + issues}
