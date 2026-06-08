@@ -10,13 +10,18 @@ import { getCriteriaCount } from '../components/StrategyChecklist'
 
 const FIXED_STAKE_USD = 100
 
+const RESET_WORD = 'RESETAR'
+
 // ── Modal Reset Geral ──────────────────────────────────────────────────────────
 function ResetModal({ onClose, onConfirm }) {
-  const [loading, setLoading] = useState(false)
-  const [error,   setError]   = useState('')
+  const [loading, setLoading]   = useState(false)
+  const [error,   setError]     = useState('')
+  const [typed,   setTyped]     = useState('')
+  const confirmed = typed.trim().toUpperCase() === RESET_WORD
 
   async function handleSubmit(e) {
     e.preventDefault()
+    if (!confirmed) return
     setError('')
     setLoading(true)
     try {
@@ -62,9 +67,24 @@ function ResetModal({ onClose, onConfirm }) {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          <p className="text-[11px] text-muted">
-            Esta ação apaga todos os bots, trades e histórico. Suas credenciais OKX permanecem intactas.
-          </p>
+          <div>
+            <label className="block text-xs text-muted mb-1.5">
+              Digite <span className="font-bold text-red-400 font-mono">{RESET_WORD}</span> para confirmar:
+            </label>
+            <input
+              autoFocus
+              value={typed}
+              onChange={e => setTyped(e.target.value)}
+              placeholder={RESET_WORD}
+              className={`w-full px-3 py-2 rounded-lg text-sm font-mono border bg-white/5 text-white placeholder-muted/40 focus:outline-none transition-colors ${
+                typed.length === 0
+                  ? 'border-white/10'
+                  : confirmed
+                  ? 'border-red-500/60 bg-red-500/5'
+                  : 'border-white/20'
+              }`}
+            />
+          </div>
 
           {error && (
             <div className="flex items-start gap-2 text-red-400 text-xs bg-red-500/10 border border-red-500/20 rounded-lg p-2.5">
@@ -84,11 +104,13 @@ function ResetModal({ onClose, onConfirm }) {
             </button>
             <button
               type="submit"
-              disabled={loading}
-              className={`btn flex-1 font-semibold ${
+              disabled={loading || !confirmed}
+              className={`btn flex-1 font-semibold transition-all ${
                 loading
                   ? 'btn-ghost opacity-50 cursor-not-allowed'
-                  : 'bg-red-500 hover:bg-red-600 text-white border-red-500'
+                  : confirmed
+                  ? 'bg-red-500 hover:bg-red-600 text-white border-red-500'
+                  : 'bg-white/5 border-white/10 text-muted/40 cursor-not-allowed'
               }`}
             >
               {loading ? (
