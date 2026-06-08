@@ -18,6 +18,7 @@ import aiohttp
 from .base import BaseExchange, CandleBar, Position
 
 OKX_BASE = "https://www.okx.com"
+FIXED_SPOT_STAKE_USD = 100.0
 
 # ── Cache de informações de instrumento (público, sem auth) ───────────────────
 # Evita chamar /public/instruments a cada ordem. Populado em warmup_instrument().
@@ -670,8 +671,9 @@ class OKXExchange(BaseExchange):
         info   = _INST_CACHE.get(symbol, {})
         ct_val = info.get("ctVal", 1.0)   # unidades base por contrato
         lot_sz = info.get("lotSz", 1.0)   # múltiplo mínimo de contratos
-        # Aplicação spot-only: stake_usd é o valor total da ordem. Nunca multiplica leverage.
-        notional = stake_usd
+        # Aplicação spot-only: stake fixo global de US$100 por ordem.
+        # O parâmetro stake_usd é mantido apenas por compatibilidade da interface.
+        notional = FIXED_SPOT_STAKE_USD
         qty = notional / (price * ct_val)
         # Arredonda para baixo ao múltiplo de lotSz
         if lot_sz > 0:

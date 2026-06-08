@@ -160,7 +160,7 @@ class DexArbitrageSentinelStrategy(BaseStrategy):
         opportunities = feed.calculate_spreads(
             dex_data,
             min_spread_pct=self.min_spread_pct,
-            stake_usd=1_000.0,
+            stake_usd=100.0,
         )
 
         # Preço OKX para indicadores

@@ -60,6 +60,7 @@ log = logging.getLogger("main")
 # Offset do fuso horário local em horas (ex: -3 para BRT). Usado para converter
 # datas UTC da OKX para o dia local correto.
 _TZ_OFFSET: int = int(os.getenv("TZ_OFFSET", "0"))
+FIXED_STAKE_USD: float = 100.0
 
 
 def _local_date_to_utc_range(date_str: str) -> tuple[str, str]:
@@ -193,7 +194,7 @@ async def monitor_bots():
             if base_qty > 0:
                 pnl_usd = base_qty * (last - entry) * direction
             else:
-                pnl_usd = float(info.get("stake_usd", 100) or 100) * pnl_pct / 100
+                pnl_usd = FIXED_STAKE_USD * pnl_pct / 100
 
         pos = exchange_pos.get(bot_id)
         okx_size = 0.0
@@ -355,7 +356,7 @@ async def startup():
     # Inicia o feed do calendário económico do provider atual, se configurado
     await calendar_feed.start()
 
-    # Migração automática: remove -SWAP e garante stake mínimo de 100
+    # Migração automática: remove -SWAP e força stake fixo global de 100
     db = SessionLocal()
     try:
         from sqlalchemy import text
@@ -383,7 +384,7 @@ async def startup():
         db.execute(text("UPDATE bots SET symbol = REPLACE(symbol, '-SWAP', '') WHERE symbol LIKE '%-SWAP'"))
         db.execute(text("UPDATE bots SET symbol = REPLACE(symbol, '-FUTURES', '') WHERE symbol LIKE '%-FUTURES'"))
         db.execute(text("UPDATE bots SET leverage = 1 WHERE leverage IS NULL OR leverage <> 1"))
-        db.execute(text("UPDATE bots SET stake_usd = 100.0 WHERE stake_usd < 100.0"))
+        db.execute(text("UPDATE bots SET stake_usd = 100.0 WHERE stake_usd IS NULL OR stake_usd <> 100.0"))
         db.commit()
         log.info("Migração de IDs, símbolos, stakes e TIMEFRAMES concluída.")
 
@@ -472,7 +473,7 @@ class BotCreate(BaseModel):
     symbol:          str    = "BTC-USDT"
     timeframe:       str    = "15m"
     demo:            bool   = True
-    stake_usd:       float  = 100.0
+    stake_usd:       float  = FIXED_STAKE_USD
     leverage:        int    = 1
     stop_loss_usd:   float  = -50.0
     strategy_params: dict   = {}
@@ -951,7 +952,7 @@ async def get_active_performance(db: Session = Depends(get_db)):
             if base_qty > 0:
                 pnl_usd = base_qty * (last_price - entry_price) * direction
             else:
-                pnl_usd = (pnl_pct / 100) * b.stake_usd
+                pnl_usd = (pnl_pct / 100) * FIXED_STAKE_USD
         else:
             continue
 
@@ -964,7 +965,7 @@ async def get_active_performance(db: Session = Depends(get_db)):
             if diff > 0:
                 guaranteed_pnl_pct = diff * 100
 
-        guaranteed_pnl_usd = (guaranteed_pnl_pct / 100) * b.stake_usd
+        guaranteed_pnl_usd = (guaranteed_pnl_pct / 100) * FIXED_STAKE_USD
 
         p = b.strategy_params or {}
         sts_trigger = (
@@ -1019,7 +1020,7 @@ def list_bots(db: Session = Depends(get_db)):
             "id": b.id, "name": b.name,
             "strategy_id": b.strategy_id, "symbol": b.symbol,
             "timeframe": b.timeframe, "demo": b.demo,
-            "stake_usd": b.stake_usd, "leverage": b.leverage,
+            "stake_usd": FIXED_STAKE_USD, "leverage": b.leverage,
             "active": b.active, "created_at": str(b.created_at),
             "runtime": status,
         })
@@ -1037,6 +1038,7 @@ def create_bot(payload: BotCreate, db: Session = Depends(get_db)):
     _assert_spot_only(payload.symbol)
     payload.symbol = _norm_symbol(payload.symbol)
     payload.leverage = 1
+    payload.stake_usd = FIXED_STAKE_USD
     _assert_symbol_available(db, payload.symbol)
 
     bot = BotModel(**payload.model_dump())
@@ -1069,6 +1071,7 @@ def update_bot(bot_id: int, payload: BotUpdate, db: Session = Depends(get_db)):
         _assert_symbol_available(db, payload.symbol, exclude_bot_id=bot_id)
     update_data = payload.model_dump(exclude_none=True)
     update_data["leverage"] = 1
+    update_data["stake_usd"] = FIXED_STAKE_USD
     for k, v in update_data.items():
         setattr(bot, k, v)
     db.commit()
@@ -1825,7 +1828,7 @@ async def run_bot_backtest(bot_id: int, db: Session = Depends(get_db)):
 
     # 2. Executa Motor
     engine = BacktestEngine(bot.strategy_id, bot.strategy_params)
-    results = await engine.run(candles, stake_usd=bot.stake_usd)
+    results = await engine.run(candles, stake_usd=FIXED_STAKE_USD)
     
     return results
 
@@ -1847,7 +1850,7 @@ async def optimize_bot_params(bot_id: int, db: Session = Depends(get_db)):
 
     # 2. Executa Otimizador
     optimizer = StrategyOptimizer(bot.strategy_id)
-    best_results = await optimizer.optimize(candles, stake_usd=bot.stake_usd)
+    best_results = await optimizer.optimize(candles, stake_usd=FIXED_STAKE_USD)
     
     return best_results
 
@@ -2332,11 +2335,11 @@ def _optimization_suggestions(signal_dist: dict, hold_reasons: list,
             )
         elif wr >= 60:
             tips.append(
-                f"Win rate de {wr}% é sólido. Considere aumentar o stake gradualmente com gestão de risco adequada."
+                f"Win rate de {wr}% é sólido. Mantenha o stake fixo de US$100 e ajuste apenas critérios/ativos."
             )
         elif wr < 40:
             tips.append(
-                f"Win rate de {wr}% está abaixo de 40%. Revise os critérios de entrada ou reduza o stake temporariamente."
+                f"Win rate de {wr}% está abaixo de 40%. Revise os critérios de entrada ou pause o bot temporariamente."
             )
 
         regime_stats = trade_analysis.get("regime_stats", {})

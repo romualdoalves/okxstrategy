@@ -8,6 +8,8 @@ import StrategyChecklist, { getCriteriaCount } from './StrategyChecklist'
 import AssetPriceCard from './AssetPriceCard'
 import { useMarketStatus } from '../hooks/useMarketStatus'
 
+const FIXED_STAKE_USD = 100
+
 function fmtStarted(iso) {
   const d = new Date(iso)
   const now = new Date()
@@ -162,7 +164,7 @@ export default function BotCard({ bot, liveStatus }) {
       <div className="grid grid-cols-3 gap-2 mb-4 text-center">
         <div>
           <p className="text-xs text-muted">{t('c.stake')}</p>
-          <p className="text-sm font-medium">${bot.stake_usd}</p>
+          <p className="text-sm font-medium">${FIXED_STAKE_USD}</p>
         </div>
         <div>
           <p className="text-xs text-muted">{t('card.pnl_today')}</p>

@@ -12,6 +12,7 @@ const SYMBOLS    = [
 ]
 const TIMEFRAMES = ['1m','5m','15m','1h','4h','1D']
 const MEDALS     = ['🥇','🥈','🥉','','','','','','','']
+const FIXED_STAKE_USD = 100
 
 const LABEL_COLORS = {
   Excelente: 'text-green-400',
@@ -95,7 +96,7 @@ export default function EditBot() {
         name: bot.name,
         symbol: bot.symbol,
         timeframe: bot.timeframe,
-        stake_usd: bot.stake_usd,
+        stake_usd: FIXED_STAKE_USD,
         leverage: 1,
         stop_loss_usd: bot.stop_loss_usd,
         strategy_params: bot.strategy_params || {},
@@ -150,7 +151,7 @@ export default function EditBot() {
       if (bot.active) {
         await stopBot(id)
       }
-      await updateBot(id, form)
+      await updateBot(id, { ...form, stake_usd: FIXED_STAKE_USD })
       qc.invalidateQueries({ queryKey: ['bot', id] })
       qc.invalidateQueries({ queryKey: ['bots'] })
       nav(`/bots/${id}`)
@@ -232,10 +233,13 @@ export default function EditBot() {
         <div className="card space-y-4">
           <h2 className="font-semibold text-sm">Gestão de Risco</h2>
           <div className="grid grid-cols-2 gap-4">
-            <div><label className="label">Stake</label><input className="input" type="number" value={form.stake_usd} onChange={e => setField('stake_usd', Number(e.target.value))} /></div>
+            <div>
+              <label className="label">Stake</label>
+              <div className="input flex items-center font-mono font-semibold text-white">$100</div>
+            </div>
             <div><label className="label">Stop Diário</label><input className="input" type="number" value={form.stop_loss_usd} onChange={e => setField('stop_loss_usd', Number(e.target.value))} /></div>
           </div>
-          <p className="text-xs text-muted">Spot sem alavancagem: a posição usa apenas o stake configurado.</p>
+          <p className="text-xs text-muted">Spot sem alavancagem: toda entrada usa stake fixo de US$100.</p>
         </div>
 
         {selectedStrategy && Object.keys(selectedStrategy.params).length > 0 && (

@@ -44,6 +44,7 @@ from .notifications import (
 )
 
 log = logging.getLogger("bot_manager")
+FIXED_STAKE_USD = 100.0
 
 CANONICAL_ENTRY_CRITERIA: dict[str, list[str]] = {
     "TF001": ["C1 EMA", "C2 VWAP", "C3 ATR"],
@@ -93,6 +94,7 @@ class BotInstance:
 
     def __init__(self, config: BotModel, ws_broadcast):
         self.config       = config
+        self.config.stake_usd = FIXED_STAKE_USD
         self._broadcast   = ws_broadcast   # coroutine para enviar ao frontend
         self.strategy     = get_strategy(config.strategy_id)
         if config.strategy_params:
@@ -590,7 +592,7 @@ class BotInstance:
                     symbol          = self.config.symbol,
                     timeframe       = self.config.timeframe,
                     leverage        = self.config.leverage,
-                    stake_usd       = self.config.stake_usd,
+                    stake_usd       = FIXED_STAKE_USD,
                     demo            = self.config.demo,
                     stop_loss_usd   = self.config.stop_loss_usd,
                     strategy_params = self.config.strategy_params or {},
@@ -928,7 +930,7 @@ class BotInstance:
                 sz = float(exchange.num_contracts(
                     self.config.symbol,
                     price,
-                    self.config.stake_usd,
+                    FIXED_STAKE_USD,
                     self.config.leverage,
                 ) or 0.0)
             except Exception as exc:
@@ -1403,7 +1405,7 @@ class BotInstance:
 
         atr = result.indicators.get("atr", price * 0.005)
         sz  = exchange.num_contracts(
-            self.config.symbol, price, self.config.stake_usd, self.config.leverage)
+            self.config.symbol, price, FIXED_STAKE_USD, self.config.leverage)
 
         sl_px  = result.metadata.get("sl_price",
             price - atr * 1.5 if direction == "long" else price + atr * 1.5)
@@ -1624,7 +1626,7 @@ class BotInstance:
             symbol        = self.config.symbol,
             timeframe     = self.config.timeframe,
             leverage      = self.config.leverage,
-            stake_usd     = self.config.stake_usd,
+            stake_usd     = FIXED_STAKE_USD,
             demo          = self.config.demo,
             stop_loss_usd = self.config.stop_loss_usd,
             direction     = direction,

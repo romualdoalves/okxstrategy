@@ -8,6 +8,8 @@ import StatCard from '../components/StatCard'
 import BotCard  from '../components/BotCard'
 import { getCriteriaCount } from '../components/StrategyChecklist'
 
+const FIXED_STAKE_USD = 100
+
 // ── Modal Reset Geral ──────────────────────────────────────────────────────────
 function ResetModal({ onClose, onConfirm }) {
   const [loading, setLoading] = useState(false)
@@ -186,7 +188,7 @@ export default function Dashboard() {
   const runningBots = botsWithRuntime.filter(b => b.runtime.status === 'running' || b.active).length
   const openPositions = botsWithRuntime.filter(b => Math.abs(b.runtime.direction ?? 0) > 0)
   const openExposure = openPositions.reduce(
-    (sum, b) => sum + Number(b.stake_usd ?? 0),
+    (sum) => sum + FIXED_STAKE_USD,
     0,
   )
   const attentionBots = botsWithRuntime.filter(b =>

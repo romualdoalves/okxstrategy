@@ -13,6 +13,7 @@ const SYMBOLS    = [
 ]
 const TIMEFRAMES = ['1m','5m','15m','1h','4h','1D']
 const MEDALS     = ['🥇','🥈','🥉','','','','','','','']
+const FIXED_STAKE_USD = 100
 
 const LABEL_COLORS = {
   Excelente: 'text-green-400',
@@ -123,7 +124,7 @@ export default function NewBot() {
     symbol:          'BTC-USDT',
     timeframe:       '15m',
     demo:            true,
-    stake_usd:       100,
+    stake_usd:       FIXED_STAKE_USD,
     leverage:        1,
     stop_loss_usd:   -50,
     strategy_params: {},
@@ -201,7 +202,7 @@ export default function NewBot() {
     if (!form.strategy_id) return setError(t('nb.err_strategy'))
     setLoading(true)
     try {
-      const bot = await createBot({ ...form, strategy_params: customParams })
+      const bot = await createBot({ ...form, stake_usd: FIXED_STAKE_USD, strategy_params: customParams })
       qc.invalidateQueries({ queryKey: ['bots'] })
       nav(`/bots/${bot.id}`)
     } catch (err) {
@@ -462,9 +463,9 @@ export default function NewBot() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="label">{t('nb.stake')}</label>
-              <input className="input" type="number" min="1" step="1"
-                value={form.stake_usd}
-                onChange={e => setField('stake_usd', Number(e.target.value))} />
+              <div className="input flex items-center font-mono font-semibold text-white">
+                ${FIXED_STAKE_USD}
+              </div>
             </div>
             <div>
               <label className="label">{t('nb.daily_stop')}</label>
@@ -476,7 +477,7 @@ export default function NewBot() {
 
           <p className="text-xs text-muted">
             {t('nb.position_calc', {
-              stake: form.stake_usd,
+              stake: FIXED_STAKE_USD,
             })}
           </p>
         </div>

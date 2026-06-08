@@ -40,6 +40,7 @@ class StrategyOptimizer:
         }.get(strategy_id, {})
 
     async def optimize(self, candles: list, stake_usd: float = 100.0) -> Dict[str, Any]:
+        stake_usd = 100.0
         if not self.search_space:
             return {"error": "Espaço de busca não definido para esta estratégia"}
 

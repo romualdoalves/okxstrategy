@@ -137,7 +137,7 @@ class DexPriceFeed:
         self,
         prices: dict[str, Any],
         min_spread_pct: float = 0.3,
-        stake_usd: float = 1_000.0,
+        stake_usd: float = 100.0,
     ) -> list[SpreadOpportunity]:
         """
         Calcula todos os pares de spread possíveis entre as fontes.

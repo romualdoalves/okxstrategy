@@ -63,6 +63,17 @@ repositório `E:\Dell Inspiron\W\Dev\Trading\OKXTrader\OKXStrategy`.
 - A fonte CEX local da estratégia A006 é OKX (`okx_price`, `use_okx_only`).
 - O adapter legado de outra corretora foi removido do repositório OKXStrategy.
 
+### Regra absoluta de stake fixo
+- Toda entrada de qualquer bot deve usar stake fixo de **US$100**.
+- O stake não é configurável no frontend, API, banco, backtest, otimização ou
+  adapter da OKX.
+- Qualquer `stake_usd` enviado por cliente/API deve ser ignorado ou sobrescrito
+  para `100.0`.
+- Migrações de startup devem forçar todos os bots existentes para
+  `stake_usd = 100.0`.
+- Nunca sugerir aumentar ou reduzir stake como ação operacional; ajustes devem
+  ocorrer por ativo, estratégia, parâmetros, pausa ou desligamento do bot.
+
 ### S013 - Viana Mini-Índice
 - Categoria: `S` / Estratégias de Estrutura, Price Action e Liquidez.
 - ID: `S013`.
@@ -249,7 +260,8 @@ Indicators computed: EMA50, VWAP (cumulative), ATR(14), MFI(14), Volume Delta,
 Volume Delta Z-Score (20-bar rolling), vol_index (ATR/price).
 
 ### Phase 4 - Risk & Sizing
-- **Dynamic qty**: `BUY_AMOUNT_USD x (1/vol_index) / price`, bounded [0.1, 2.0]x base.
+- **Fixed stake**: toda entrada usa `US$100 / price`, arredondado pelo `lotSz`
+  do instrumento OKX spot.
 - **Structural stop** (long): `POC - (2 ticks x $1)`. If price falls through POC,
   the thesis is dead.
 - **Liquidity target**: next high-volume shelf above entry (from VP levels).
@@ -264,7 +276,7 @@ Volume Delta Z-Score (20-bar rolling), vol_index (ATR/price).
 
 ### Position rules (hard-coded)
 ```text
-BUY_AMOUNT_USD       = 1000.0   # base, scaled by volatility
+BUY_AMOUNT_USD       = 100.0    # fixed stake; never configurable
 MAX_OPEN_POSITIONS   = 1        # one trade at a time
 DAILY_LOSS_LIMIT_PCT = 0.03
 ```
@@ -916,4 +928,3 @@ Em 2026-06-01 foi feito um **Reset Geral** da plataforma:
   - **A004**: C2 fica verde apenas quando cruzamento alinhado com a zona (`buyZone && cross_up` ou `sellZone && cross_down`); amarelo com detalhe "Cruzamento na direção errada — aguardando reversão" no conflito.
 - **Estratégias verificadas sem este bug:** A002, A005, A006, A007, B002.
 - **Arquivo alterado:** `frontend/src/components/StrategyChecklist.jsx` (somente frontend).
-

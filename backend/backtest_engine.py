@@ -25,6 +25,7 @@ class BacktestEngine:
         Executa a simulação. 
         'candles' deve ser uma lista de objetos CandleBar (o mesmo que a estratégia usa).
         """
+        stake_usd = 100.0
         self.balance = 1000.0
         self.trades = []
         position = None

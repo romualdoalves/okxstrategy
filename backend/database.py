@@ -48,7 +48,7 @@ class BotModel(Base):
     symbol          = Column(String,  nullable=False, default="BTC-USDT", unique=True)
     timeframe       = Column(String,  default="15m")
     demo            = Column(Boolean, default=True)
-    stake_usd       = Column(Float,   default=10.0)
+    stake_usd       = Column(Float,   default=100.0)
     leverage        = Column(Integer, default=1)
     strategy_params = Column(JSON,    default={})
     active          = Column(Boolean, default=False)
