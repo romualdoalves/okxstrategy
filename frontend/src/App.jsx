@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
 import {
-  LayoutDashboard, Bot, Zap, History, TrendingUp, Trophy, Activity, Plug, CheckCircle2, FlaskConical, MonitorIcon, ScanSearch
+  LayoutDashboard, Bot, Zap, BookText, TrendingUp, Trophy, Plug, CheckCircle2, FlaskConical, MonitorIcon, ScanSearch
 } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 
@@ -12,10 +12,9 @@ import NewBot       from './pages/NewBot'
 import EditBot      from './pages/EditBot'
 import BotDetail    from './pages/BotDetail'
 import Strategies   from './pages/Strategies'
-import Trades       from './pages/Trades'
+import Registros    from './pages/Registros'
 import Performance  from './pages/Performance'
 import TradeReport  from './pages/TradeReport'
-import Activities       from './pages/Activities'
 import StrategyFactory  from './pages/StrategyFactory'
 import Monitor          from './pages/Monitor'
 import BatchBacktest    from './pages/BatchBacktest'
@@ -82,9 +81,8 @@ function AppShell() {
     { to: '/strategy-factory',  labelKey: 'nav.factory',     icon: FlaskConical },
     { to: '/monitor',           labelKey: 'nav.monitor',     icon: MonitorIcon },
     { to: '/batch-backtest',    labelKey: 'nav.scanner',     icon: ScanSearch },
-    { to: '/trades',            labelKey: 'nav.history',     icon: History },
+    { to: '/registros',         labelKey: 'nav.registros',   icon: BookText },
     { to: '/performance',       labelKey: 'nav.performance', icon: Trophy },
-    { to: '/activities',        labelKey: 'nav.activities',  icon: Activity },
   ]
 
   return (
@@ -199,9 +197,10 @@ function AppShell() {
             <Route path="/bots/:id"       element={<ErrorBoundary><BotDetail /></ErrorBoundary>} />
             <Route path="/bots/:id/report" element={<ErrorBoundary><TradeReport /></ErrorBoundary>} />
             <Route path="/strategies"     element={<Strategies />} />
-            <Route path="/trades"         element={<Trades />} />
+            <Route path="/registros"      element={<Registros />} />
+            <Route path="/trades"         element={<Registros />} />
+            <Route path="/activities"     element={<Registros />} />
             <Route path="/performance"    element={<Performance />} />
-            <Route path="/activities"        element={<Activities />} />
             <Route path="/strategy-factory" element={<StrategyFactory />} />
             <Route path="/monitor"          element={<Monitor />} />
             <Route path="/batch-backtest"   element={<BatchBacktest />} />
