@@ -8,9 +8,8 @@ description: |
   deployment, Hostinger VPS, or okx.tradixio.com.
 ---
 
-# OKXStrategy — Project State
+# OKXStrategy — Referência do Projeto
 
-**Last updated:** 2026-06-08
 **Exchange:** OKX only (spot)
 **Repository:** https://github.com/romualdoalves/okxstrategy
 **Deploy path (VPS):** `/opt/okx-strategy`
@@ -19,66 +18,14 @@ description: |
 
 ---
 
-## Changelog Recente
-
-### 2026-06-08 — feat: Escala Likert de recomendação de backtest
-- Substituiu o badge categórico isolado por uma escala visual contínua 0–10.00.
-- `backtest_score(r)` no backend (`backtest_engine.py`): PF como driver principal
-  (PF=1.0→3.0, 2.0→5.5, 3.0→8.0), ajustes por trades/drawdown/win-rate (±1.8 max).
-- `getBacktestScore(r)` no frontend (`BotDetail.jsx`): espelho exato da função Python.
-- `BacktestLikert.jsx` (componente compartilhado): track com 3 zonas coloridas
-  (NÃO INICIAR/CUIDADO/INICIAR), marcador branco na posição exata, score 2 decimais + badge.
-- `backtest_recommendation()` agora sempre inclui `score` no dict retornado.
-- Usado em `BotDetail.jsx` (backtest individual) e `BatchBacktest.jsx` (scanner).
-
-### 2026-06-08 — feat: Scanner de Backtest por Categoria
-- Nova página `/batch-backtest` ("Scanner BT" no menu lateral).
-- Usuário escolhe categoria (TF/MR/PA/SC/RG/IF/NW) + ativo e clica em "Executar Backtest da Categoria".
-- Backend: `POST /api/backtest/category` — filtra registry pelo prefixo, agrupa por `recommended_timeframe`, busca candles uma vez por TF, roda backtests em paralelo (`asyncio.gather`).
-- Estratégias com `needs_gex_context` ou `needs_graph_context` aparecem com badge N/A.
-- Resultado ordenado: INICIAR → CUIDADO → NÃO INICIAR → N/A; dentro de cada grupo por Profit Factor decrescente.
-- `backtest_recommendation()` extraída para `backtest_engine.py` (compartilhada com o endpoint de bot individual).
-- Página mostra cards expansíveis por estratégia com métricas + bullets de justificativa.
-
-### 2026-06-08 — feat: Botão Liquidar na página Monitor
-- Coluna "Ações" adicionada à tabela de bots em `Monitor.jsx`.
-- Botão "Liquidar" visível apenas para bots com `direction !== 'FLAT'`.
-- Chama `POST /api/bots/{bot_id}/liquidate` (endpoint já existia no backend).
-- Loading por linha (não bloqueia outros bots), banner de feedback verde/vermelho.
-- Confirmação via `window.confirm` antes de enviar a ordem.
-
-### 2026-06-08 — feat: Recomendação automática pós-backtest
-- `BotDetail.jsx` — `getBacktestRecommendation()` exibe badge colorido após backtest.
-- **INICIAR** (verde): PnL > 0, PF ≥ 1.2, ≥ 3 trades, drawdown ≤ lucro.
-- **CUIDADO** (amarelo): passa os hard stops mas tem alguma ressalva.
-- **NÃO INICIAR** (vermelho): zero trades, PnL ≤ 0, ou PF < 1.0.
-
-### 2026-06-08 — fix: Backtest reescrito para SPOT-only
-- BUY abre long; SELL fecha long; SELL com bot flat é ignorado (nunca short).
-- Stake fixo US$100, saldo inicial US$1,000.
-- Métricas: Win Rate, Profit Factor, Max Drawdown, posição aberta + PnL não realizado.
-
-### 2026-06-05/06 — feat: Fábrica de Estratégias IA
-- Wizard 5 etapas: plan → generate → validate → deploy → hot-load.
-- IA: KIMI `moonshot-v1-32k` — `KIMI_API_KEY` só no `.env`, nunca commitada.
-- IDs semânticos auto-atribuídos: TF/MR/PA/SC/RG/IF/NW + número sequencial.
-- Sandbox: 250 candles sintéticos, 12 verificações, AST safety check.
-- `criteria_total` corrigido automaticamente por regex pós-geração.
-
-### 2026-05-28 — feat: WebSocket real de fills + Activities cross-day FIFO
-- `OKXPrivateStream` canal `orders` para confirmação de fill em tempo real.
-- `_confirm_fill_price` reduzido a 7 tentativas (~4 min) como fallback REST.
-- Activities: FIFO cross-day carrega fills desde o dia da entrada mais antiga aberta.
-
----
-
-## REGRA ABSOLUTA — OKXStrategy Operacional
+## REGRA ABSOLUTA — Operacional
 
 Trabalhe somente no repositório `E:\Dell Inspiron\W\Dev\Trading\OKXTrader\OKXStrategy`.
 
 ### Ritual obrigatório de entrega
 - Sempre atualizar este `SKILL.md` quando houver mudança operacional, deploy,
-  regra de segurança, banco de dados ou fluxo de trabalho.
+  regra de segurança, banco de dados ou fluxo de trabalho. Sem histórico — apenas
+  o estado atual da app.
 - Sempre commitar e enviar para o GitHub antes de responder com comandos de deploy.
 - Ao final de pedidos de deploy, responder somente com os comandos para o VPS.
 - A pasta `/opt/okx-strategy` já existe no VPS — não incluir `mkdir` nos comandos.
@@ -99,16 +46,24 @@ Trabalhe somente no repositório `E:\Dell Inspiron\W\Dev\Trading\OKXTrader\OKXSt
 - Toda entrada usa exatamente US$100. Não configurável em nenhuma camada.
 - Qualquer `stake_usd` recebido por API é sobrescrito para `100.0`.
 - Startup força `stake_usd = 100.0` em todos os bots existentes.
-- Backtest: stake fixo US$100, SPOT-only, SELL com bot flat é ignorado.
+- Backtest: stake fixo US$100, SPOT-only, SELL com bot flat é ignorado (nunca short).
 - Dashboard exibe exposição pelo notional real (`size × preço`); stake é fallback
   apenas quando preço não foi carregado ainda.
-- Orphan recovery: adota saldo spot da OKX só se notional ≤ tolerância de US$100;
-  caso contrário, vira alerta de divergência.
 - Nunca sugerir alterar stake como ação operacional.
 
 ### Um ativo por bot
 - Cada símbolo pode existir em apenas um bot (validado em create/edit/start).
 - `BotManager` mantém trava runtime. Banco tem constraint único em `bots.symbol`.
+
+### Baseline de holdings pré-existentes
+- Ao criar um bot, `POST /api/bots` faz snapshot do saldo spot do ativo na OKX e
+  armazena em `bots.baseline_balance` (quantidade bruta do ativo, ex: 1.0 BTC).
+- A detecção de divergências e o orphan recovery usam `(saldo_okx − baseline)` como
+  referência, não o saldo bruto. Holdings pré-existentes (demo ou reais) são ignorados.
+- Se `(saldo_okx − baseline) ≈ $100` → posição órfã legítima, adotada pelo bot.
+- Se `(saldo_okx − baseline) ≤ 0` → bot fica FLAT sem alertas de divergência.
+- Exibido no card do bot no Dashboard (componente `BotCard.jsx`).
+- Bots criados antes desta feature têm `baseline_balance = 0` — recriar para corrigir.
 
 ### Auditoria de rejeições
 - Toda rejeição crítica de ordem persistida em `order_rejections`.
@@ -118,8 +73,7 @@ Trabalhe somente no repositório `E:\Dell Inspiron\W\Dev\Trading\OKXTrader\OKXSt
 - OKX API v5: trailing stop usa `ordType="move_order_stop"` com
   `callbackRatio`/`callbackSpread`.
 - Se trailing falhar → fallback SL fixo + registra rejeição do trailing.
-- `_recover_state()` sempre recria trailing stop ao reiniciar, independente de
-  `tp1_done`.
+- `_recover_state()` sempre recria trailing stop ao reiniciar, independente de `tp1_done`.
 - Orphan recovery calcula `tp1 = entry × 1.02 (LONG) / 0.98 (SHORT)`.
 
 ### Telegram
@@ -136,15 +90,6 @@ Trabalhe somente no repositório `E:\Dell Inspiron\W\Dev\Trading\OKXTrader\OKXSt
 - **Nunca** apagar, renomear ou recriar volumes Docker sem autorização explícita.
 - Deploys preservam banco por padrão — apenas rebuild do container `okx_strategy`.
 
-### S013 — Viana Mini-Índice
-- Price Action + VWAP intradiária + players OKX + confirmação por FVG ou barra ignorada.
-- Feed: `backend/feeds/okx_market_players.py` (endpoints públicos OKX, sem auth).
-  - Divergência vendedora: varejo comprado (`ratio > 1.4`) + top traders vendidos
-    (`shortRatio > 0.55`).
-  - Divergência compradora: varejo vendido (`ratio < 0.8`) + top traders comprados
-    (`longRatio > 0.55`).
-- `require_market_players=true` bloqueia se feed indisponível.
-
 ---
 
 ## REGRA ABSOLUTA — Conformidade App ↔ OKX
@@ -157,7 +102,7 @@ reiniciar com conta limpa.
 **Mecanismos implementados:**
 - WS `orders` → fill confirmado em tempo real (`OKXPrivateStream`)
 - `_confirm_fill_price` → fallback REST ~4 min, 7 tentativas
-- `_reconcile_loop` → a cada 5 min, detecta posições DB que a OKX não tem
+- `_reconcile_loop` → a cada 15 s, detecta orphans e desyncs
 - Ordem rejeitada/cancelada → deleta trade e reseta bot
 - Reset Geral → `POST /api/account/reset`
 
@@ -183,25 +128,74 @@ reiniciar com conta limpa.
 ```text
 OKXStrategy/
 ├── backend/
-│   ├── main.py                  # FastAPI app
-│   ├── bot_manager.py           # Orquestração de bots
-│   ├── backtest_engine.py       # Backtest SPOT-only
-│   ├── database.py              # SQLAlchemy models
-│   ├── exchanges/okx.py         # OKXExchange + OKXPrivateStream
+│   ├── main.py                    # FastAPI app + todos os endpoints REST
+│   ├── bot_manager.py             # Orquestração de bots (BotRunner + BotManager)
+│   ├── backtest_engine.py         # BacktestEngine, backtest_score(), backtest_recommendation()
+│   ├── database.py                # SQLAlchemy models (BotModel.baseline_balance incluído)
+│   ├── exchanges/okx.py           # OKXExchange + OKXPrivateStream
 │   ├── strategies/
-│   │   ├── registry.py          # REGISTRY + auto-descoberta factory/
-│   │   ├── base.py              # StrategyBase, StrategyResult, StrategyInfo
-│   │   └── factory/             # Estratégias da Fábrica IA (volume Docker)
-│   ├── strategy_factory/        # kimi_client, planner, generator, validator, deployer
-│   ├── feeds/                   # gex_feed, okx_market_players, onchain_monitor…
-│   └── notifications/           # Telegram message_builder
+│   │   ├── registry.py            # REGISTRY + auto-descoberta factory/
+│   │   ├── base.py                # StrategyBase, StrategyResult, StrategyInfo
+│   │   └── factory/               # Estratégias da Fábrica IA (volume Docker)
+│   ├── strategy_factory/          # kimi_client, planner, generator, validator, deployer
+│   ├── feeds/                     # gex_feed, okx_market_players, onchain_monitor…
+│   └── notifications/             # Telegram message_builder
 ├── frontend/src/
-│   ├── pages/                   # Dashboard, BotDetail, Strategies, Activities…
-│   └── components/              # StrategyChecklist, BotCard, Chart…
+│   ├── pages/
+│   │   ├── Dashboard.jsx          # Lista de bots com BotCard
+│   │   ├── BotDetail.jsx          # Detalhes do bot + backtest individual + Likert
+│   │   ├── Monitor.jsx            # Monitoramento em tempo real + botão Liquidar
+│   │   ├── BatchBacktest.jsx      # Scanner: backtest de toda uma categoria de estratégias
+│   │   ├── Strategies.jsx
+│   │   ├── Activities.jsx
+│   │   └── StrategyFactory.jsx    # Wizard 5 etapas (IA)
+│   └── components/
+│       ├── BotCard.jsx            # Card do bot (inclui baseline_balance)
+│       ├── BacktestLikert.jsx     # Escala visual 0–10 compartilhada (BotDetail + Scanner)
+│       ├── StrategyChecklist.jsx
+│       └── Chart.jsx
 ├── docker-compose.prod.yml
 ├── Dockerfile
 └── SKILL.md
 ```
+
+---
+
+## Banco de dados — colunas relevantes
+
+| Tabela | Coluna | Descrição |
+|--------|--------|-----------|
+| `bots` | `baseline_balance` | Qtde bruta do ativo spot na OKX ao criar o bot (ex: 1.0 BTC). Migrations automáticas no startup. |
+| `bots` | `stake_usd` | Sempre 100.0 — sobrescrito no create/edit/startup. |
+| `settings` | `key/value` | Credenciais OKX criptografadas (nunca em `.env`). |
+| `order_rejections` | — | Auditoria de ordens rejeitadas/canceladas. |
+
+Migrations adicionais são executadas via lista `migrations` em `database.py` usando
+`ALTER TABLE … ADD COLUMN IF NOT EXISTS` — seguro em redeployments.
+
+---
+
+## Backtest
+
+- **Engine:** `BacktestEngine` em `backend/backtest_engine.py`. 500 candles, stake $100, saldo inicial $1.000 (buffer de simulação).
+- **SPOT-only:** BUY abre long, SELL fecha long, SELL com bot flat é ignorado.
+- **`backtest_score(r)`:** Score contínuo 0–10.00. PF como driver principal
+  (PF=1.0→3.0, 2.0→5.5, 3.0→8.0), ajustado por trades (±1.0), drawdown (±0.5) e win rate (±0.3).
+- **`backtest_recommendation(r)`:** Retorna `{verdict, level, score, reasons[]}`.
+  Zonas: NÃO INICIAR (0–3.33) · CUIDADO (3.33–6.67) · INICIAR (6.67–10).
+- **`BacktestLikert.jsx`:** Componente visual compartilhado — track com 3 zonas coloridas,
+  marcador branco na posição exata, score com 2 decimais + badge categórico.
+- **Percentuais nos bullets:** referenciados ao stake de $100 (não ao saldo simulado de $1.000).
+- **Estratégias context-dependent** (`needs_gex_context`, `needs_graph_context`): aparecem
+  como N/A no scanner — não podem ser backtestadas sem feed ao vivo.
+
+### Scanner de Backtest (`/batch-backtest`)
+- Usuário escolhe categoria (TF/MR/PA/SC/RG/IF/NW) + ativo e clica "Executar".
+- `POST /api/backtest/category`: filtra REGISTRY por prefixo, agrupa por `recommended_timeframe`,
+  busca candles uma vez por TF, roda backtests em paralelo (`asyncio.gather`).
+- Resultado ordenado: INICIAR → CUIDADO → NÃO INICIAR → N/A; dentro de cada grupo por PF desc.
+- Cada card mostra Likert + métricas + bullets expansíveis + botão **Criar Bot** (navega para
+  `/bots/new?strategy=ID&symbol=ATIVO` com campos pré-preenchidos).
 
 ---
 
@@ -224,18 +218,17 @@ OKXStrategy/
 - Arquivos: `backend/strategies/factory/[a-z]{2}[0-9]{3}.py`
 - Volume Docker `okx_strategy_factory` → `/app/backend/strategies/factory`
 
-### Critérios de ordem (separados dos critérios da estratégia)
+### Critérios de ordem
 O backend expõe `runtime.order_criteria` — a ordem só é enviada quando BUY/SELL
 **e** todos os critérios de ordem estão verdes: runtime ativo, circuit breaker livre,
 posição flat, sem entrada pendente, direção permitida, calendário livre, OKX conectada,
 tamanho válido, SL/TP coerentes, posição OKX flat.
 
-- Sem sinal BUY/SELL os critérios O2-O11 ficam dormentes (`status="none"`).
-- Frontend usa `_criteria_met/_criteria_total/_criteria_names` do backend — nunca
-  heurísticas locais.
+- Sem sinal BUY/SELL os critérios O2–O11 ficam dormentes (`status="none"`).
+- Frontend usa `_criteria_met/_criteria_total/_criteria_names` do backend — nunca heurísticas locais.
 
 ### Fábrica IA
-- Menu "Fábrica IA" → `/strategy-factory` (wizard 5 etapas).
+- Menu "Fábrica IA" → `/strategy-factory` (wizard 5 etapas: plan → generate → validate → deploy → hot-load).
 - `KIMI_API_KEY` só no `.env` — nunca commitar.
 - Hot-load sem restart via `importlib`; auto-descoberta no startup.
 - Validação: sandbox 250 candles sintéticos, 12 checks, AST safety.
@@ -243,6 +236,13 @@ tamanho válido, SL/TP coerentes, posição OKX flat.
 - `criteria_total` corrigido automaticamente por regex pós-geração.
 - Delete button aceita regex `^(TF|MR|PA|SC|RG|IF|NW|F|FX)\d`.
 - `assign_next_id` considera arquivos órfãos no disco para reutilizar IDs deletados.
+
+### S013 — Viana Mini-Índice
+- Price Action + VWAP intradiária + players OKX + confirmação por FVG ou barra ignorada.
+- Feed: `backend/feeds/okx_market_players.py` (endpoints públicos OKX, sem auth).
+  - Divergência vendedora: varejo comprado (`ratio > 1.4`) + top traders vendidos (`shortRatio > 0.55`).
+  - Divergência compradora: varejo vendido (`ratio < 0.8`) + top traders comprados (`longRatio > 0.55`).
+- `require_market_players=true` bloqueia se feed indisponível.
 
 ---
 
@@ -263,7 +263,6 @@ git clone https://github.com/romualdoalves/okxstrategy.git /opt/okx-strategy
 docker network create traefik-public 2>/dev/null || true
 docker volume create okx_strategy_pgdata 2>/dev/null || true
 docker volume create okx_strategy_factory 2>/dev/null || true
-# Subir Traefik separadamente se necessário (traefik:v3.0, portas 80/443, acme TLS)
 cp /opt/okx-strategy/.env.production.example /opt/okx-strategy/.env
 nano /opt/okx-strategy/.env
 docker compose -f /opt/okx-strategy/docker-compose.prod.yml build --no-cache
@@ -313,3 +312,9 @@ docker exec okx_strategy_db pg_dump -U crypto okx_strategy > backup.sql
 # Restore
 docker exec -i okx_strategy_db psql -U crypto -d okx_strategy < backup.sql
 ```
+
+### Divergência OKX falsa
+Se o Monitor mostrar "Divergência" para um bot com holdings pré-existentes:
+1. O bot foi criado antes da feature `baseline_balance` — tem `baseline_balance = 0`.
+2. Solução: delete o bot e recrie — o snapshot capturará o saldo atual como baseline.
+3. Reset Geral (`POST /api/account/reset`) limpa o alerta mas não corrige o baseline.
