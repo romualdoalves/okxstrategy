@@ -212,13 +212,7 @@ async def monitor_bots():
             okx_size_raw = abs(float(getattr(pos, "size", 0.0) or 0.0)) if pos else 0.0
             baseline = float(info.get("baseline_balance") or 0.0)
             okx_size = max(0.0, okx_size_raw - baseline)  # desconsidera holdings pré-existentes
-            # Direção líquida: se net_size=0 (tudo é baseline), reporta FLAT
-            if okx_size <= 1e-9:
-                okx_direction = "FLAT"
-            elif pos and getattr(pos, "side", "") == "long":
-                okx_direction = "LONG"
-            else:
-                okx_direction = "SHORT" if pos else "FLAT"
+            okx_direction = "LONG" if pos and getattr(pos, "side", "") == "long" else ("SHORT" if pos else "FLAT")
             local_size = abs(float(st.get("size", 0.0) or 0.0))
             notional_price = float(last or 0.0)
             if notional_price <= 0 and pos:
