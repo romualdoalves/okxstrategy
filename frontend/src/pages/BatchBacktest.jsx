@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ScanSearch, Play, HelpCircle, ChevronDown, ChevronUp, PlusCircle } from 'lucide-react'
 import BacktestLikert from '../components/BacktestLikert'
-import { getStrategies } from '../api'
+import { getStrategies, getBots } from '../api'
 
 const API = import.meta.env.VITE_API_URL || ''
 
@@ -118,6 +118,9 @@ export default function BatchBacktest() {
   const [error, setError]       = useState(null)
 
   const { data: strategies = [] } = useQuery({ queryKey: ['strategies'], queryFn: getStrategies })
+  const { data: bots = [] }       = useQuery({ queryKey: ['bots'],       queryFn: getBots       })
+  const usedSymbols = new Set(bots.map(b => b.symbol))
+
   const strategyCounts = strategies.reduce((acc, s) => {
     const prefix = (s.id || '').match(/^([A-Z]+)/i)?.[1]?.toUpperCase()
     if (prefix) acc[prefix] = (acc[prefix] || 0) + 1
@@ -205,19 +208,26 @@ export default function BatchBacktest() {
           <div className="flex-1 min-w-[160px]">
             <label className="text-xs text-muted uppercase tracking-wider mb-2 block">Ativo</label>
             <div className="flex gap-2 flex-wrap">
-              {SYMBOLS.map(s => (
-                <button
-                  key={s}
-                  onClick={() => setSymbol(s)}
-                  className={`px-2.5 py-1 rounded text-xs font-mono border transition-all ${
-                    symbol === s
-                      ? 'bg-accent/20 border-accent/50 text-accent'
-                      : 'bg-white/5 border-white/10 text-muted hover:text-white'
-                  }`}
-                >
-                  {s}
-                </button>
-              ))}
+              {SYMBOLS.map(s => {
+                const inUse = usedSymbols.has(s)
+                return (
+                  <button
+                    key={s}
+                    onClick={() => !inUse && setSymbol(s)}
+                    disabled={inUse}
+                    title={inUse ? 'Já existe um bot usando este ativo' : undefined}
+                    className={`px-2.5 py-1 rounded text-xs font-mono border transition-all ${
+                      inUse
+                        ? 'opacity-35 cursor-not-allowed bg-white/3 border-white/8 text-muted line-through'
+                        : symbol === s
+                        ? 'bg-accent/20 border-accent/50 text-accent'
+                        : 'bg-white/5 border-white/10 text-muted hover:text-white'
+                    }`}
+                  >
+                    {s}
+                  </button>
+                )
+              })}
               <input
                 value={SYMBOLS.includes(symbol) ? '' : symbol}
                 onChange={e => setSymbol(e.target.value.toUpperCase())}
