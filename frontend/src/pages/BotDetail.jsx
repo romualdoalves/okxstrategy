@@ -365,7 +365,15 @@ export default function BotDetail() {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          {backtestResult.assumptions?.length > 0 && (
+            <div className="mb-4 rounded-lg border border-yellow-500/25 bg-yellow-500/8 p-3 text-xs text-yellow-300/90 space-y-1">
+              {backtestResult.assumptions.map((item, i) => (
+                <p key={i}>· {item}</p>
+              ))}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
             <div className="p-4 rounded-xl bg-white/5 border border-white/10">
               <p className="text-xs text-muted uppercase tracking-wider mb-1">Lucro Total Estimado</p>
               <p className={`text-2xl font-bold ${backtestResult.total_profit >= 0 ? 'text-bull' : 'text-bear'}`}>
@@ -373,14 +381,40 @@ export default function BotDetail() {
               </p>
             </div>
             <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-              <p className="text-xs text-muted uppercase tracking-wider mb-1">Total de Operações</p>
+              <p className="text-xs text-muted uppercase tracking-wider mb-1">Trades Fechados</p>
               <p className="text-2xl font-bold text-white">{backtestResult.trades_count}</p>
             </div>
             <div className="p-4 rounded-xl bg-white/5 border border-white/10">
               <p className="text-xs text-muted uppercase tracking-wider mb-1">Saldo Final Simulado</p>
               <p className="text-2xl font-bold text-accent">${backtestResult.final_balance.toFixed(2)}</p>
             </div>
+            <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+              <p className="text-xs text-muted uppercase tracking-wider mb-1">Win Rate</p>
+              <p className={`text-2xl font-bold ${(backtestResult.win_rate ?? 0) >= 50 ? 'text-bull' : 'text-bear'}`}>
+                {(backtestResult.win_rate ?? 0).toFixed(1)}%
+              </p>
+              <p className="text-[10px] text-muted">{backtestResult.wins ?? 0}W · {backtestResult.losses ?? 0}L</p>
+            </div>
+            <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+              <p className="text-xs text-muted uppercase tracking-wider mb-1">Profit Factor</p>
+              <p className={`text-2xl font-bold ${(backtestResult.profit_factor ?? 0) >= 1 ? 'text-bull' : 'text-bear'}`}>
+                {(backtestResult.profit_factor ?? 0).toFixed(2)}
+              </p>
+            </div>
+            <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+              <p className="text-xs text-muted uppercase tracking-wider mb-1">Drawdown Máx.</p>
+              <p className="text-2xl font-bold text-bear">${(backtestResult.max_drawdown ?? 0).toFixed(2)}</p>
+              <p className="text-[10px] text-muted">Pior flutuação aberta</p>
+            </div>
           </div>
+
+          {backtestResult.open_position && (
+            <div className="mb-4 rounded-lg border border-blue-500/25 bg-blue-500/8 p-3 text-xs text-blue-300/90">
+              Há posição simulada ainda aberta: entrada ${backtestResult.open_position.entry_price.toFixed(4)},
+              último preço ${backtestResult.open_position.last_price.toFixed(4)},
+              PnL não realizado {backtestResult.open_position.unrealized >= 0 ? '+' : ''}${backtestResult.open_position.unrealized.toFixed(2)}.
+            </div>
+          )}
 
           <div className="space-y-3 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
             <h4 className="text-xs font-bold text-muted uppercase">Histórico de Sinais Simulados</h4>

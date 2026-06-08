@@ -78,6 +78,9 @@ repositório `E:\Dell Inspiron\W\Dev\Trading\OKXTrader\OKXStrategy`.
   notional estimado estiver dentro da tolerância do stake fixo de US$100. Saldos
   antigos ou maiores devem virar alerta de divergência/atenção, nunca posição
   normal do bot.
+- Backtests também devem respeitar o modo operacional real: OKX spot-only,
+  stake fixo de US$100, BUY abre posição comprada e SELL fecha posição comprada.
+  SELL com bot flat deve ser ignorado, nunca simulado como short.
 - O Dashboard deve exibir exposição aberta do app pelo notional real
   (`size * preço atual/entrada`) para comparação fiel com a OKX; o stake fixo é
   usado como fallback apenas quando tamanho/preço ainda não foram carregados.
