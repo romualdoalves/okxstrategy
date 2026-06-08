@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { ScanSearch, Play, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { ScanSearch, Play, HelpCircle, ChevronDown, ChevronUp, PlusCircle } from 'lucide-react'
 import BacktestLikert from '../components/BacktestLikert'
 
 const API = import.meta.env.VITE_API_URL || ''
@@ -33,12 +34,17 @@ function MetricPill({ label, value, positive }) {
   )
 }
 
-function ResultCard({ r }) {
+function ResultCard({ r, symbol }) {
   const [open, setOpen] = useState(false)
+  const nav = useNavigate()
   const rec = r.recommendation
   const cfg = VERDICT_CFG[rec.verdict] || VERDICT_CFG['N/A']
   const hasMetrics = r.trades_count !== undefined
   const isNA = rec.verdict === 'N/A'
+
+  function handleCreateBot() {
+    nav(`/bots/new?strategy=${r.strategy_id}&symbol=${encodeURIComponent(symbol)}`)
+  }
 
   return (
     <div className={`rounded-xl border ${cfg.border} ${cfg.bg} p-4`}>
@@ -53,6 +59,15 @@ function ResultCard({ r }) {
           <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold text-gray-400 border border-white/10">
             <HelpCircle size={11} />N/A
           </span>
+        )}
+        {!isNA && (
+          <button
+            onClick={handleCreateBot}
+            className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-accent/15 text-accent border border-accent/30 hover:bg-accent/25 transition-colors shrink-0"
+          >
+            <PlusCircle size={13} />
+            Criar Bot
+          </button>
         )}
       </div>
 
@@ -252,7 +267,7 @@ export default function BatchBacktest() {
 
           <div className="space-y-3">
             {results.results.map(r => (
-              <ResultCard key={r.strategy_id} r={r} />
+              <ResultCard key={r.strategy_id} r={r} symbol={results.symbol} />
             ))}
           </div>
         </>

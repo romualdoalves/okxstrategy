@@ -106,6 +106,7 @@ export default function NewBot() {
   const { t } = useLanguage()
   const [params] = useSearchParams()
   const defaultStrategy = params.get('strategy') ?? ''
+  const defaultSymbol   = params.get('symbol')   ?? 'BTC-USDT'
 
   const { data: strategies = [] } = useQuery({
     queryKey: ['strategies'],
@@ -121,7 +122,7 @@ export default function NewBot() {
   const [form, setForm] = useState({
     name:            '',
     strategy_id:     defaultStrategy,
-    symbol:          'BTC-USDT',
+    symbol:          defaultSymbol,
     timeframe:       '15m',
     demo:            true,
     stake_usd:       FIXED_STAKE_USD,
