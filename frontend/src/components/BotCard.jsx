@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Play, Square, ChevronRight, Activity, AlertTriangle, TrendingUp, Star, Zap, Clock, Bookmark, RefreshCw } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
