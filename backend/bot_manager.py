@@ -158,14 +158,31 @@ class BotInstance:
     def _can_adopt_spot_position(self, pos, *, context: str) -> bool:
         if not pos or not self._is_spot_symbol(self.config.symbol):
             return True
-        notional = self._position_notional(pos)
-        tolerance = max(2.0, FIXED_STAKE_USD * 0.05)
-        if notional <= 0 or abs(notional - FIXED_STAKE_USD) <= tolerance:
-            return True
 
+        total_size   = abs(float(getattr(pos, "size", 0.0) or 0.0))
+        baseline_qty = abs(float(getattr(self.config, "baseline_balance", 0.0) or 0.0))
+        net_size     = max(0.0, total_size - baseline_qty)
+
+        if net_size <= 1e-9:
+            # Todo o saldo OKX é pré-existente (baseline) — bot fica FLAT sem divergência.
+            log.debug(
+                "[Bot %d] Saldo spot %s=%.8f inteiramente coberto pelo baseline=%.8f — ignorado.",
+                self.config.id, self.config.symbol, total_size, baseline_qty,
+            )
+            return False
+
+        price    = abs(float(getattr(pos, "avg_price", 0.0) or 0.0))
+        notional = net_size * price if price > 0 else 0.0
+        tolerance = max(2.0, FIXED_STAKE_USD * 0.05)
+
+        if notional <= 0 or abs(notional - FIXED_STAKE_USD) <= tolerance:
+            return True  # notional líquido ≈ stake → adota como posição do bot
+
+        # Notional líquido existe mas não bate com o stake → divergência genuína
         msg = (
-            f"Saldo spot órfão em {self.config.symbol} vale ${notional:.2f}; "
-            f"esperado ${FIXED_STAKE_USD:.2f}. Não foi adotado como posição do bot."
+            f"Posição líquida em {self.config.symbol}: {net_size:.8f} units (${notional:.2f}); "
+            f"esperado ${FIXED_STAKE_USD:.2f}. "
+            f"[total OKX={total_size:.8f}, baseline={baseline_qty:.8f}]"
         )
         self._hold_reason = msg
         self._last_order_error = {
@@ -453,7 +470,8 @@ class BotInstance:
                             # enquanto a posição órfã existir na exchange sem gestão local).
                             if self._can_adopt_spot_position(pos, context="startup_recovery"):
                                 adopted_dir = 1 if pos.side == "long" else -1
-                                adopted_sz  = abs(pos.size)
+                                _baseline   = abs(float(getattr(self.config, "baseline_balance", 0.0) or 0.0))
+                                adopted_sz  = max(0.0, abs(pos.size) - _baseline)
                                 adopted_px  = pos.avg_price or 0.0
                                 # SL conservador de 5 % — substituído pelo ATR real no primeiro candle
                                 fallback_sl = round(
@@ -1488,7 +1506,8 @@ class BotInstance:
                         self._entry_inflight = False
                         return
                     adopted_dir = 1 if pos.side == "long" else -1
-                    adopted_sz  = abs(pos.size)
+                    _baseline   = abs(float(getattr(self.config, "baseline_balance", 0.0) or 0.0))
+                    adopted_sz  = max(0.0, abs(pos.size) - _baseline)
                     adopted_px  = pos.avg_price or 0.0
                     fallback_sl = round(
                         adopted_px * (1 - 0.05) if adopted_dir == 1
@@ -2700,8 +2719,10 @@ class BotManager:
                         continue
                     pos = await exchange.get_position(bot.config.symbol)
                     qty = abs(float(pos.size or 0.0)) if pos else 0.0
+                    baseline_qty = abs(float(getattr(bot.config, "baseline_balance", 0.0) or 0.0))
+                    net_qty = max(0.0, qty - baseline_qty)
                     if bot._direction == 0:
-                        if qty > 0 and bot._is_spot_symbol(bot.config.symbol):
+                        if net_qty > 1e-9 and bot._is_spot_symbol(bot.config.symbol):
                             if not bot._can_adopt_spot_position(pos, context="reconcile_loop"):
                                 continue
                             adopted_dir = 1 if pos.side == "long" else -1
@@ -2713,8 +2734,8 @@ class BotManager:
                             )
                             orphan_tp1 = adopted_px * (1.02 if adopted_dir == 1 else 0.98)
                             bot._direction = adopted_dir
-                            bot._sz = qty
-                            bot._sz_remaining = qty
+                            bot._sz = net_qty
+                            bot._sz_remaining = net_qty
                             bot._entry_price = adopted_px
                             bot._sl_price = fallback_sl
                             bot._tp1_price = orphan_tp1

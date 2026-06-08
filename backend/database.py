@@ -55,7 +55,10 @@ class BotModel(Base):
     created_at      = Column(DateTime, default=datetime.datetime.utcnow)
 
     # Risk
-    stop_loss_usd   = Column(Float, default=-50.0)
+    stop_loss_usd    = Column(Float, default=-50.0)
+    # Saldo spot do ativo no momento da criação do bot — usado para isolar
+    # holdings pré-existentes do usuário da detecção de divergências.
+    baseline_balance = Column(Float, default=0.0)
 
 
 class TradeModel(Base):
@@ -243,6 +246,7 @@ def _run_migrations():
         "CREATE INDEX IF NOT EXISTS idx_order_rejections_symbol ON order_rejections(symbol)",
         "CREATE INDEX IF NOT EXISTS idx_order_rejections_resolved ON order_rejections(resolved)",
         "CREATE UNIQUE INDEX IF NOT EXISTS ux_bots_symbol_upper ON bots (UPPER(symbol))",
+        "ALTER TABLE bots ADD COLUMN IF NOT EXISTS baseline_balance FLOAT DEFAULT 0.0",
     ]
     try:
         with engine.connect() as conn:

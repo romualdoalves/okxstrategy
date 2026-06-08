@@ -3,6 +3,7 @@ main.py — FastAPI: REST API + WebSocket hub — OKXStrategy.
 """
 
 from __future__ import annotations
+import aiohttp
 import asyncio
 import json
 import logging
@@ -1049,7 +1050,7 @@ def list_bots(db: Session = Depends(get_db)):
 
 
 @app.post("/api/bots", status_code=201)
-def create_bot(payload: BotCreate, db: Session = Depends(get_db)):
+async def create_bot(payload: BotCreate, db: Session = Depends(get_db)):
     # Valida estratégia
     try:
         get_strategy(payload.strategy_id)
@@ -1066,6 +1067,23 @@ def create_bot(payload: BotCreate, db: Session = Depends(get_db)):
     db.add(bot)
     db.commit()
     db.refresh(bot)
+
+    # Snapshot do saldo spot pré-existente — isola holdings do usuário das
+    # divergências. Qualquer quantidade acima deste baseline é do bot.
+    try:
+        async with aiohttp.ClientSession() as _s:
+            _ex = build_exchange(_s, demo=bot.demo)
+            _pos = await _ex.get_position(bot.symbol)
+            if _pos and _pos.size > 1e-9:
+                bot.baseline_balance = float(_pos.size)
+                db.commit()
+                log.info(
+                    "Bot %d: baseline=%.8f %s (holdings pré-existentes ignorados na detecção de divergências)",
+                    bot.id, bot.baseline_balance, bot.symbol,
+                )
+    except Exception as _exc:
+        log.warning("Bot %d: baseline snapshot falhou (%s) — assumindo 0.0", bot.id, _exc)
+
     log.info("Bot criado: %d — %s", bot.id, bot.name)
     return {"id": bot.id, "name": bot.name, "strategy_id": bot.strategy_id}
 
