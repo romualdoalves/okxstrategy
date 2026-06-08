@@ -1,0 +1,115 @@
+    def compute(self, candles: list) -> Optional[StrategyResult]:
+        if len(candles) < self.zone_lookback + 2:
+            return None
+
+        df = pd.DataFrame([{
+            "open": c.open, "high": c.high, "low": c.low, "close": c.close
+        } for c in candles])
+
+        # ── Cálculo das Bandas ───────────────────────────────────────────────
+        # Banda Externa (Source: Open)
+        o_bb = ta.bbands(df["open"], length=self.outer_length, std=self.outer_std)
+        # Banda Interna (Source: Close)
+        i_bb = ta.bbands(df["close"], length=self.inner_length, std=self.inner_std)
+
+        if o_bb is None or i_bb is None or len(o_bb) == 0 or len(i_bb) == 0:
+            return None
+
+        # Mapeamento de nomes (pandas_ta usa sufixos)
+        o_upper = o_bb.iloc[:, 2] # Upper
+        o_lower = o_bb.iloc[:, 0] # Lower
+        i_upper = i_bb.iloc[:, 2] # Upper
+        i_lower = i_bb.iloc[:, 0] # Lower
+        i_mid   = i_bb.iloc[:, 1] # SMA20
+
+        curr = df.iloc[-1]
+        prev = df.iloc[-2]
+
+        signal_type = None
+        hold_reason = "Aguardando toque em bandas externas ou rompimento de zona"
+        metadata    = {}
+
+        # ── 1. Cenário A: Reversão à Média (Mean Reversion) ─────────────────
+        
+        # LONG: Mínima anterior furou ambas, atual fechou dentro com rejeição
+        signal_long_rev = (prev["low"] < o_lower.iloc[-2]) and (prev["low"] < i_lower.iloc[-2])
+        conf_long_rev   = (curr["low"] < i_lower.iloc[-1]) and (curr["close"] > i_lower.iloc[-1])
+
+        if signal_long_rev and conf_long_rev:
+            entry = curr["close"]
+            stop  = min(curr["low"], o_lower.iloc[-1]) * 0.9998
+            risk  = entry - stop
+            if risk > 0:
+                signal_type = Signal.BUY
+                hold_reason = "Reversão Double B (Long)"
+                metadata = {"sl_price": round(stop, 2), "tp1_price": round(entry + (risk * self.rr_ratio), 2)}
+
+        # SHORT: Máxima anterior furou ambas, atual fechou dentro com rejeição
+        signal_short_rev = (prev["high"] > o_upper.iloc[-2]) and (prev["high"] > i_upper.iloc[-2])
+        conf_short_rev   = (curr["high"] > i_upper.iloc[-1]) and (curr["close"] < i_upper.iloc[-1])
+
+        if signal_short_rev and conf_short_rev:
+            entry = curr["close"]
+            stop  = max(curr["high"], o_upper.iloc[-1]) * 1.0002
+            risk  = stop - entry
+            if risk > 0:
+                signal_type = Signal.SELL
+                hold_reason = "Reversão Double B (Short)"
+                metadata = {"sl_price": round(stop, 2), "tp1_price": round(entry - (risk * self.rr_ratio), 2)}
+
+        # ── 2. Cenário B: Rompimento (Breakout) ──────────────────────────────
+        
+        # Filtro de zona (Máxima/Mínima dos últimos N candles)
+        recent_high = df["high"].iloc[-(self.zone_lookback+1):-1].max()
+        recent_low  = df["low"].iloc[-(self.zone_lookback+1):-1].min()
+
+        if signal_type is None:
+            # LONG: Fechamento acima de ambas as bandas E acima da resistência recente
+            if curr["close"] > o_upper.iloc[-1] and curr["close"] > i_upper.iloc[-1]:
+                if curr["close"] > recent_high:
+                    entry = curr["close"]
+                    stop  = i_lower.iloc[-1]
+                    risk  = entry - stop
+                    if risk > 0:
+                        return StrategyResult(
+                            signal=Signal.BUY,
+                            hold_reason="Rompimento Double B (Long)",
+                            indicators=self._inds(curr, o_upper.iloc[-1], o_lower.iloc[-1], i_upper.iloc[-1], i_lower.iloc[-1], recent_high, recent_low),
+                            metadata={"sl_price": round(stop, 2), "tp1_price": round(entry + (risk * 2.0), 2)}
+                        )
+                else:
+                    hold_reason = f"Rompimento Pendente: Preço ({curr['close']:.2f}) abaixo da resistência ({recent_high:.2f})"
+
+            # SHORT: Fechamento abaixo de ambas as bandas E abaixo do suporte recente
+            elif curr["close"] < o_lower.iloc[-1] and curr["close"] < i_lower.iloc[-1]:
+                if curr["close"] < recent_low:
+                    entry = curr["close"]
+                    stop  = i_upper.iloc[-1]
+                    risk  = stop - entry
+                    if risk > 0:
+                        return StrategyResult(
+                            signal=Signal.SELL,
+                            hold_reason="Rompimento Double B (Short)",
+                            indicators=self._inds(curr, o_upper.iloc[-1], o_lower.iloc[-1], i_upper.iloc[-1], i_lower.iloc[-1], recent_high, recent_low),
+                            metadata={"sl_price": round(stop, 2), "tp1_price": round(entry - (risk * 2.0), 2)}
+                        )
+                else:
+                    hold_reason = f"Rompimento Pendente: Preço ({curr['close']:.2f}) acima do suporte ({recent_low:.2f})"
+
+        # Fallback para HOLD ou Reversão processada
+        if signal_type is None:
+            if hold_reason == "Aguardando toque em bandas externas ou rompimento de zona":
+                hold_reason = f"Monitorando Zonas: R {recent_high:.2f} | S {recent_low:.2f}"
+
+            return StrategyResult(
+                signal=Signal.HOLD,
+                hold_reason=hold_reason,
+                indicators=self._inds(curr, o_upper.iloc[-1], o_lower.iloc[-1], i_upper.iloc[-1], i_lower.iloc[-1], recent_high, recent_low)
+            )
+
+        return StrategyResult(
+            signal=signal_type,
+            hold_reason=hold_reason,
+            indicators=self._inds(curr, o_upper.iloc[-1], o_lower.iloc[-1], i_upper.iloc[-1], i_lower.iloc[-1], recent_high, recent_low),
+            metadata=metadata
+        )

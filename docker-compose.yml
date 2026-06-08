@@ -1,0 +1,24 @@
+# docker-compose.yml — Ambiente de desenvolvimento local
+# Sobe o PostgreSQL para desenvolvimento. O backend roda com: uvicorn backend.main:app --reload
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: okx_strategy_db_dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       okx_strategy
+      POSTGRES_USER:     crypto
+      POSTGRES_PASSWORD: crypto
+    ports:
+      - "5432:5432"
+    volumes:
+      - okx_strategy_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crypto -d okx_strategy"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  okx_strategy_pgdata:

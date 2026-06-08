@@ -1,0 +1,10 @@
+{
+  "okx": {
+    "ethereum": [],
+    "bitcoin": []
+  },
+  "notes": [
+    "Populate these lists with verified exchange deposit or hot wallet addresses before treating destination labels as high confidence.",
+    "Keep addresses lowercase for EVM chains."
+  ]
+}

@@ -1,0 +1,53 @@
+services:
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: okx_strategy_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       okx_strategy
+      POSTGRES_USER:     crypto
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-crypto}
+    volumes:
+      - okx_strategy_pgdata:/var/lib/postgresql/data
+    networks:
+      - traefik-public
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crypto -d okx_strategy"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── App ─────────────────────────────────────────────────────────────────────
+  okx_strategy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: okx_strategy:latest
+    container_name: okx_strategy
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://crypto:${POSTGRES_PASSWORD:-crypto}@postgres:5432/okx_strategy
+      EXCHANGE_PROVIDER: okx
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - traefik-public
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.okx_strategy.rule=Host(`okx.tradixio.com`)
+      - traefik.http.routers.okx_strategy.entrypoints=websecure
+      - traefik.http.routers.okx_strategy.tls=true
+      - traefik.http.routers.okx_strategy.tls.certresolver=myresolver
+      - traefik.http.services.okx_strategy.loadbalancer.server.port=8000
+
+volumes:
+  okx_strategy_pgdata:
+    external: true
+
+networks:
+  traefik-public:
+    external: true
