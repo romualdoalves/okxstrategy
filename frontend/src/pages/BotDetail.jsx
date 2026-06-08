@@ -82,7 +82,7 @@ function getBacktestRecommendation(r) {
   const tp = r.total_profit ?? 0
   const dd = r.max_drawdown ?? 0
   const score = getBacktestScore(r)
-  const INITIAL_BALANCE = 1000
+  const STAKE = 100
 
   if (tc === 0) return {
     verdict: 'NÃO INICIAR', level: 'danger', score,
@@ -100,10 +100,10 @@ function getBacktestRecommendation(r) {
   const highlights = []
   const issues = []
   const ddRatio = tp > 0 ? dd / tp : 999
-  const pnlPct = (tp / INITIAL_BALANCE * 100).toFixed(2)
   const avgTrade = r.avg_trade != null ? r.avg_trade : (tc > 0 ? tp / tc : 0)
+  const avgPct = (avgTrade / STAKE * 100).toFixed(2)
 
-  highlights.push(`PnL positivo: +${tp.toFixed(2)} USD (+${pnlPct}% do capital de $${INITIAL_BALANCE.toLocaleString()}; média de $${avgTrade.toFixed(2)}/trade).`)
+  highlights.push(`PnL positivo: +${tp.toFixed(2)} USD total — média de +$${avgTrade.toFixed(2)}/trade (+${avgPct}% do stake de $${STAKE}).`)
 
   if (pf >= 1.5) {
     highlights.push(`Profit Factor excelente: ${pf.toFixed(2)} — para cada $1,00 perdido, a estratégia retornou $${pf.toFixed(2)} em ganhos.`)
@@ -123,13 +123,13 @@ function getBacktestRecommendation(r) {
     issues.push(`Apenas ${tc} trade(s) fechado(s) — amostra insuficiente; qualquer métrica pode ser fruto do acaso.`)
   }
 
-  const ddCapPct = (dd / INITIAL_BALANCE * 100).toFixed(2)
+  const ddStakePct = (dd / STAKE * 100).toFixed(2)
   if (ddRatio <= 0.5) {
-    highlights.push(`Drawdown controlado: $${dd.toFixed(2)} (${(ddRatio * 100).toFixed(0)}% do lucro · ${ddCapPct}% do capital) — risco bem dimensionado.`)
+    highlights.push(`Drawdown controlado: $${dd.toFixed(2)} (${(ddRatio * 100).toFixed(0)}% do lucro · ${ddStakePct}% do stake de $${STAKE}) — risco bem dimensionado.`)
   } else if (ddRatio <= 1.0) {
-    issues.push(`Drawdown de $${dd.toFixed(2)} representa ${(ddRatio * 100).toFixed(0)}% do lucro (${ddCapPct}% do capital de $${INITIAL_BALANCE.toLocaleString()}) — o capital flutuou bastante antes de fechar no positivo.`)
+    issues.push(`Drawdown de $${dd.toFixed(2)} representa ${(ddRatio * 100).toFixed(0)}% do lucro e ${ddStakePct}% do stake de $${STAKE} — o capital flutuou bastante antes de fechar no positivo.`)
   } else {
-    issues.push(`Drawdown de $${dd.toFixed(2)} supera o lucro total (${ddCapPct}% do capital de $${INITIAL_BALANCE.toLocaleString()}) — a estratégia ficou profundamente no vermelho antes de recuperar, risco muito elevado.`)
+    issues.push(`Drawdown de $${dd.toFixed(2)} supera o lucro total (${ddStakePct}% do stake de $${STAKE}) — a estratégia ficou profundamente no vermelho antes de recuperar, risco muito elevado.`)
   }
 
   if (issues.length === 0) {
