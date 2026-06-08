@@ -843,18 +843,28 @@ def get_performance_ranking(db: Session = Depends(get_db)):
     bots = db.query(BotModel).all()
     bot_map = {b.id: b for b in bots}
     
-    # 2. Busca estatísticas básicas (PnL e Total) — apenas trades de saída para evitar duplicação
+    # 2. Usa a mesma base do /api/trades/summary: uma linha por round-trip
+    # fechado. Linhas type="exit"/"tp1" são eventos visuais e não devem
+    # duplicar a contagem do ranking histórico.
     stats_rows = db.query(
         TradeModel.bot_id,
         func.sum(TradeModel.pnl).label("pnl_sum"),
         func.count(TradeModel.id).label("total_count")
-    ).filter(TradeModel.type == "exit", TradeModel.pnl.is_not(None)).group_by(TradeModel.bot_id).all()
+    ).filter(
+        TradeModel.type == "entry",
+        TradeModel.exit_price.isnot(None),
+        TradeModel.pnl.is_not(None),
+    ).group_by(TradeModel.bot_id).all()
     
     # 3. Busca vitórias separadamente para segurança
     wins_rows = db.query(
         TradeModel.bot_id,
         func.count(TradeModel.id).label("win_count")
-    ).filter(TradeModel.type == "exit", TradeModel.pnl > 0).group_by(TradeModel.bot_id).all()
+    ).filter(
+        TradeModel.type == "entry",
+        TradeModel.exit_price.isnot(None),
+        TradeModel.pnl > 0,
+    ).group_by(TradeModel.bot_id).all()
     wins_map = {row[0]: row[1] for row in wins_rows}
     
     ranking = []
