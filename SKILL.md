@@ -10,7 +10,7 @@ description: |
 
 # OKXStrategy - Project Status
 
-**Date of this snapshot:** 2026-06-05
+**Date of this snapshot:** 2026-06-08
 **Exchange:** OKX only
 **Active API Key:** armazenada fora do repositório
 **User location:** Brazil
@@ -21,6 +21,21 @@ description: |
 **Deploy path:** `/opt/okx-strategy`
 **GitHub Token:** nunca documentar tokens reais no repositório
 **Key ID in use:** armazenado fora do repositório
+
+---
+
+## Changelog Recente
+
+### 36. feat: Recomendação automática pós-backtest (2026-06-08)
+
+- `frontend/src/pages/BotDetail.jsx` — bloco de recomendação aparece automaticamente após executar o backtest.
+- Lógica em `getBacktestRecommendation()` (frontend puro, sem chamada de API):
+  - **NÃO INICIAR** (vermelho): zero trades, PnL ≤ 0, ou Profit Factor < 1.0.
+  - **CUIDADO** (amarelo): PnL positivo mas PF < 1.2, ou < 3 trades fechados, ou drawdown > lucro.
+  - **INICIAR** (verde): PnL positivo, PF ≥ 1.2, ≥ 3 trades, drawdown ≤ lucro.
+- Badge colorido com veredicto + bullets explicando cada ponto (positivos e problemas separados).
+- Ícones lucide-react: `CheckCircle` / `AlertTriangle` / `XCircle`.
+- Backtest já estava corrigido para SPOT-only desde commit `404df82`.
 
 ---
 

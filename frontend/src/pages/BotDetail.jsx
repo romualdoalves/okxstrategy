@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Play, Square, Trash2, Wallet, Sparkles, AlertTriangle, Clock, Info, TrendingUp, ChevronDown, ChevronUp, Zap, BarChart } from 'lucide-react'
+import { ArrowLeft, Play, Square, Trash2, Wallet, Sparkles, AlertTriangle, Clock, Info, TrendingUp, ChevronDown, ChevronUp, Zap, BarChart, CheckCircle, XCircle } from 'lucide-react'
 import { getBot, getTrades, getTradesSummary, getCandles, getBalance, getGraphState, getGraphInterpretation, getSignalLogsReadiness, getSignalLogsAnalysis, startBot, stopBot, deleteBot, getBotAiAnalysis, getAiUsageStatus, runBacktest } from '../api'
 import { useWebSocket } from '../hooks/useWebSocket'
 import { useMarketStatus } from '../hooks/useMarketStatus'
@@ -43,6 +43,61 @@ const CHART_SUBTITLE = {
   IF003: 'Event-Driven Flow',
   NW001: 'Influencers and Followers',
   RG001: 'Markov Regime + EMA21',
+}
+
+function getBacktestRecommendation(r) {
+  const pf = r.profit_factor ?? 0
+  const tc = r.trades_count ?? 0
+  const tp = r.total_profit ?? 0
+  const dd = r.max_drawdown ?? 0
+
+  if (tc === 0) return {
+    verdict: 'NÃO INICIAR', level: 'danger',
+    reasons: ['Nenhum trade fechado no período — impossível avaliar a estratégia.'],
+  }
+  if (tp <= 0) return {
+    verdict: 'NÃO INICIAR', level: 'danger',
+    reasons: [`PnL negativo (${tp.toFixed(2)} USD) — estratégia perdedora neste período.`],
+  }
+  if (pf < 1.0) return {
+    verdict: 'NÃO INICIAR', level: 'danger',
+    reasons: [`Profit Factor ${pf.toFixed(2)}: as perdas superam os ganhos brutos.`],
+  }
+
+  const highlights = []
+  const issues = []
+
+  highlights.push(`PnL positivo: +${tp.toFixed(2)} USD.`)
+
+  if (pf >= 1.5) {
+    highlights.push(`Profit Factor excelente: ${pf.toFixed(2)}.`)
+  } else if (pf >= 1.2) {
+    highlights.push(`Profit Factor adequado: ${pf.toFixed(2)} (idealmente acima de 1.5).`)
+  } else {
+    issues.push(`Profit Factor ${pf.toFixed(2)} abaixo do mínimo recomendado (1.2).`)
+  }
+
+  if (tc >= 5) {
+    highlights.push(`${tc} trades fechados — amostra razoável.`)
+  } else if (tc >= 3) {
+    highlights.push(`${tc} trades fechados (mínimo aceitável).`)
+  } else {
+    issues.push(`Apenas ${tc} trade(s) fechado(s) — amostra insuficiente para confiança estatística.`)
+  }
+
+  const ddRatio = tp > 0 ? dd / tp : 999
+  if (ddRatio <= 0.5) {
+    highlights.push(`Drawdown controlado: $${dd.toFixed(2)} (${(ddRatio * 100).toFixed(0)}% do lucro).`)
+  } else if (ddRatio <= 1.0) {
+    issues.push(`Drawdown de $${dd.toFixed(2)} representa ${(ddRatio * 100).toFixed(0)}% do lucro total — elevado.`)
+  } else {
+    issues.push(`Drawdown de $${dd.toFixed(2)} supera o lucro total — risco muito elevado.`)
+  }
+
+  if (issues.length === 0) {
+    return { verdict: 'INICIAR', level: 'success', reasons: highlights }
+  }
+  return { verdict: 'CUIDADO', level: 'warning', reasons: [...highlights, ...issues] }
 }
 
 function useElapsed(startedAt) {
@@ -407,6 +462,35 @@ export default function BotDetail() {
               <p className="text-[10px] text-muted">Pior flutuação aberta</p>
             </div>
           </div>
+
+          {/* Recommendation block */}
+          {(() => {
+            const rec = getBacktestRecommendation(backtestResult)
+            const cfg = {
+              success: { border: 'border-green-500/30', bg: 'bg-green-500/10', title: 'text-green-400', badge: 'bg-green-500/20 text-green-300', Icon: CheckCircle },
+              warning: { border: 'border-yellow-500/30', bg: 'bg-yellow-500/10', title: 'text-yellow-400', badge: 'bg-yellow-500/20 text-yellow-300', Icon: AlertTriangle },
+              danger:  { border: 'border-red-500/30',   bg: 'bg-red-500/10',   title: 'text-red-400',   badge: 'bg-red-500/20 text-red-300',   Icon: XCircle },
+            }[rec.level]
+            return (
+              <div className={`mb-4 rounded-xl border ${cfg.border} ${cfg.bg} p-4`}>
+                <div className="flex items-center gap-2 mb-3">
+                  <cfg.Icon size={16} className={cfg.title} />
+                  <span className={`text-sm font-bold uppercase tracking-wide ${cfg.title}`}>Recomendação</span>
+                  <span className={`ml-auto px-3 py-0.5 rounded-full text-xs font-bold ${cfg.badge}`}>
+                    {rec.verdict}
+                  </span>
+                </div>
+                <ul className="space-y-1.5">
+                  {rec.reasons.map((item, i) => (
+                    <li key={i} className="text-xs text-white/75 flex gap-2">
+                      <span className={`shrink-0 ${cfg.title}`}>·</span>
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )
+          })()}
 
           {backtestResult.open_position && (
             <div className="mb-4 rounded-lg border border-blue-500/25 bg-blue-500/8 p-3 text-xs text-blue-300/90">
