@@ -334,6 +334,40 @@ class OKXExchange(BaseExchange):
 
     # ── Ordens ────────────────────────────────────────────────────────────────
 
+    async def _guard_spot_sell_close(self, symbol: str, side: str, size: float, *, close_intent: bool) -> bool:
+        """Bloqueia venda SPOT que não seja fechamento de saldo já comprado."""
+        if _inst_type(symbol) != "SPOT":
+            return True
+        side_norm = (side or "").lower()
+        if side_norm != "sell":
+            return True
+        if not close_intent:
+            self.last_order_error = {
+                "kind": "spot_sell_blocked",
+                "message": "Mercado SPOT permite venda somente para fechar saldo comprado existente.",
+            }
+            return False
+        pos = await self.get_position(symbol)
+        available = abs(float(pos.size or 0.0)) if pos and pos.side == "long" else 0.0
+        requested = abs(float(size or 0.0))
+        if requested <= 0 or available <= 0:
+            self.last_order_error = {
+                "kind": "spot_sell_without_balance",
+                "message": "Venda SPOT bloqueada: não há saldo comprado para fechar.",
+                "available": available,
+                "requested": requested,
+            }
+            return False
+        if requested > available * 1.001:
+            self.last_order_error = {
+                "kind": "spot_sell_size_exceeds_balance",
+                "message": "Venda SPOT bloqueada: quantidade maior que o saldo comprado disponível.",
+                "available": available,
+                "requested": requested,
+            }
+            return False
+        return True
+
     async def market_order(self, symbol: str, side: str, size: float, reduce_only: bool = False) -> Optional[str]:
         self.last_order_error = None
         if _inst_type(symbol) != "SPOT":
@@ -341,6 +375,8 @@ class OKXExchange(BaseExchange):
                 "kind": "spot_only",
                 "message": "Este app opera somente OKX spot. Símbolos -SWAP/-FUTURES estão bloqueados.",
             }
+            return None
+        if not await self._guard_spot_sell_close(symbol, side, size, close_intent=reduce_only):
             return None
         body_dict = {
             "instId":  symbol,
@@ -375,6 +411,14 @@ class OKXExchange(BaseExchange):
         if _inst_type(symbol) != "SPOT":
             self.last_order_error = {"kind": "spot_only", "message": "Stop Loss permitido somente em OKX spot."}
             return None
+        if (side or "").lower() != "sell":
+            self.last_order_error = {
+                "kind": "spot_stop_side_blocked",
+                "message": "Stop Loss SPOT só pode vender saldo comprado existente.",
+            }
+            return None
+        if not await self._guard_spot_sell_close(symbol, side, size, close_intent=True):
+            return None
         body = json.dumps({
             "instId":          symbol,
             "tdMode":          _td_mode(symbol),
@@ -402,6 +446,14 @@ class OKXExchange(BaseExchange):
         self.last_order_error = None
         if _inst_type(symbol) != "SPOT":
             self.last_order_error = {"kind": "spot_only", "message": "Trailing stop permitido somente em OKX spot."}
+            return None
+        if (side or "").lower() != "sell":
+            self.last_order_error = {
+                "kind": "spot_trailing_side_blocked",
+                "message": "Trailing stop SPOT só pode vender saldo comprado existente.",
+            }
+            return None
+        if not await self._guard_spot_sell_close(symbol, side, size, close_intent=True):
             return None
         body_dict: dict = {
             "instId":        symbol,
