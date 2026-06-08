@@ -155,8 +155,9 @@ async def monitor_bots():
     db = SessionLocal()
     try:
         bots = db.query(BotModel).all()
-        bot_map = {b.id: {"name": b.name, "symbol": b.symbol, "timeframe": b.timeframe, 
-                          "strategy_id": b.strategy_id, "active": b.active, "stake_usd": b.stake_usd} for b in bots}
+        bot_map = {b.id: {"name": b.name, "symbol": b.symbol, "timeframe": b.timeframe,
+                          "strategy_id": b.strategy_id, "active": b.active, "stake_usd": b.stake_usd,
+                          "baseline_balance": b.baseline_balance or 0.0} for b in bots}
     finally:
         db.close()
     
@@ -208,7 +209,9 @@ async def monitor_bots():
             sync_status = "error"
             sync_detail = f"Falha ao consultar OKX: {pos}"
         else:
-            okx_size = abs(float(getattr(pos, "size", 0.0) or 0.0)) if pos else 0.0
+            okx_size_raw = abs(float(getattr(pos, "size", 0.0) or 0.0)) if pos else 0.0
+            baseline = float(info.get("baseline_balance") or 0.0)
+            okx_size = max(0.0, okx_size_raw - baseline)  # desconsidera holdings pré-existentes
             okx_direction = "LONG" if pos and getattr(pos, "side", "") == "long" else ("SHORT" if pos else "FLAT")
             local_size = abs(float(st.get("size", 0.0) or 0.0))
             notional_price = float(last or 0.0)
@@ -1131,11 +1134,11 @@ async def recapture_baseline(bot_id: int, db: Session = Depends(get_db)):
             new_baseline = float(_pos.size) if (_pos and _pos.size > 1e-9) else 0.0
             bot.baseline_balance = new_baseline
             db.commit()
-            # Força o bot_manager a reler o baseline na próxima reconciliação
-            if bot_id in manager._bots:
-                manager._bots[bot_id].config.baseline_balance = new_baseline
-                manager._bots[bot_id]._last_order_error = None
-                manager._bots[bot_id]._hold_reason = None
+            # Atualiza instância em memória para efeito imediato (sem reiniciar o bot)
+            if bot_id in manager._instances:
+                manager._instances[bot_id].config.baseline_balance = new_baseline
+                manager._instances[bot_id]._last_order_error = None
+                manager._instances[bot_id]._hold_reason = None
         log.info("Bot %d: baseline recapturado → %.8f %s", bot_id, new_baseline, bot.symbol)
         return {"ok": True, "baseline_balance": new_baseline, "symbol": bot.symbol}
     except Exception as exc:
