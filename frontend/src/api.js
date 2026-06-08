@@ -40,8 +40,9 @@ export const liquidateBot    = (id)     => req(`/bots/${id}/liquidate`, { method
 export const runBacktest      = (id)     => req(`/bots/${id}/backtest`,  { method: 'POST' })
 export const optimizeBotParams = (id)     => req(`/bots/${id}/optimize`,  { method: 'POST' })
 export const getBotStatus    = (id)     => req(`/bots/${id}/status`)
-export const switchBotSymbol = (id, symbol = 'BTC-USDT') =>
+export const switchBotSymbol     = (id, symbol = 'BTC-USDT') =>
   req(`/bots/${id}/switch-symbol`, { method: 'POST', body: JSON.stringify({ symbol }) })
+export const recaptureBaseline   = (id) => req(`/bots/${id}/recapture-baseline`, { method: 'POST' })
 
 // Trades
 export const getTrades        = (botId)  => req(`/trades${botId ? `?bot_id=${botId}` : ''}`)

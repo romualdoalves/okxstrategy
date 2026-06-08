@@ -1,8 +1,8 @@
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Play, Square, ChevronRight, Activity, AlertTriangle, TrendingUp, Star, Zap, Clock, Bookmark } from 'lucide-react'
+import { Play, Square, ChevronRight, Activity, AlertTriangle, TrendingUp, Star, Zap, Clock, Bookmark, RefreshCw } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
-import { startBot, stopBot, switchBotSymbol, liquidateBot } from '../api'
+import { startBot, stopBot, switchBotSymbol, liquidateBot, recaptureBaseline } from '../api'
 import { useLanguage } from '../i18n/LanguageContext'
 import StrategyChecklist, { getCriteriaCount } from './StrategyChecklist'
 import AssetPriceCard from './AssetPriceCard'
@@ -90,6 +90,18 @@ export default function BotCard({ bot, liveStatus }) {
     qc.invalidateQueries({ queryKey: ['bots'] })
   }
 
+  const [capturingBaseline, setCapturingBaseline] = useState(false)
+  async function handleRecaptureBaseline(e) {
+    e.stopPropagation()
+    setCapturingBaseline(true)
+    try {
+      await recaptureBaseline(bot.id)
+      qc.invalidateQueries({ queryKey: ['bots'] })
+    } finally {
+      setCapturingBaseline(false)
+    }
+  }
+
   return (
     <div
       onClick={() => nav(`/bots/${bot.id}`)}
@@ -154,6 +166,17 @@ export default function BotCard({ bot, liveStatus }) {
                   className="mt-2 rounded-md border border-yellow-300/30 px-2 py-1 text-[11px] font-medium text-yellow-100 hover:bg-yellow-300/10"
                 >
                   {t('card.switch_symbol', { symbol: suggestedSymbol })}
+                </button>
+              )}
+              {orderError?.kind === 'spot_orphan_notional_mismatch' && (
+                <button
+                  type="button"
+                  onClick={handleRecaptureBaseline}
+                  disabled={capturingBaseline}
+                  className="mt-2 flex items-center gap-1.5 rounded-md border border-blue-400/30 bg-blue-500/10 px-2 py-1 text-[11px] font-medium text-blue-300 hover:bg-blue-500/20 disabled:opacity-50"
+                >
+                  <RefreshCw size={10} className={capturingBaseline ? 'animate-spin' : ''} />
+                  {capturingBaseline ? 'Capturando…' : 'Capturar Baseline Agora'}
                 </button>
               )}
             </div>

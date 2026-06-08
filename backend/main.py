@@ -1118,6 +1118,30 @@ def update_bot(bot_id: int, payload: BotUpdate, db: Session = Depends(get_db)):
     return {"ok": True}
 
 
+@app.post("/api/bots/{bot_id}/recapture-baseline")
+async def recapture_baseline(bot_id: int, db: Session = Depends(get_db)):
+    """Recaptura o saldo spot atual como baseline — limpa divergências de holdings pré-existentes."""
+    bot = db.get(BotModel, bot_id)
+    if not bot:
+        raise HTTPException(404, "Bot não encontrado")
+    try:
+        async with aiohttp.ClientSession() as _s:
+            _ex = build_exchange(_s, demo=bot.demo)
+            _pos = await _ex.get_position(bot.symbol)
+            new_baseline = float(_pos.size) if (_pos and _pos.size > 1e-9) else 0.0
+            bot.baseline_balance = new_baseline
+            db.commit()
+            # Força o bot_manager a reler o baseline na próxima reconciliação
+            if bot_id in manager._bots:
+                manager._bots[bot_id].config.baseline_balance = new_baseline
+                manager._bots[bot_id]._last_order_error = None
+                manager._bots[bot_id]._hold_reason = None
+        log.info("Bot %d: baseline recapturado → %.8f %s", bot_id, new_baseline, bot.symbol)
+        return {"ok": True, "baseline_balance": new_baseline, "symbol": bot.symbol}
+    except Exception as exc:
+        raise HTTPException(500, f"Falha ao recapturar baseline: {exc}")
+
+
 @app.delete("/api/bots/{bot_id}", status_code=204)
 def delete_bot(bot_id: int, db: Session = Depends(get_db)):
     bot = db.get(BotModel, bot_id)
