@@ -168,17 +168,6 @@ export default function BotCard({ bot, liveStatus }) {
                   {t('card.switch_symbol', { symbol: suggestedSymbol })}
                 </button>
               )}
-              {orderError?.kind === 'spot_orphan_notional_mismatch' && (
-                <button
-                  type="button"
-                  onClick={handleRecaptureBaseline}
-                  disabled={capturingBaseline}
-                  className="mt-2 flex items-center gap-1.5 rounded-md border border-blue-400/30 bg-blue-500/10 px-2 py-1 text-[11px] font-medium text-blue-300 hover:bg-blue-500/20 disabled:opacity-50"
-                >
-                  <RefreshCw size={10} className={capturingBaseline ? 'animate-spin' : ''} />
-                  {capturingBaseline ? 'Capturando…' : 'Capturar Baseline Agora'}
-                </button>
-              )}
             </div>
           </div>
         </div>
@@ -214,22 +203,32 @@ export default function BotCard({ bot, liveStatus }) {
         const baseCcy  = bot.symbol.split('-')[0]
         const fmt = n => parseFloat(n.toPrecision(6)).toString()
         return (
-          <div className="mb-3 flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-white/8 bg-white/4 text-[11px]">
-            <Bookmark size={11} className={`shrink-0 ${baseline > 0 ? 'text-accent/70' : 'text-muted/40'}`} />
-            <span className="text-muted">Baseline</span>
-            {baseline > 0 ? (
-              <>
-                <span className="font-mono font-semibold text-white/80">{fmt(baseline)} {baseCcy}</span>
-                <span className="ml-auto text-muted/50 text-[9px] text-right leading-tight">
-                  pré-existente<br />ignorado em divergências
-                </span>
-              </>
-            ) : (
-              <>
-                <span className="font-mono text-muted/50">—</span>
-                <span className="ml-auto text-muted/40 text-[9px]">sem holdings ao criar</span>
-              </>
-            )}
+          <div className="mb-3 rounded-lg border border-white/8 bg-white/4 text-[11px] overflow-hidden">
+            <div className="flex items-center gap-2 px-2.5 py-1.5">
+              <Bookmark size={11} className={`shrink-0 ${baseline > 0 ? 'text-accent/70' : 'text-muted/40'}`} />
+              <span className="text-muted">Baseline</span>
+              {baseline > 0 ? (
+                <>
+                  <span className="font-mono font-semibold text-white/80">{fmt(baseline)} {baseCcy}</span>
+                  <span className="ml-auto text-muted/50 text-[9px] text-right leading-tight">
+                    pré-existente<br />ignorado em divergências
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="font-mono text-muted/50">—</span>
+                  <span className="ml-auto text-muted/40 text-[9px]">sem holdings ao criar</span>
+                </>
+              )}
+            </div>
+            <button
+              onClick={e => { e.stopPropagation(); handleRecaptureBaseline(e) }}
+              disabled={capturingBaseline}
+              className="w-full flex items-center justify-center gap-1.5 px-2.5 py-1 border-t border-white/8 text-[10px] text-blue-300/70 hover:text-blue-300 hover:bg-blue-500/10 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw size={9} className={capturingBaseline ? 'animate-spin' : ''} />
+              {capturingBaseline ? 'Capturando…' : 'Recapturar Baseline'}
+            </button>
           </div>
         )
       })()}
