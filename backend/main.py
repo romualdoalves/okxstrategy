@@ -198,6 +198,8 @@ async def monitor_bots():
 
         pos = exchange_pos.get(bot_id)
         okx_size = 0.0
+        app_notional = 0.0
+        okx_notional = 0.0
         okx_direction = "FLAT"
         sync_status = "unknown"
         sync_detail = "OKX ainda não verificada."
@@ -208,6 +210,13 @@ async def monitor_bots():
             okx_size = abs(float(getattr(pos, "size", 0.0) or 0.0)) if pos else 0.0
             okx_direction = "LONG" if pos and getattr(pos, "side", "") == "long" else ("SHORT" if pos else "FLAT")
             local_size = abs(float(st.get("size", 0.0) or 0.0))
+            notional_price = float(last or 0.0)
+            if notional_price <= 0 and pos:
+                notional_price = float(getattr(pos, "avg_price", 0.0) or 0.0)
+            if notional_price > 0:
+                app_notional = local_size * notional_price
+                okx_notional = okx_size * notional_price
+            notional_tolerance = max(2.0, FIXED_STAKE_USD * 0.05)
             local_open = direction != 0
             okx_open = okx_size > 1e-9
             if local_open and okx_open:
@@ -218,6 +227,12 @@ async def monitor_bots():
                 elif local_size > 0 and abs(okx_size - local_size) > max(1e-8, local_size * 0.001):
                     sync_status = "divergent"
                     sync_detail = f"Tamanho divergente: App {local_size:.8f}, OKX {okx_size:.8f}."
+                elif okx_notional > 0 and abs(okx_notional - FIXED_STAKE_USD) > notional_tolerance:
+                    sync_status = "divergent"
+                    sync_detail = (
+                        f"Notional divergente: OKX ${okx_notional:.2f}, "
+                        f"esperado ${FIXED_STAKE_USD:.2f} por stake fixo."
+                    )
                 else:
                     sync_status = "ok"
                     sync_detail = "App e OKX com posição aberta correspondente."
@@ -248,6 +263,9 @@ async def monitor_bots():
             "size": round(float(st.get("size", 0.0) or 0.0), 8),
             "okx_direction": okx_direction,
             "okx_size": round(okx_size, 8),
+            "app_notional": round(app_notional, 2),
+            "okx_notional": round(okx_notional, 2),
+            "expected_notional": FIXED_STAKE_USD if direction != 0 else 0.0,
             "sync_status": sync_status,
             "sync_detail": sync_detail,
             "pnl_pct": round(pnl_pct, 2),

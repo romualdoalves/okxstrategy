@@ -218,6 +218,11 @@ export default function Monitor() {
                   <div className="text-[10px] text-muted mt-1 font-mono">
                     OKX {bot.okx_direction || '—'} {bot.okx_size ? bot.okx_size : ''}
                   </div>
+                  {bot.okx_notional > 0 && (
+                    <div className="text-[10px] text-muted mt-0.5 font-mono">
+                      ${Number(bot.okx_notional).toFixed(2)} / ${Number(bot.expected_notional || 0).toFixed(2)}
+                    </div>
+                  )}
                 </td>
                 <td className="p-3">
                   {bot.halted ? (

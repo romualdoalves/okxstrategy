@@ -71,6 +71,12 @@ repositório `E:\Dell Inspiron\W\Dev\Trading\OKXTrader\OKXStrategy`.
   para `100.0`.
 - Migrações de startup devem forçar todos os bots existentes para
   `stake_usd = 100.0`.
+- O monitor de conformidade deve marcar divergência quando uma posição aberta na
+  OKX tiver notional real fora da tolerância do stake fixo de US$100, mesmo que
+  direção e quantidade local estejam sincronizadas.
+- O Dashboard deve exibir exposição aberta do app pelo notional real
+  (`size * preço atual/entrada`) para comparação fiel com a OKX; o stake fixo é
+  usado como fallback apenas quando tamanho/preço ainda não foram carregados.
 - Nunca sugerir aumentar ou reduzir stake como ação operacional; ajustes devem
   ocorrer por ativo, estratégia, parâmetros, pausa ou desligamento do bot.
 

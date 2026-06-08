@@ -187,10 +187,12 @@ export default function Dashboard() {
 
   const runningBots = botsWithRuntime.filter(b => b.runtime.status === 'running' || b.active).length
   const openPositions = botsWithRuntime.filter(b => Math.abs(b.runtime.direction ?? 0) > 0)
-  const openExposure = openPositions.reduce(
-    (sum) => sum + FIXED_STAKE_USD,
-    0,
-  )
+  const openExposure = openPositions.reduce((sum, bot) => {
+    const size = Math.abs(Number(bot.runtime.size ?? 0))
+    const price = Number(bot.runtime.last_price ?? bot.runtime.entry_price ?? 0)
+    const notional = size > 0 && price > 0 ? size * price : FIXED_STAKE_USD
+    return sum + notional
+  }, 0)
   const attentionBots = botsWithRuntime.filter(b =>
     b.runtime.status === 'error' ||
     b.runtime.status === 'maintenance' ||
