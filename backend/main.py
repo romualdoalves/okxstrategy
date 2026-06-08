@@ -1044,6 +1044,7 @@ def list_bots(db: Session = Depends(get_db)):
             "timeframe": b.timeframe, "demo": b.demo,
             "stake_usd": FIXED_STAKE_USD, "leverage": b.leverage,
             "active": b.active, "created_at": str(b.created_at),
+            "baseline_balance": b.baseline_balance or 0.0,
             "runtime": status,
         })
     return result

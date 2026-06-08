@@ -1,6 +1,6 @@
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Play, Square, ChevronRight, Activity, AlertTriangle, TrendingUp, Star, Zap, Clock } from 'lucide-react'
+import { Play, Square, ChevronRight, Activity, AlertTriangle, TrendingUp, Star, Zap, Clock, Bookmark } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { startBot, stopBot, switchBotSymbol, liquidateBot } from '../api'
 import { useLanguage } from '../i18n/LanguageContext'
@@ -161,7 +161,7 @@ export default function BotCard({ bot, liveStatus }) {
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-2 mb-4 text-center">
+      <div className="grid grid-cols-3 gap-2 mb-3 text-center">
         <div>
           <p className="text-xs text-muted">{t('c.stake')}</p>
           <p className="text-sm font-medium">${FIXED_STAKE_USD}</p>
@@ -184,6 +184,32 @@ export default function BotCard({ bot, liveStatus }) {
           </div>
         </div>
       </div>
+
+      {/* Baseline — holdings pré-existentes do ativo ao criar o bot */}
+      {(() => {
+        const baseline = bot.baseline_balance ?? 0
+        const baseCcy  = bot.symbol.split('-')[0]
+        const fmt = n => parseFloat(n.toPrecision(6)).toString()
+        return (
+          <div className="mb-3 flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-white/8 bg-white/4 text-[11px]">
+            <Bookmark size={11} className={`shrink-0 ${baseline > 0 ? 'text-accent/70' : 'text-muted/40'}`} />
+            <span className="text-muted">Baseline</span>
+            {baseline > 0 ? (
+              <>
+                <span className="font-mono font-semibold text-white/80">{fmt(baseline)} {baseCcy}</span>
+                <span className="ml-auto text-muted/50 text-[9px] text-right leading-tight">
+                  pré-existente<br />ignorado em divergências
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="font-mono text-muted/50">—</span>
+                <span className="ml-auto text-muted/40 text-[9px]">sem holdings ao criar</span>
+              </>
+            )}
+          </div>
+        )
+      })()}
 
       {/* Guaranteed Profit Stars */}
       {rt.guaranteed_pnl > 0 && (
