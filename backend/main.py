@@ -46,7 +46,7 @@ from .database import (
     get_db,
 )
 from .bot_manager import manager
-from .backtest_engine import BacktestEngine
+from .backtest_engine import BacktestEngine, backtest_recommendation
 from .optimizer import StrategyOptimizer
 from .exchanges.factory import build_exchange, get_default_demo_mode, get_exchange_provider, get_ranked_assets_universe, map_timeframe_for_history
 from .strategies.registry import list_strategies, get_strategy
@@ -1852,6 +1852,91 @@ async def run_bot_backtest(bot_id: int, db: Session = Depends(get_db)):
     results = await engine.run(candles, stake_usd=FIXED_STAKE_USD)
     
     return results
+
+class CategoryBacktestRequest(BaseModel):
+    category: str
+    symbol: str
+
+
+_VERDICT_ORDER = {"INICIAR": 0, "CUIDADO": 1, "NÃO INICIAR": 2, "N/A": 3}
+_CONTEXT_FLAGS = ("needs_gex_context", "needs_graph_context")
+
+
+@app.post("/api/backtest/category")
+async def run_category_backtest(req: CategoryBacktestRequest):
+    """Executa backtest de todas as estratégias de uma categoria para um símbolo."""
+    import aiohttp as _aiohttp
+    from .strategies.registry import REGISTRY
+
+    prefix = req.category.upper()
+    strategy_ids = [sid for sid in REGISTRY if sid.upper().startswith(prefix)]
+    if not strategy_ids:
+        raise HTTPException(404, f"Nenhuma estratégia encontrada para categoria '{prefix}'")
+
+    # Separa estratégias que precisam de contexto externo (não backtestáveis)
+    na_ids: list[str] = []
+    tf_groups: dict[str, list[str]] = {}
+    for sid in sorted(strategy_ids):
+        cls = REGISTRY[sid]
+        if any(getattr(cls, flag, False) for flag in _CONTEXT_FLAGS):
+            na_ids.append(sid)
+            continue
+        tf = cls.info().recommended_timeframe or "15m"
+        tf_groups.setdefault(tf, []).append(sid)
+
+    # Busca candles uma vez por timeframe único
+    candle_cache: dict[str, list] = {}
+    async with _aiohttp.ClientSession() as session:
+        ex = build_exchange(session)
+        for tf in tf_groups:
+            bar = map_timeframe_for_history(tf)
+            candle_cache[tf] = await ex.fetch_candles(req.symbol, bar, limit=500) or []
+
+    # Executa backtests em paralelo
+    async def _run(sid: str, tf: str) -> dict:
+        candles = candle_cache.get(tf, [])
+        info = REGISTRY[sid].info()
+        base = {"strategy_id": sid, "strategy_name": info.name, "timeframe": tf}
+        try:
+            engine = BacktestEngine(sid)
+            result = await engine.run(candles)
+            result.update(base)
+            result["recommendation"] = backtest_recommendation(result)
+            result.pop("trades", None)
+            result.pop("closed_trades", None)
+            result.pop("assumptions", None)
+            return result
+        except Exception as exc:
+            log.warning("Category backtest error %s: %s", sid, exc)
+            return {**base, "recommendation": {
+                "verdict": "N/A", "level": "na",
+                "reasons": [f"Erro na execução: {exc}"],
+            }}
+
+    import asyncio as _asyncio
+    tasks = [_run(sid, tf) for tf, sids in tf_groups.items() for sid in sids]
+    results: list[dict] = list(await _asyncio.gather(*tasks))
+
+    # Acrescenta entradas N/A para estratégias com contexto externo
+    for sid in na_ids:
+        info = REGISTRY[sid].info()
+        results.append({
+            "strategy_id": sid,
+            "strategy_name": info.name,
+            "timeframe": info.recommended_timeframe or "—",
+            "recommendation": {
+                "verdict": "N/A", "level": "na",
+                "reasons": ["Requer contexto externo ao vivo (GEX/Graph) — backtest não suportado."],
+            },
+        })
+
+    results.sort(key=lambda x: (
+        _VERDICT_ORDER.get(x["recommendation"]["verdict"], 9),
+        -(x.get("profit_factor") or 0),
+    ))
+
+    return {"category": prefix, "symbol": req.symbol, "results": results, "total": len(results)}
+
 
 @app.post("/api/bots/{bot_id}/optimize")
 async def optimize_bot_params(bot_id: int, db: Session = Depends(get_db)):

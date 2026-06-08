@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
 import {
-  LayoutDashboard, Bot, Zap, History, TrendingUp, Trophy, Activity, Plug, CheckCircle2, FlaskConical, MonitorIcon
+  LayoutDashboard, Bot, Zap, History, TrendingUp, Trophy, Activity, Plug, CheckCircle2, FlaskConical, MonitorIcon, ScanSearch
 } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 
@@ -18,6 +18,7 @@ import TradeReport  from './pages/TradeReport'
 import Activities       from './pages/Activities'
 import StrategyFactory  from './pages/StrategyFactory'
 import Monitor          from './pages/Monitor'
+import BatchBacktest    from './pages/BatchBacktest'
 import ErrorBoundary   from './components/ErrorBoundary'
 import ToastContainer  from './components/ToastContainer'
 import OkxConnectModal from './components/OkxConnectModal'
@@ -80,6 +81,7 @@ function AppShell() {
     { to: '/strategies',        labelKey: 'nav.strategies',  icon: Zap },
     { to: '/strategy-factory',  labelKey: 'nav.factory',     icon: FlaskConical },
     { to: '/monitor',           labelKey: 'nav.monitor',     icon: MonitorIcon },
+    { to: '/batch-backtest',    labelKey: 'nav.scanner',     icon: ScanSearch },
     { to: '/trades',            labelKey: 'nav.history',     icon: History },
     { to: '/performance',       labelKey: 'nav.performance', icon: Trophy },
     { to: '/activities',        labelKey: 'nav.activities',  icon: Activity },
@@ -202,6 +204,7 @@ function AppShell() {
             <Route path="/activities"        element={<Activities />} />
             <Route path="/strategy-factory" element={<StrategyFactory />} />
             <Route path="/monitor"          element={<Monitor />} />
+            <Route path="/batch-backtest"   element={<BatchBacktest />} />
           </Routes>
         </ErrorBoundary>
       </main>

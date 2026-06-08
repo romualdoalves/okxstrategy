@@ -169,3 +169,54 @@ class BacktestEngine:
                 "Resultado ainda não inclui taxas, slippage nem latência de execução.",
             ],
         }
+
+
+def backtest_recommendation(r: dict) -> dict:
+    """
+    Deriva o veredicto INICIAR / CUIDADO / NÃO INICIAR / N/A a partir dos
+    resultados brutos de BacktestEngine.run(). Espelha a lógica de
+    getBacktestRecommendation() no frontend (BotDetail.jsx).
+    """
+    pf = r.get("profit_factor") or 0.0
+    tc = r.get("trades_count") or 0
+    tp = r.get("total_profit") or 0.0
+    dd = r.get("max_drawdown") or 0.0
+
+    if tc == 0:
+        return {"verdict": "NÃO INICIAR", "level": "danger",
+                "reasons": ["Nenhum trade fechado no período."]}
+    if tp <= 0:
+        return {"verdict": "NÃO INICIAR", "level": "danger",
+                "reasons": [f"PnL negativo ({tp:.2f} USD) — estratégia perdedora neste período."]}
+    if pf < 1.0:
+        return {"verdict": "NÃO INICIAR", "level": "danger",
+                "reasons": [f"Profit Factor {pf:.2f}: perdas superam ganhos brutos."]}
+
+    issues: list[str] = []
+    highlights: list[str] = [f"PnL positivo: +{tp:.2f} USD."]
+
+    if pf >= 1.5:
+        highlights.append(f"Profit Factor excelente: {pf:.2f}.")
+    elif pf >= 1.2:
+        highlights.append(f"Profit Factor adequado: {pf:.2f} (idealmente ≥ 1.5).")
+    else:
+        issues.append(f"Profit Factor {pf:.2f} abaixo do mínimo recomendado (1.2).")
+
+    if tc >= 5:
+        highlights.append(f"{tc} trades fechados — amostra razoável.")
+    elif tc >= 3:
+        highlights.append(f"{tc} trades fechados (mínimo aceitável).")
+    else:
+        issues.append(f"Apenas {tc} trade(s) fechado(s) — amostra insuficiente.")
+
+    dd_ratio = dd / tp if tp > 0 else 999.0
+    if dd_ratio <= 0.5:
+        highlights.append(f"Drawdown controlado: ${dd:.2f} ({dd_ratio * 100:.0f}% do lucro).")
+    elif dd_ratio <= 1.0:
+        issues.append(f"Drawdown ${dd:.2f} representa {dd_ratio * 100:.0f}% do lucro — elevado.")
+    else:
+        issues.append(f"Drawdown ${dd:.2f} supera o lucro total — risco muito elevado.")
+
+    if issues:
+        return {"verdict": "CUIDADO", "level": "warning", "reasons": highlights + issues}
+    return {"verdict": "INICIAR", "level": "success", "reasons": highlights}

@@ -21,6 +21,15 @@ description: |
 
 ## Changelog Recente
 
+### 2026-06-08 — feat: Scanner de Backtest por Categoria
+- Nova página `/batch-backtest` ("Scanner BT" no menu lateral).
+- Usuário escolhe categoria (TF/MR/PA/SC/RG/IF/NW) + ativo e clica em "Executar Backtest da Categoria".
+- Backend: `POST /api/backtest/category` — filtra registry pelo prefixo, agrupa por `recommended_timeframe`, busca candles uma vez por TF, roda backtests em paralelo (`asyncio.gather`).
+- Estratégias com `needs_gex_context` ou `needs_graph_context` aparecem com badge N/A.
+- Resultado ordenado: INICIAR → CUIDADO → NÃO INICIAR → N/A; dentro de cada grupo por Profit Factor decrescente.
+- `backtest_recommendation()` extraída para `backtest_engine.py` (compartilhada com o endpoint de bot individual).
+- Página mostra cards expansíveis por estratégia com métricas + bullets de justificativa.
+
 ### 2026-06-08 — feat: Botão Liquidar na página Monitor
 - Coluna "Ações" adicionada à tabela de bots em `Monitor.jsx`.
 - Botão "Liquidar" visível apenas para bots com `direction !== 'FLAT'`.
