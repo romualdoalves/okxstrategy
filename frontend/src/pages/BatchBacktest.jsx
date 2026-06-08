@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { ScanSearch, Play, HelpCircle, ChevronDown, ChevronUp, PlusCircle } from 'lucide-react'
 import BacktestLikert from '../components/BacktestLikert'
+import { getStrategies } from '../api'
 
 const API = import.meta.env.VITE_API_URL || ''
 
@@ -115,6 +117,13 @@ export default function BatchBacktest() {
   const [results, setResults]   = useState(null)
   const [error, setError]       = useState(null)
 
+  const { data: strategies = [] } = useQuery({ queryKey: ['strategies'], queryFn: getStrategies })
+  const strategyCounts = strategies.reduce((acc, s) => {
+    const prefix = (s.id || '').match(/^([A-Z]+)/i)?.[1]?.toUpperCase()
+    if (prefix) acc[prefix] = (acc[prefix] || 0) + 1
+    return acc
+  }, {})
+
   const run = async () => {
     setLoading(true)
     setResults(null)
@@ -160,21 +169,29 @@ export default function BatchBacktest() {
         <div>
           <label className="text-xs text-muted uppercase tracking-wider mb-2 block">Categoria</label>
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
-            {CATEGORIES.map(cat => (
-              <button
-                key={cat.id}
-                onClick={() => setCategory(cat.id)}
-                title={cat.description}
-                className={`px-3 py-2 rounded-lg text-sm font-bold border transition-all ${
-                  category === cat.id
-                    ? 'bg-accent/20 border-accent/50 text-accent'
-                    : 'bg-white/5 border-white/10 text-muted hover:text-white hover:border-white/20'
-                }`}
-              >
-                {cat.id}
-                <div className="text-[9px] font-normal opacity-70 truncate">{cat.label}</div>
-              </button>
-            ))}
+            {CATEGORIES.map(cat => {
+              const count = strategyCounts[cat.id] ?? 0
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => setCategory(cat.id)}
+                  title={cat.description}
+                  className={`px-3 py-2 rounded-lg text-sm font-bold border transition-all ${
+                    category === cat.id
+                      ? 'bg-accent/20 border-accent/50 text-accent'
+                      : 'bg-white/5 border-white/10 text-muted hover:text-white hover:border-white/20'
+                  }`}
+                >
+                  {cat.id}
+                  <div className="text-[9px] font-normal opacity-70 truncate">{cat.label}</div>
+                  {count > 0 && (
+                    <div className={`text-[9px] font-bold mt-0.5 ${category === cat.id ? 'text-accent/80' : 'text-muted/60'}`}>
+                      {count} {count === 1 ? 'estratégia' : 'estratégias'}
+                    </div>
+                  )}
+                </button>
+              )
+            })}
           </div>
           {category && (
             <p className="text-xs text-muted mt-2">
