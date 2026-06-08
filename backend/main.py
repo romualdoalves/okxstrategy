@@ -216,6 +216,8 @@ async def monitor_bots():
             if notional_price > 0:
                 app_notional = local_size * notional_price
                 okx_notional = okx_size * notional_price
+            entry_notional_price = float(entry or notional_price or 0.0)
+            okx_entry_notional = okx_size * entry_notional_price if entry_notional_price > 0 else 0.0
             notional_tolerance = max(2.0, FIXED_STAKE_USD * 0.05)
             local_open = direction != 0
             okx_open = okx_size > 1e-9
@@ -227,10 +229,10 @@ async def monitor_bots():
                 elif local_size > 0 and abs(okx_size - local_size) > max(1e-8, local_size * 0.001):
                     sync_status = "divergent"
                     sync_detail = f"Tamanho divergente: App {local_size:.8f}, OKX {okx_size:.8f}."
-                elif okx_notional > 0 and abs(okx_notional - FIXED_STAKE_USD) > notional_tolerance:
+                elif okx_entry_notional > 0 and abs(okx_entry_notional - FIXED_STAKE_USD) > notional_tolerance:
                     sync_status = "divergent"
                     sync_detail = (
-                        f"Notional divergente: OKX ${okx_notional:.2f}, "
+                        f"Notional de entrada divergente: OKX ${okx_entry_notional:.2f}, "
                         f"esperado ${FIXED_STAKE_USD:.2f} por stake fixo."
                     )
                 else:
@@ -265,6 +267,7 @@ async def monitor_bots():
             "okx_size": round(okx_size, 8),
             "app_notional": round(app_notional, 2),
             "okx_notional": round(okx_notional, 2),
+            "okx_entry_notional": round(okx_entry_notional, 2),
             "expected_notional": FIXED_STAKE_USD if direction != 0 else 0.0,
             "sync_status": sync_status,
             "sync_detail": sync_detail,

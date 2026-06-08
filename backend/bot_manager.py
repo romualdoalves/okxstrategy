@@ -150,6 +150,35 @@ class BotInstance:
         s = (symbol or "").upper()
         return "-" in s and not (s.endswith("-SWAP") or s.endswith("-FUTURES"))
 
+    def _position_notional(self, pos, reference_price: float | None = None) -> float:
+        price = float(reference_price or getattr(pos, "avg_price", 0.0) or 0.0)
+        size = abs(float(getattr(pos, "size", 0.0) or 0.0))
+        return size * price if price > 0 and size > 0 else 0.0
+
+    def _can_adopt_spot_position(self, pos, *, context: str) -> bool:
+        if not pos or not self._is_spot_symbol(self.config.symbol):
+            return True
+        notional = self._position_notional(pos)
+        tolerance = max(2.0, FIXED_STAKE_USD * 0.05)
+        if notional <= 0 or abs(notional - FIXED_STAKE_USD) <= tolerance:
+            return True
+
+        msg = (
+            f"Saldo spot órfão em {self.config.symbol} vale ${notional:.2f}; "
+            f"esperado ${FIXED_STAKE_USD:.2f}. Não foi adotado como posição do bot."
+        )
+        self._hold_reason = msg
+        self._last_order_error = {
+            "kind": "spot_orphan_notional_mismatch",
+            "message": msg,
+            "symbol": self.config.symbol,
+            "context": context,
+            "okx_notional": round(notional, 2),
+            "expected_notional": FIXED_STAKE_USD,
+        }
+        log.warning("[Bot %d] %s", self.config.id, msg)
+        return False
+
     async def _close_size_from_exchange(self, exchange: BaseExchange) -> float:
         local_size = abs(float(self._sz or 0.0))
         if self._is_spot_symbol(self.config.symbol) and self._direction > 0:
@@ -422,39 +451,40 @@ class BotInstance:
                             # Banco FLAT mas OKX tem posição → adotar automaticamente.
                             # Ignorar deixaria o bot em HOLD permanente (O11 bloqueia nova entrada
                             # enquanto a posição órfã existir na exchange sem gestão local).
-                            adopted_dir = 1 if pos.side == "long" else -1
-                            adopted_sz  = abs(pos.size)
-                            adopted_px  = pos.avg_price or 0.0
-                            # SL conservador de 5 % — substituído pelo ATR real no primeiro candle
-                            fallback_sl = round(
-                                adopted_px * (1 - 0.05) if adopted_dir == 1
-                                else adopted_px * (1 + 0.05), 6
-                            )
-                            self._direction    = adopted_dir
-                            self._sz           = adopted_sz
-                            self._sz_remaining = adopted_sz
-                            self._entry_price  = adopted_px
-                            self._sl_price     = fallback_sl
-                            # Calcula TP1 para posição órfã (2% de lucro como padrão conservador)
-                            orphan_tp1 = adopted_px * (1.02 if adopted_dir == 1 else 0.98)
-                            self._tp1_price    = orphan_tp1
-                            log.warning(
-                                "[Bot %d] Posição órfã adotada: %.4f %s @ %.4f "
-                                "(banco estava FLAT). SL conservador em %.4f. TP1 em %.4f. "
-                                "Posição será gerenciada normalmente.",
-                                self.config.id, adopted_sz, pos.side, adopted_px, fallback_sl, orphan_tp1,
-                            )
-                            trade_id = self._save_trade({
-                                "type":        "entry",
-                                "event":       "ORPHAN_ADOPTED",
-                                "direction":   "LONG" if adopted_dir == 1 else "SHORT",
-                                "size":        adopted_sz,
-                                "entry_price": adopted_px,
-                                "sl_price":    fallback_sl,
-                                "tp1_price":   orphan_tp1,
-                                "source":      "orphan_recovery",
-                            })
-                            self._current_trade_id = trade_id
+                            if self._can_adopt_spot_position(pos, context="startup_recovery"):
+                                adopted_dir = 1 if pos.side == "long" else -1
+                                adopted_sz  = abs(pos.size)
+                                adopted_px  = pos.avg_price or 0.0
+                                # SL conservador de 5 % — substituído pelo ATR real no primeiro candle
+                                fallback_sl = round(
+                                    adopted_px * (1 - 0.05) if adopted_dir == 1
+                                    else adopted_px * (1 + 0.05), 6
+                                )
+                                self._direction    = adopted_dir
+                                self._sz           = adopted_sz
+                                self._sz_remaining = adopted_sz
+                                self._entry_price  = adopted_px
+                                self._sl_price     = fallback_sl
+                                # Calcula TP1 para posição órfã (2% de lucro como padrão conservador)
+                                orphan_tp1 = adopted_px * (1.02 if adopted_dir == 1 else 0.98)
+                                self._tp1_price    = orphan_tp1
+                                log.warning(
+                                    "[Bot %d] Posição órfã adotada: %.4f %s @ %.4f "
+                                    "(banco estava FLAT). SL conservador em %.4f. TP1 em %.4f. "
+                                    "Posição será gerenciada normalmente.",
+                                    self.config.id, adopted_sz, pos.side, adopted_px, fallback_sl, orphan_tp1,
+                                )
+                                trade_id = self._save_trade({
+                                    "type":        "entry",
+                                    "event":       "ORPHAN_ADOPTED",
+                                    "direction":   "LONG" if adopted_dir == 1 else "SHORT",
+                                    "size":        adopted_sz,
+                                    "entry_price": adopted_px,
+                                    "sl_price":    fallback_sl,
+                                    "tp1_price":   orphan_tp1,
+                                    "source":      "orphan_recovery",
+                                })
+                                self._current_trade_id = trade_id
                     else:
                         if self._direction != 0:
                             log.warning(
@@ -1454,6 +1484,9 @@ class BotInstance:
                     )
                 else:
                     # Banco FLAT mas OKX tem posição — adotar agora para não ficar bloqueado.
+                    if not self._can_adopt_spot_position(pos, context="entry_precheck"):
+                        self._entry_inflight = False
+                        return
                     adopted_dir = 1 if pos.side == "long" else -1
                     adopted_sz  = abs(pos.size)
                     adopted_px  = pos.avg_price or 0.0
@@ -2669,6 +2702,8 @@ class BotManager:
                     qty = abs(float(pos.size or 0.0)) if pos else 0.0
                     if bot._direction == 0:
                         if qty > 0 and bot._is_spot_symbol(bot.config.symbol):
+                            if not bot._can_adopt_spot_position(pos, context="reconcile_loop"):
+                                continue
                             adopted_dir = 1 if pos.side == "long" else -1
                             adopted_px = float(pos.avg_price or 0.0)
                             fallback_sl = round(
