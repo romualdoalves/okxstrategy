@@ -1930,8 +1930,8 @@ class BotInstance:
                 timestamp=ts,
                 signal=result.signal.value,
                 hold_reason=result.hold_reason or None,
-                indicators=dict(result.indicators) if result.indicators else {},
-                meta=dict(result.metadata) if result.metadata else {},
+                indicators=self._to_json(dict(result.indicators)) if result.indicators else {},
+                meta=self._to_json(dict(result.metadata)) if result.metadata else {},
                 candle_open=bar.open,
                 candle_high=bar.high,
                 candle_low=bar.low,
@@ -2465,7 +2465,7 @@ class BotManager:
 
     async def _broadcast(self, msg: dict):
         import json
-        data = json.dumps(msg)
+        data = json.dumps(BotInstance._to_json(msg))
         dead = set()
         for q in self._ws_clients:
             try:
