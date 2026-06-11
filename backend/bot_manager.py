@@ -44,7 +44,6 @@ from .notifications import (
 )
 
 log = logging.getLogger("bot_manager")
-FIXED_STAKE_USD = 100.0
 
 CANONICAL_ENTRY_CRITERIA: dict[str, list[str]] = {
     "TF001": ["C1 EMA", "C2 VWAP", "C3 ATR"],
@@ -94,7 +93,6 @@ class BotInstance:
 
     def __init__(self, config: BotModel, ws_broadcast):
         self.config       = config
-        self.config.stake_usd = FIXED_STAKE_USD
         self._broadcast   = ws_broadcast   # coroutine para enviar ao frontend
         self.strategy     = get_strategy(config.strategy_id)
         if config.strategy_params:
@@ -164,7 +162,6 @@ class BotInstance:
         net_size     = max(0.0, total_size - baseline_qty)
 
         if net_size <= 1e-9:
-            # Todo o saldo OKX é pré-existente (baseline) — bot fica FLAT sem divergência.
             log.debug(
                 "[Bot %d] Saldo spot %s=%.8f inteiramente coberto pelo baseline=%.8f — ignorado.",
                 self.config.id, self.config.symbol, total_size, baseline_qty,
@@ -173,16 +170,11 @@ class BotInstance:
 
         price    = abs(float(getattr(pos, "avg_price", 0.0) or 0.0))
         notional = net_size * price if price > 0 else 0.0
-        tolerance = max(2.0, FIXED_STAKE_USD * 0.05)
 
-        if notional <= 0 or abs(notional - FIXED_STAKE_USD) <= tolerance:
-            return True  # notional líquido ≈ stake → adota como posição do bot
-
-        # Notional líquido existe mas não bate com o stake → divergência genuína
         msg = (
-            f"Posição líquida em {self.config.symbol}: {net_size:.8f} units (${notional:.2f}); "
-            f"esperado ${FIXED_STAKE_USD:.2f}. "
-            f"[total OKX={total_size:.8f}, baseline={baseline_qty:.8f}]"
+            f"Aviso: Saldo spot encontrado na OKX em {self.config.symbol} (líquido: {net_size:.8f} units, ~${notional:.2f}). "
+            f"O bot foi bloqueado para entrada automática a fim de proteger seus fundos de hold. "
+            f"Se deseja que o bot opere, venda este saldo manualmente na OKX ou ajuste o baseline_balance do bot."
         )
         self._hold_reason = msg
         self._last_order_error = {
@@ -191,7 +183,7 @@ class BotInstance:
             "symbol": self.config.symbol,
             "context": context,
             "okx_notional": round(notional, 2),
-            "expected_notional": FIXED_STAKE_USD,
+            "expected_notional": getattr(self.config, "stake_usd", 0.0),
         }
         log.warning("[Bot %d] %s", self.config.id, msg)
         return False
@@ -446,63 +438,12 @@ class BotInstance:
                                 )
                                 self._sl_price = new_sl
 
-                            # Sincronização de Emergência: reativa SW-TS se lucro >= 1% já existe
-                            if self._entry_price > 0:
-                                ticker = await exchange.get_ticker(self.config.symbol)
-                                last_price = float(ticker.get("last") or ticker.get("ask") or self._entry_price)
-                                pnl_pct = (last_price - self._entry_price) / self._entry_price * self._direction
-
-                                if pnl_pct >= 0.01:
-                                    cb = max(0.005, (self._current_atr * 1.5) / last_price if self._current_atr else 0.005)
-                                    self._tp1_done = True
-                                    self._peak_price = last_price
-                                    self._ts_algo_id = "sw"
-                                    self._ts_callback_ratio = cb
-                                    self._sl_price = (last_price * (1 - cb) if self._direction == 1
-                                                      else last_price * (1 + cb))
-                                    log.info(
-                                        "[Bot %d] Start Sync: PnL %.2f%% — SW-TS reativado. peak=%.4f stop=%.4f",
-                                        self.config.id, pnl_pct * 100, self._peak_price, self._sl_price,
-                                    )
+                            # Sincronização de Emergência baseada na OKX apenas (removido SW-TS local)
+                            pass
                         else:
-                            # Banco FLAT mas OKX tem posição → adotar automaticamente.
-                            # Ignorar deixaria o bot em HOLD permanente (O11 bloqueia nova entrada
-                            # enquanto a posição órfã existir na exchange sem gestão local).
-                            if self._can_adopt_spot_position(pos, context="startup_recovery"):
-                                adopted_dir = 1 if pos.side == "long" else -1
-                                _baseline   = abs(float(getattr(self.config, "baseline_balance", 0.0) or 0.0))
-                                adopted_sz  = max(0.0, abs(pos.size) - _baseline)
-                                adopted_px  = pos.avg_price or 0.0
-                                # SL conservador de 5 % — substituído pelo ATR real no primeiro candle
-                                fallback_sl = round(
-                                    adopted_px * (1 - 0.05) if adopted_dir == 1
-                                    else adopted_px * (1 + 0.05), 6
-                                )
-                                self._direction    = adopted_dir
-                                self._sz           = adopted_sz
-                                self._sz_remaining = adopted_sz
-                                self._entry_price  = adopted_px
-                                self._sl_price     = fallback_sl
-                                # Calcula TP1 para posição órfã (2% de lucro como padrão conservador)
-                                orphan_tp1 = adopted_px * (1.02 if adopted_dir == 1 else 0.98)
-                                self._tp1_price    = orphan_tp1
-                                log.warning(
-                                    "[Bot %d] Posição órfã adotada: %.4f %s @ %.4f "
-                                    "(banco estava FLAT). SL conservador em %.4f. TP1 em %.4f. "
-                                    "Posição será gerenciada normalmente.",
-                                    self.config.id, adopted_sz, pos.side, adopted_px, fallback_sl, orphan_tp1,
-                                )
-                                trade_id = self._save_trade({
-                                    "type":        "entry",
-                                    "event":       "ORPHAN_ADOPTED",
-                                    "direction":   "LONG" if adopted_dir == 1 else "SHORT",
-                                    "size":        adopted_sz,
-                                    "entry_price": adopted_px,
-                                    "sl_price":    fallback_sl,
-                                    "tp1_price":   orphan_tp1,
-                                    "source":      "orphan_recovery",
-                                })
-                                self._current_trade_id = trade_id
+                            # Banco FLAT mas OKX tem posição.
+                            # A adoção automática foi desativada.
+                            self._can_adopt_spot_position(pos, context="startup_recovery")
                     else:
                         if self._direction != 0:
                             log.warning(
@@ -640,7 +581,7 @@ class BotInstance:
                     symbol          = self.config.symbol,
                     timeframe       = self.config.timeframe,
                     leverage        = self.config.leverage,
-                    stake_usd       = FIXED_STAKE_USD,
+                    stake_usd       = self.config.stake_usd,
                     demo            = self.config.demo,
                     stop_loss_usd   = self.config.stop_loss_usd,
                     strategy_params = self.config.strategy_params or {},
@@ -978,7 +919,7 @@ class BotInstance:
                 sz = float(exchange.num_contracts(
                     self.config.symbol,
                     price,
-                    FIXED_STAKE_USD,
+                    self.config.stake_usd,
                     self.config.leverage,
                 ) or 0.0)
             except Exception as exc:
@@ -1085,25 +1026,8 @@ class BotInstance:
                 else:
                     if self._peak_price == 0 or bar.close < self._peak_price:
                         self._peak_price = bar.close
-
-                # Software TS: keep _sl_price current and fire exit when stop is crossed
-                if self._ts_algo_id == "sw" and self._ts_callback_ratio > 0 and self._peak_price > 0:
-                    sw_stop = (
-                        self._peak_price * (1 - self._ts_callback_ratio)
-                        if self._direction == 1
-                        else self._peak_price * (1 + self._ts_callback_ratio)
-                    )
-                    self._sl_price = sw_stop
-
-                    stop_hit = (
-                        (self._direction == 1  and bar.close <= sw_stop) or
-                        (self._direction == -1 and bar.close >= sw_stop)
-                    )
-                    if stop_hit and not self._exit_ord_id:
-                        self._exit_ord_id = "sw_pending"
-                        log.info("[Bot %d] SW-TS TRIGGERED: price=%.4f stop=%.4f",
-                                 self.config.id, bar.close, sw_stop)
-                        asyncio.create_task(self._sw_exit(bar.close, exchange))
+                # Remover bloco de TS em software (usamos apenas OKX nativo)
+                pass
 
             await self._broadcast({
                 "type":   "price",
@@ -1125,41 +1049,7 @@ class BotInstance:
         # Se não há posição, não há o que sincronizar
         if self._direction == 0:
             return
-
-        # Software trailing stop: advance peak, recompute stop, trigger exit if crossed
-        if self._ts_algo_id == "sw":
-            if self._candles and self._ts_callback_ratio > 0:
-                last_close = self._candles[-1].close
-                if self._direction == 1:
-                    if self._peak_price == 0 or last_close > self._peak_price:
-                        self._peak_price = last_close
-                else:
-                    if self._peak_price == 0 or last_close < self._peak_price:
-                        self._peak_price = last_close
-                if self._peak_price > 0:
-                    new_stop = (
-                        self._peak_price * (1 - self._ts_callback_ratio)
-                        if self._direction == 1
-                        else self._peak_price * (1 + self._ts_callback_ratio)
-                    )
-                    self._sl_price = new_stop
-                    log.info("[AUDITORIA Bot %d] SW-TS: peak=%.4f stop=%.4f",
-                             self.config.id, self._peak_price, self._sl_price)
-                    # Persiste o nível avançado do trailing stop para sobreviver a restarts
-                    if new_stop > self._last_persisted_sl:
-                        self._persist_trailing_stop_level()
-                    # Streams de fallback podem renderizar somente candles fechados.
-                    # never runs — check the trigger here on every poll cycle instead.
-                    stop_hit = (
-                        (self._direction == 1  and last_close <= new_stop) or
-                        (self._direction == -1 and last_close >= new_stop)
-                    )
-                    if stop_hit and not self._exit_ord_id:
-                        self._exit_ord_id = "sw_pending"
-                        log.info("[Bot %d] SW-TS TRIGGERED via sync: price=%.4f stop=%.4f",
-                                 self.config.id, last_close, new_stop)
-                        asyncio.create_task(self._sw_exit(last_close, exchange))
-            return
+        # Bloco de trailing stop por software foi descontinuado
 
         try:
             # 1. Recupera o ID se não tivermos um, ou se for o marcador de restart
@@ -1453,7 +1343,7 @@ class BotInstance:
 
         atr = result.indicators.get("atr", price * 0.005)
         sz  = exchange.num_contracts(
-            self.config.symbol, price, FIXED_STAKE_USD, self.config.leverage)
+            self.config.symbol, price, self.config.stake_usd, self.config.leverage)
 
         sl_px  = result.metadata.get("sl_price",
             price - atr * 1.5 if direction == "long" else price + atr * 1.5)
@@ -1563,8 +1453,9 @@ class BotInstance:
             self._hold_reason = "Mercado spot sem alavancagem permite apenas compra/fechamento de saldo."
             self._entry_inflight = False
             return
-
         try:
+            # Força alavancagem de 1x (risco isolado) antes de entrar
+            await exchange.set_leverage(self.config.symbol, 1)
             ord_id = await exchange.market_order(self.config.symbol, entry_side, sz)
         except Exception as exc:
             ord_id = None

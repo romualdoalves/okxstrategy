@@ -18,7 +18,6 @@ import aiohttp
 from .base import BaseExchange, CandleBar, Position
 
 OKX_BASE = "https://www.okx.com"
-FIXED_SPOT_STAKE_USD = 100.0
 
 # ── Cache de informações de instrumento (público, sem auth) ───────────────────
 # Evita chamar /public/instruments a cada ordem. Populado em warmup_instrument().
@@ -192,14 +191,26 @@ class OKXExchange(BaseExchange):
 
     async def fetch_candles(self, symbol: str, timeframe: str, limit: int = 100) -> list[CandleBar]:
         bar = _tf_to_okx(timeframe)
-        path = f"/api/v5/market/candles?instId={symbol}&bar={bar}&limit={min(limit, 300)}"
-        async with aiohttp.ClientSession() as s:
-            async with s.get(f"{OKX_BASE}{path}") as resp:
-                data = await resp.json()
-        _check(data, "fetch_candles")
+        all_rows = []
+        after = ""
+        while len(all_rows) < limit:
+            chunk_size = min(limit - len(all_rows), 300)
+            path = f"/api/v5/market/candles?instId={symbol}&bar={bar}&limit={chunk_size}"
+            if after:
+                path += f"&after={after}"
+            async with aiohttp.ClientSession() as s:
+                async with s.get(f"{OKX_BASE}{path}") as resp:
+                    data = await resp.json()
+            _check(data, "fetch_candles")
+            rows = data.get("data", [])
+            if not rows:
+                break
+            all_rows.extend(rows)
+            after = rows[-1][0] # ts of the oldest candle in chunk
+            if len(rows) < chunk_size:
+                break # no more data available
         # OKX retorna do mais recente para o mais antigo — invertemos para ordem cronológica
-        rows = data.get("data", [])
-        return [_parse_candle(r) for r in reversed(rows)]
+        return [_parse_candle(r) for r in reversed(all_rows)]
 
     async def get_ticker(self, symbol: str) -> dict:
         path = f"/api/v5/market/ticker?instId={symbol}"
@@ -331,7 +342,22 @@ class OKXExchange(BaseExchange):
     # ── Compatibilidade spot-only ─────────────────────────────────────────────
 
     async def set_leverage(self, symbol: str, leverage: int) -> None:
-        return  # Aplicação spot-only: nunca configura alavancagem.
+        if _inst_type(symbol) == "SPOT":
+            return
+        body = json.dumps({
+            "instId": symbol,
+            "mgnMode": "isolated",
+            "lever": str(leverage),
+        })
+        path = "/api/v5/account/set-leverage"
+        headers = _auth_headers("POST", path, body)
+        async with aiohttp.ClientSession() as s:
+            async with s.post(f"{OKX_BASE}{path}", headers=headers, data=body) as resp:
+                data = await resp.json()
+        if str(data.get("code", "0")) != "0":
+            # OKX Code 51006 means leverage is already set to the same level.
+            if str(data.get("code", "0")) != "51006":
+                _check(data, "set_leverage")
 
     # ── Ordens ────────────────────────────────────────────────────────────────
 
@@ -371,14 +397,9 @@ class OKXExchange(BaseExchange):
 
     async def market_order(self, symbol: str, side: str, size: float, reduce_only: bool = False) -> Optional[str]:
         self.last_order_error = None
-        if _inst_type(symbol) != "SPOT":
-            self.last_order_error = {
-                "kind": "spot_only",
-                "message": "Este app opera somente OKX spot. Símbolos -SWAP/-FUTURES estão bloqueados.",
-            }
-            return None
-        if not await self._guard_spot_sell_close(symbol, side, size, close_intent=reduce_only):
-            return None
+        if _inst_type(symbol) == "SPOT":
+            if not await self._guard_spot_sell_close(symbol, side, size, close_intent=reduce_only):
+                return None
         body_dict = {
             "instId":  symbol,
             "tdMode":  _td_mode(symbol),
@@ -409,17 +430,15 @@ class OKXExchange(BaseExchange):
 
     async def place_stop_loss(self, symbol: str, side: str, size: float, trigger_price: float) -> Optional[str]:
         self.last_order_error = None
-        if _inst_type(symbol) != "SPOT":
-            self.last_order_error = {"kind": "spot_only", "message": "Stop Loss permitido somente em OKX spot."}
-            return None
-        if (side or "").lower() != "sell":
-            self.last_order_error = {
-                "kind": "spot_stop_side_blocked",
-                "message": "Stop Loss SPOT só pode vender saldo comprado existente.",
-            }
-            return None
-        if not await self._guard_spot_sell_close(symbol, side, size, close_intent=True):
-            return None
+        if _inst_type(symbol) == "SPOT":
+            if (side or "").lower() != "sell":
+                self.last_order_error = {
+                    "kind": "spot_stop_side_blocked",
+                    "message": "Stop Loss SPOT só pode vender saldo comprado existente.",
+                }
+                return None
+            if not await self._guard_spot_sell_close(symbol, side, size, close_intent=True):
+                return None
         body = json.dumps({
             "instId":          symbol,
             "tdMode":          _td_mode(symbol),
@@ -445,17 +464,15 @@ class OKXExchange(BaseExchange):
 
     async def place_trailing_stop(self, symbol: str, side: str, size: float, callback_ratio: float, activation_price: float = 0.0) -> Optional[str]:
         self.last_order_error = None
-        if _inst_type(symbol) != "SPOT":
-            self.last_order_error = {"kind": "spot_only", "message": "Trailing stop permitido somente em OKX spot."}
-            return None
-        if (side or "").lower() != "sell":
-            self.last_order_error = {
-                "kind": "spot_trailing_side_blocked",
-                "message": "Trailing stop SPOT só pode vender saldo comprado existente.",
-            }
-            return None
-        if not await self._guard_spot_sell_close(symbol, side, size, close_intent=True):
-            return None
+        if _inst_type(symbol) == "SPOT":
+            if (side or "").lower() != "sell":
+                self.last_order_error = {
+                    "kind": "spot_trailing_side_blocked",
+                    "message": "Trailing stop SPOT só pode vender saldo comprado existente.",
+                }
+                return None
+            if not await self._guard_spot_sell_close(symbol, side, size, close_intent=True):
+                return None
         body_dict: dict = {
             "instId":        symbol,
             "tdMode":        _td_mode(symbol),
@@ -671,10 +688,8 @@ class OKXExchange(BaseExchange):
         info   = _INST_CACHE.get(symbol, {})
         ct_val = info.get("ctVal", 1.0)   # unidades base por contrato
         lot_sz = info.get("lotSz", 1.0)   # múltiplo mínimo de contratos
-        # Aplicação spot-only: stake fixo global de US$100 por ordem.
-        # O parâmetro stake_usd é mantido apenas por compatibilidade da interface.
-        notional = FIXED_SPOT_STAKE_USD
-        qty = notional / (price * ct_val)
+        
+        qty = stake_usd / (price * ct_val)
         # Arredonda para baixo ao múltiplo de lotSz
         if lot_sz > 0:
             qty = math.floor(qty / lot_sz) * lot_sz
