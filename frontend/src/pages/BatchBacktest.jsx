@@ -111,11 +111,16 @@ function ResultCard({ r, symbol }) {
 }
 
 export default function BatchBacktest() {
+  const nav = useNavigate()
   const [category, setCategory] = useState('TF')
   const [symbol, setSymbol]     = useState('')
   const [loading, setLoading]   = useState(false)
   const [results, setResults]   = useState(null)
   const [error, setError]       = useState(null)
+
+  const [autoScanLoading, setAutoScanLoading] = useState(false)
+  const [autoScanProgress, setAutoScanProgress] = useState({ current: 0, total: 0 })
+  const [autoScanResults, setAutoScanResults] = useState(null)
 
   const { data: strategies = [] } = useQuery({ queryKey: ['strategies'], queryFn: getStrategies })
   const { data: bots = [] }       = useQuery({ queryKey: ['bots'],       queryFn: getBots       })
@@ -128,6 +133,65 @@ export default function BatchBacktest() {
     if (prefix) acc[prefix] = (acc[prefix] || 0) + 1
     return acc
   }, {})
+
+  const runAutoScan = async () => {
+    setAutoScanLoading(true)
+    setAutoScanResults(null)
+    setError(null)
+
+    const combinations = []
+    for (const cat of CATEGORIES) {
+      if (!strategyCounts[cat.id]) continue;
+      for (const sym of SYMBOLS) {
+        if (usedSymbols.has(sym)) continue;
+        combinations.push({ cat: cat.id, sym })
+      }
+    }
+
+    setAutoScanProgress({ current: 0, total: combinations.length })
+
+    let allResults = []
+    let current = 0
+
+    for (const { cat, sym } of combinations) {
+      try {
+        const res = await fetch(`${API}/api/backtest/category`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ category: cat, symbol: sym, exclude_strategies: usedStrategies }),
+        })
+        if (res.ok) {
+          const data = await res.json()
+          for (const r of data.results || []) {
+             if (r.recommendation?.score >= 7.0 && r.recommendation?.verdict === 'INICIAR') {
+                 allResults.push({ ...r, symbol: sym, category: cat })
+             }
+          }
+        }
+      } catch (err) {
+        console.error(err)
+      }
+      current++
+      setAutoScanProgress({ current, total: combinations.length })
+    }
+
+    allResults.sort((a, b) => (b.recommendation?.score || 0) - (a.recommendation?.score || 0))
+
+    const finalRanking = []
+    const seenStrats = new Set()
+    const seenSyms = new Set()
+
+    for (const r of allResults) {
+       if (!seenStrats.has(r.strategy_id) && !seenSyms.has(r.symbol)) {
+           finalRanking.push(r)
+           seenStrats.add(r.strategy_id)
+           seenSyms.add(r.symbol)
+       }
+    }
+
+    setAutoScanResults(finalRanking)
+    setAutoScanLoading(false)
+  }
 
   const run = async () => {
     setLoading(true)
@@ -166,6 +230,88 @@ export default function BatchBacktest() {
           <h1 className="text-2xl font-bold">Scanner de Backtest</h1>
           <p className="text-sm text-muted">Testa todas as estratégias de uma categoria em um ativo e ordena do melhor ao pior</p>
         </div>
+      </div>
+
+      {/* Auto-Scan Section */}
+      <div className="card p-5 mb-6 space-y-4 border-accent/30">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-bold text-accent">Ranking Auto-Scan (INICIAR)</h2>
+            <p className="text-sm text-muted">Testa todas as categorias e ativos disponíveis e ranqueia as melhores combinações</p>
+          </div>
+          <button
+            onClick={runAutoScan}
+            disabled={autoScanLoading}
+            className="btn flex items-center gap-2 bg-accent text-black font-bold hover:bg-accent/90 shadow-[0_0_20px_rgba(var(--accent-rgb),0.3)] disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {autoScanLoading
+              ? <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
+              : <Play size={15} />
+            }
+            {autoScanLoading ? 'Escaneando…' : 'Auto-Scan'}
+          </button>
+        </div>
+
+        {autoScanLoading && (
+          <div className="flex flex-col items-center justify-center py-8 gap-3 text-muted">
+            <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+            <p className="text-sm">Analisando todas as combinações de estratégias e ativos…</p>
+            <p className="text-xs font-mono bg-white/5 px-3 py-1 rounded-full text-accent">
+              {autoScanProgress.current} / {autoScanProgress.total} concluídos
+            </p>
+          </div>
+        )}
+
+        {autoScanResults && !autoScanLoading && (
+          autoScanResults.length === 0 ? (
+            <div className="text-center py-8 text-muted border border-white/5 rounded-lg bg-white/5">
+              Nenhuma combinação atingiu score ≥ 7.0
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm whitespace-nowrap">
+                <thead>
+                  <tr className="text-muted border-b border-white/10 text-xs uppercase tracking-wider">
+                    <th className="py-3 px-4">#</th>
+                    <th className="py-3 px-4">Estratégia</th>
+                    <th className="py-3 px-4">Ativo</th>
+                    <th className="py-3 px-4 text-right">Score</th>
+                    <th className="py-3 px-4 text-right">WR</th>
+                    <th className="py-3 px-4 text-right">PF</th>
+                    <th className="py-3 px-4 text-right">DD</th>
+                    <th className="py-3 px-4 text-right">P&L</th>
+                    <th className="py-3 px-4 text-center">Ação</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {autoScanResults.map((r, i) => (
+                    <tr key={`${r.strategy_id}-${r.symbol}`} className="hover:bg-white/5 transition-colors">
+                      <td className="py-3 px-4 font-mono text-muted">{i + 1}</td>
+                      <td className="py-3 px-4 font-bold text-white">{r.strategy_id}</td>
+                      <td className="py-3 px-4 font-mono text-white">{r.symbol}</td>
+                      <td className="py-3 px-4 text-right font-mono text-green-400 font-bold">{r.recommendation?.score?.toFixed(1)}</td>
+                      <td className="py-3 px-4 text-right font-mono">{r.win_rate?.toFixed(1)}%</td>
+                      <td className="py-3 px-4 text-right font-mono">{r.profit_factor?.toFixed(2)}</td>
+                      <td className="py-3 px-4 text-right font-mono text-red-400">${r.max_drawdown?.toFixed(2)}</td>
+                      <td className={`py-3 px-4 text-right font-mono font-bold ${r.total_profit > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                        {r.total_profit > 0 ? '+' : ''}${r.total_profit?.toFixed(2)}
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <button
+                          onClick={() => nav(`/bots/new?strategy=${r.strategy_id}&symbol=${encodeURIComponent(r.symbol)}`)}
+                          className="inline-flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-bold bg-accent/15 text-accent border border-accent/30 hover:bg-accent/25 transition-colors"
+                        >
+                          <PlusCircle size={13} />
+                          Criar Bot
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        )}
       </div>
 
       {/* Controls */}
