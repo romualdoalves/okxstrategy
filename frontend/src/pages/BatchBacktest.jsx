@@ -112,7 +112,7 @@ function ResultCard({ r, symbol }) {
 
 export default function BatchBacktest() {
   const [category, setCategory] = useState('TF')
-  const [symbol, setSymbol]     = useState('BTC-USDT')
+  const [symbol, setSymbol]     = useState('')
   const [loading, setLoading]   = useState(false)
   const [results, setResults]   = useState(null)
   const [error, setError]       = useState(null)
