@@ -15,7 +15,9 @@ __pycache__
 .mypy_cache
 .ruff_cache
 
-.git
+.git/*
+!.git/HEAD
+!.git/refs
 .gitignore
 .claude
 images

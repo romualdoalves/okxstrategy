@@ -21,6 +21,7 @@ RUN groupadd --system app && useradd --system --gid app --home-dir /app app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
+COPY .git/ ./.git/
 COPY backend/ ./backend/
 COPY --from=frontend-build /app/backend/static_frontend ./backend/static_frontend
 
