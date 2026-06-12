@@ -18,6 +18,7 @@ __pycache__
 .git/*
 !.git/HEAD
 !.git/refs
+!.git/logs
 .gitignore
 .claude
 images

@@ -106,6 +106,9 @@ function AppShell() {
             {healthData?.version && (
               <span className="text-[10px] text-muted/50 font-mono leading-tight tracking-wider">
                 v{healthData.version}
+                {healthData.timestamp && ` • ${new Date(healthData.timestamp * 1000).toLocaleString(lang, { 
+                  month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' 
+                })}`}
               </span>
             )}
           </div>
