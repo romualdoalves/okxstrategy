@@ -599,22 +599,27 @@ async def factory_plan(req: FactoryPlanRequest):
         # Atribui o próximo ID disponível
         db = SessionLocal()
         try:
-            used = [r.strategy_id for r in db.query(FactoryStrategyModel.strategy_id).all()]
+            used = [r[0] for r in db.query(FactoryStrategyModel.strategy_id).all()]
         finally:
             db.close()
         from .strategy_factory.deployer import assign_next_id
         # Usa o prefixo da categoria semântica escolhida pela IA
         prefix = plan.get("category", "TF")
-        if prefix not in ("TF", "MR", "PA", "SC", "RG", "IF", "NW"):
+        if not isinstance(prefix, str) or prefix not in ("TF", "MR", "PA", "SC", "RG", "IF", "NW"):
             prefix = "TF"  # fallback seguro
         plan["id"] = assign_next_id(used, prefix=prefix)
         # Substitui placeholder pelo ID real
         placeholder = plan.get("id", "TF001")[:2] + "001"
-        plan["name"] = plan["name"].replace(placeholder, plan["id"], 1)
+        if isinstance(plan.get("name"), str):
+            plan["name"] = plan["name"].replace(placeholder, plan["id"], 1)
         # Remove qualquer placeholder legado (não deve acontecer com IA atualizada)
         return {"plan": plan}
     except RuntimeError as e:
         raise HTTPException(400, str(e))
+    except Exception as e:
+        import traceback
+        log.error("Erro no factory_plan:\n%s", traceback.format_exc())
+        raise HTTPException(400, f"Erro fatal ao gerar plano: {type(e).__name__} - {e}")
 
 
 @app.post("/api/strategy-factory/generate")
