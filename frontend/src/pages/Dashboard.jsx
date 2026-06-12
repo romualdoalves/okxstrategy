@@ -463,6 +463,8 @@ export default function Dashboard() {
         />
       </div>
 
+      <GeneralTunnel bots={botsWithRuntime} summary={summary} />
+
       <div>
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-semibold">{t('nav.bots')}</h2>
@@ -558,4 +560,62 @@ function criteriaRate(bot) {
   const criteria = getCriteriaCount(bot, indicators)
   if (!criteria || criteria.total === 0) return 0
   return criteria.ok / criteria.total
+}
+
+function GeneralTunnel({ bots, summary }) {
+  const tunnelLongs = bots.filter(b => b.runtime?.direction === 1).length
+  const tunnelShorts = bots.filter(b => b.runtime?.direction === -1).length
+  const tunnelFlats = bots.filter(b => b.runtime?.status === 'running' && (b.runtime?.direction === 0 || !b.runtime?.direction)).length
+  const totalGanhos = summary?.wins ?? 0
+  
+  const totalActive = tunnelLongs + tunnelShorts + tunnelFlats
+
+  return (
+    <div className="card p-5 mb-6 bg-gradient-to-r from-card to-card/50 border border-white/5 shadow-xl relative overflow-hidden">
+      {/* Decoração de fundo */}
+      <div className="absolute top-0 right-0 w-64 h-64 bg-bull/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 pointer-events-none" />
+      <div className="absolute bottom-0 right-0 w-64 h-64 bg-bear/5 rounded-full blur-3xl translate-y-1/2 translate-x-1/3 pointer-events-none" />
+
+      <div className="flex items-center justify-between mb-6 relative z-10">
+        <h2 className="font-bold text-sm tracking-wider uppercase flex items-center gap-2">
+          <Activity size={16} className="text-muted" />
+          Visão Geral do Túnel
+        </h2>
+        <span className="text-xs font-mono px-2 py-1 bg-white/5 rounded-md text-white/70">
+          {totalActive} total
+        </span>
+      </div>
+      
+      <div className="space-y-4 relative z-10">
+        {/* Linha Superior (Acima) */}
+        <div className="flex items-center gap-4">
+          <div className="w-24 text-right text-xs font-mono font-medium">{tunnelLongs} acima</div>
+          <div className="flex-1 h-2 bg-bear/20 rounded-full overflow-hidden shadow-inner">
+            <div 
+              className="h-full bg-bear transition-all duration-1000 shadow-[0_0_10px_rgba(239,68,68,0.5)]" 
+              style={{ width: totalActive > 0 ? `${Math.max(0, (tunnelLongs / totalActive) * 100)}%` : '0%' }} 
+            />
+          </div>
+        </div>
+        
+        {/* Meio (Dentro) */}
+        <div className="flex items-center justify-center py-2">
+          <div className="text-xs text-muted font-mono bg-background/50 px-4 py-1.5 rounded-full border border-white/5 shadow-sm">
+            {tunnelFlats} dentro <span className="mx-2 opacity-30">·</span> <span className="text-bull font-bold drop-shadow-sm">{totalGanhos} ganhos</span>
+          </div>
+        </div>
+
+        {/* Linha Inferior (Abaixo) */}
+        <div className="flex items-center gap-4">
+          <div className="w-24 text-right text-xs font-mono font-medium">{tunnelShorts} abaixo</div>
+          <div className="flex-1 h-2 bg-bull/20 rounded-full overflow-hidden shadow-inner">
+            <div 
+              className="h-full bg-bull transition-all duration-1000 shadow-[0_0_10px_rgba(34,197,94,0.5)]" 
+              style={{ width: totalActive > 0 ? `${Math.max(0, (tunnelShorts / totalActive) * 100)}%` : '0%' }} 
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 }
