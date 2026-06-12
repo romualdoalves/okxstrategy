@@ -123,6 +123,7 @@ export default function BatchBacktest() {
   const usedStrategies = Array.from(new Set(bots.map(b => b.strategy_id)))
 
   const strategyCounts = strategies.reduce((acc, s) => {
+    if (usedStrategies.includes(s.id)) return acc
     const prefix = (s.id || '').match(/^([A-Z]+)/i)?.[1]?.toUpperCase()
     if (prefix) acc[prefix] = (acc[prefix] || 0) + 1
     return acc
