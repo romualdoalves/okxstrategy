@@ -120,6 +120,7 @@ export default function BatchBacktest() {
 
   const [autoScanLoading, setAutoScanLoading] = useState(false)
   const [autoScanProgress, setAutoScanProgress] = useState({ current: 0, total: 0 })
+  const [categoryProgress, setCategoryProgress] = useState({})
   const [autoScanResults, setAutoScanResults] = useState(null)
 
   const { data: strategies = [] } = useQuery({ queryKey: ['strategies'], queryFn: getStrategies })
@@ -140,18 +141,35 @@ export default function BatchBacktest() {
     setError(null)
 
     const combinations = []
+    const initialProgress = {}
+
     for (const cat of CATEGORIES) {
       if (!strategyCounts[cat.id]) continue;
+      
+      let catTotal = 0
       for (const sym of SYMBOLS) {
         if (usedSymbols.has(sym)) continue;
         combinations.push({ cat: cat.id, sym })
+        catTotal++
+      }
+
+      if (catTotal > 0) {
+        initialProgress[cat.id] = {
+          current: 0,
+          total: catTotal,
+          bestScore: 0,
+          bestSymbol: '',
+          bestStrategy: ''
+        }
       }
     }
 
+    setCategoryProgress(initialProgress)
     setAutoScanProgress({ current: 0, total: combinations.length })
 
     let allResults = []
-    let current = 0
+    let currentTotal = 0
+    let trackingProgress = { ...initialProgress }
 
     for (const { cat, sym } of combinations) {
       try {
@@ -162,17 +180,43 @@ export default function BatchBacktest() {
         })
         if (res.ok) {
           const data = await res.json()
+          
+          let maxCatScore = trackingProgress[cat].bestScore
+          let bestSym = trackingProgress[cat].bestSymbol
+          let bestStrat = trackingProgress[cat].bestStrategy
+
           for (const r of data.results || []) {
-             if (r.recommendation?.score >= 7.0 && r.recommendation?.verdict === 'INICIAR') {
+             const score = r.recommendation?.score || 0
+             if (score >= 7.0 && r.recommendation?.verdict === 'INICIAR') {
                  allResults.push({ ...r, symbol: sym, category: cat })
              }
+             if (score > maxCatScore) {
+                 maxCatScore = score
+                 bestSym = sym
+                 bestStrat = r.strategy_id
+             }
           }
+
+          trackingProgress[cat] = {
+            ...trackingProgress[cat],
+            current: trackingProgress[cat].current + 1,
+            bestScore: maxCatScore,
+            bestSymbol: bestSym,
+            bestStrategy: bestStrat
+          }
+          
+          setCategoryProgress({ ...trackingProgress })
         }
       } catch (err) {
         console.error(err)
+        trackingProgress[cat] = {
+            ...trackingProgress[cat],
+            current: trackingProgress[cat].current + 1
+        }
+        setCategoryProgress({ ...trackingProgress })
       }
-      current++
-      setAutoScanProgress({ current, total: combinations.length })
+      currentTotal++
+      setAutoScanProgress({ current: currentTotal, total: combinations.length })
     }
 
     allResults.sort((a, b) => (b.recommendation?.score || 0) - (a.recommendation?.score || 0))
@@ -252,13 +296,54 @@ export default function BatchBacktest() {
           </button>
         </div>
 
-        {autoScanLoading && (
-          <div className="flex flex-col items-center justify-center py-8 gap-3 text-muted">
-            <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-            <p className="text-sm">Analisando todas as combinações de estratégias e ativos…</p>
-            <p className="text-xs font-mono bg-white/5 px-3 py-1 rounded-full text-accent">
-              {autoScanProgress.current} / {autoScanProgress.total} concluídos
-            </p>
+        {(autoScanLoading || (autoScanResults && Object.keys(categoryProgress).length > 0)) && (
+          <div className="flex flex-col py-4 gap-6 bg-white/[0.02] p-4 rounded-xl border border-white/5">
+            {autoScanLoading && (
+              <div className="flex flex-col items-center justify-center gap-2 text-muted">
+                <div className="flex items-center gap-3">
+                  <div className="w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+                  <span className="text-sm font-bold text-white">Analisando estratégias e ativos…</span>
+                </div>
+                <p className="text-xs font-mono bg-white/5 px-3 py-1 rounded-full text-accent mt-1">
+                  Progresso Global: {autoScanProgress.current} / {autoScanProgress.total}
+                </p>
+              </div>
+            )}
+            
+            {/* Barras de progresso por categoria */}
+            <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+              {Object.entries(categoryProgress).map(([catId, prog]) => {
+                const catInfo = CATEGORIES.find(c => c.id === catId)
+                const pct = prog.total > 0 ? (prog.current / prog.total) * 100 : 0
+                return (
+                  <div key={catId} className={`flex flex-col gap-1.5 transition-opacity duration-500 ${!autoScanLoading && pct === 100 ? 'opacity-70' : 'opacity-100'}`}>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-white">
+                        {catId} <span className="text-muted font-normal ml-1">({catInfo?.label})</span>
+                      </span>
+                      <span className="text-muted flex items-center gap-2">
+                        {prog.bestScore > 0 && (
+                          <span className="text-accent font-bold px-1.5 py-0.5 bg-accent/10 border border-accent/20 rounded shadow-[0_0_8px_rgba(var(--accent-rgb),0.15)] flex items-center gap-1">
+                            {prog.bestScore.toFixed(1)} <span className="font-mono text-[9px] opacity-80">({prog.bestStrategy}/{prog.bestSymbol.split('-')[0]})</span>
+                          </span>
+                        )}
+                        <span className="font-mono w-9 text-right bg-white/5 px-1.5 py-0.5 rounded">{prog.current}/{prog.total}</span>
+                      </span>
+                    </div>
+                    <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden shadow-inner">
+                      <div 
+                        className="h-full bg-accent transition-all duration-300 relative"
+                        style={{ width: `${pct}%` }}
+                      >
+                        {autoScanLoading && pct < 100 && (
+                          <div className="absolute inset-0 bg-white/20 animate-pulse" />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           </div>
         )}
 
