@@ -70,6 +70,8 @@ Trabalhe somente no repositório `E:\Dell Inspiron\W\Dev\Trading\OKXTrader\OKXSt
 - APIs: `GET /api/order-rejections`, `PATCH /api/order-rejections/{id}`.
 
 ### Stop Loss e trailing stop
+- O `bot_manager` implementa um fallback dinâmico: se a estratégia não enviar `sl_price`, o Stop Loss é calculado usando `ATR(14)` dinâmico (Stop a 1.5x o ATR).
+- Proteção Estatística (Hard Floor): O stop NUNCA pode ser menor que 1.5x o ATR(14) no timeframe do bot, garantindo que o stop respeite a volatilidade do ativo (substituindo o antigo limite cego de 0.8%).
 - OKX API v5: trailing stop usa `ordType="move_order_stop"` com
   `callbackRatio`/`callbackSpread`.
 - Se trailing falhar → fallback SL fixo + registra rejeição do trailing.

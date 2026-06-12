@@ -807,6 +807,31 @@ class BotInstance:
             ctx["market_players"] = self._market_players
         return ctx
 
+    def _get_dynamic_atr(self, result, default_atr: float) -> float:
+        """Calcula ATR(14) dinâmico caso a estratégia não tenha fornecido."""
+        if result and result.indicators and result.indicators.get("atr"):
+            return float(result.indicators["atr"])
+        if not self._candles:
+            return default_atr
+            
+        try:
+            import pandas as pd
+            import pandas_ta as ta
+            df = pd.DataFrame([c.__dict__ for c in self._candles])
+            if len(df) > 14:
+                df.ta.atr(length=14, append=True)
+                atr_cols = [c for c in df.columns if c.startswith('ATRr_')]
+                if atr_cols:
+                    current_atr = float(df[atr_cols[0]].iloc[-1])
+                    if not pd.isna(current_atr) and current_atr > 0:
+                        if result and result.indicators is not None:
+                            result.indicators["atr"] = current_atr
+                        return current_atr
+        except Exception as e:
+            log.warning(f"[Bot {self.config.id}] Falha ao calcular ATR dinâmico: {e}")
+            
+        return default_atr
+
     async def _evaluate_order_criteria(
         self,
         *,
@@ -949,7 +974,7 @@ class BotInstance:
 
         risk_ok = False
         if result and direction and price > 0:
-            atr = result.indicators.get("atr", price * 0.005)
+            atr = self._get_dynamic_atr(result, price * 0.005)
             sl_px = result.metadata.get("sl_price", price - atr * 1.5 if direction == "long" else price + atr * 1.5)
             tp1_px = result.metadata.get("tp1_price", price * 1.02 if direction == "long" else price * 0.98)
             risk_ok = (
@@ -1341,7 +1366,7 @@ class BotInstance:
             return
         # ─────────────────────────────────────────────────────────────────────
 
-        atr = result.indicators.get("atr", price * 0.005)
+        atr = self._get_dynamic_atr(result, price * 0.005)
         sz  = exchange.num_contracts(
             self.config.symbol, price, self.config.stake_usd, self.config.leverage)
 
@@ -1350,12 +1375,12 @@ class BotInstance:
         tp1_px = result.metadata.get("tp1_price",
             price * 1.02 if direction == "long" else price * 0.98)
 
-        # Proteção Estatística: Hard Floor de 0.8% para evitar ruído (whipsaw)
-        min_sl_dist_abs = price * 0.008
+        # Proteção Estatística: O stop não pode ser menor que 1.5x o ATR atual (para evitar ruído)
+        min_sl_dist_abs = atr * 1.5
         current_sl_dist = abs(price - sl_px)
         
         if current_sl_dist < min_sl_dist_abs:
-            log.warning(f"[Bot {self.config.id}] SL Original apertado ({current_sl_dist/price*100:.2f}%). Ajustando para o mínimo (0.8%).")
+            log.warning(f"[Bot {self.config.id}] SL Original apertado ({current_sl_dist/price*100:.2f}%). Ajustando para o mínimo dinâmico baseado em ATR.")
             if direction == "long":
                 sl_px = price - min_sl_dist_abs
             else:
