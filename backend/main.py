@@ -135,9 +135,22 @@ def _assert_symbol_available(db: Session, symbol: str, *, exclude_bot_id: int | 
         )
 
 
+import subprocess
+_cached_commit_hash = None
+
 @app.get("/api/health")
 def health_check():
-    return {"ok": True}
+    global _cached_commit_hash
+    if not _cached_commit_hash:
+        try:
+            _cached_commit_hash = subprocess.check_output(
+                ["git", "rev-parse", "--short", "HEAD"], 
+                text=True, stderr=subprocess.DEVNULL
+            ).strip()
+        except Exception:
+            _cached_commit_hash = "unknown"
+            
+    return {"ok": True, "version": _cached_commit_hash}
 
 
 @app.head("/api/health")

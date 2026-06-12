@@ -20,7 +20,8 @@ async function req(path, options = {}) {
 }
 
 // Estratégias
-export const getStrategies   = ()       => req('/strategies')
+export const getHealth           = ()       => req('/health')
+export const getStrategies       = ()       => req('/strategies')
 export const deleteStrategy  = (id)     => req(`/strategy-factory/strategies/${id}/permanent`, { method: 'DELETE' })
 export const getMarketRegime = ()       => req('/market/regime')
 export const getMarketClock = ()       => req('/market/clock')

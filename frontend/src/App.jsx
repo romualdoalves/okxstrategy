@@ -21,7 +21,7 @@ import BatchBacktest    from './pages/BatchBacktest'
 import ErrorBoundary   from './components/ErrorBoundary'
 import ToastContainer  from './components/ToastContainer'
 import OkxConnectModal from './components/OkxConnectModal'
-import { disconnectOkxAccount, getOkxStatus } from './api'
+import { disconnectOkxAccount, getOkxStatus, getHealth } from './api'
 import { toast } from './hooks/useToast'
 
 function AppShell() {
@@ -33,6 +33,13 @@ function AppShell() {
   const { data: okxStatus } = useQuery({
     queryKey: ['okx-status'],
     queryFn:  getOkxStatus,
+    refetchInterval: 60_000,
+    retry: false,
+  })
+
+  const { data: healthData } = useQuery({
+    queryKey: ['system-health'],
+    queryFn:  getHealth,
     refetchInterval: 60_000,
     retry: false,
   })
@@ -93,8 +100,15 @@ function AppShell() {
       <aside className="w-56 bg-panel border-r border-border flex flex-col shrink-0">
         {/* Logo */}
         <div className="flex items-center gap-2 px-5 py-5 border-b border-border">
-          <TrendingUp size={22} className="text-accent" />
-          <span className="font-bold text-base tracking-tight">{t('app.brand')}</span>
+          <TrendingUp size={22} className="text-accent shrink-0" />
+          <div className="flex flex-col">
+            <span className="font-bold text-base tracking-tight leading-tight">{t('app.brand')}</span>
+            {healthData?.version && (
+              <span className="text-[10px] text-muted/50 font-mono leading-tight tracking-wider">
+                v{healthData.version}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Nav */}
