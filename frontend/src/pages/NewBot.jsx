@@ -166,9 +166,14 @@ export default function NewBot() {
     }
     // Preenche o nome com "ID - Nome da Estratégia" se o campo estiver vazio
     // ou se ainda tiver o valor auto-preenchido pela estratégia anterior
+    let newDefaultName = selectedStrategy.name;
+    if (!newDefaultName.startsWith(selectedStrategy.id)) {
+      newDefaultName = `${selectedStrategy.id} - ${newDefaultName}`;
+    }
+
     if (!form.name || form.name === lastAutoNameRef.current) {
-      setField('name', selectedStrategy.name)
-      lastAutoNameRef.current = selectedStrategy.name
+      setField('name', newDefaultName)
+      lastAutoNameRef.current = newDefaultName
     }
   }, [form.strategy_id, strategies])
 
@@ -216,7 +221,7 @@ export default function NewBot() {
   return (
     <div className="p-6 max-w-2xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
-        <button onClick={() => nav(-1)} className="btn-ghost btn p-2">
+        <button type="button" onClick={() => nav(-1)} className="btn-ghost btn p-2">
           <ArrowLeft size={16} />
         </button>
         <div>
@@ -232,12 +237,13 @@ export default function NewBot() {
           <h2 className="font-semibold text-sm">{t('nb.general')}</h2>
 
           <div>
-            <label className="label">{t('nb.bot_name')}</label>
+            <label className="label">{t('nb.bot_name')} <span className="text-red-400">*</span></label>
             <input
               className="input"
               placeholder={t('nb.name_ph')}
               value={form.name}
               onChange={e => setField('name', e.target.value)}
+              required
             />
           </div>
 
