@@ -689,10 +689,12 @@ class OKXExchange(BaseExchange):
         ct_val = info.get("ctVal", 1.0)   # unidades base por contrato
         lot_sz = info.get("lotSz", 1.0)   # múltiplo mínimo de contratos
         
-        qty = stake_usd / (price * ct_val)
-        # Arredonda para baixo ao múltiplo de lotSz
+        # A posição nocional operada é a margem (stake) vezes a alavancagem
+        qty = (stake_usd * leverage) / (price * ct_val)
+        
+        # Arredonda para baixo ao múltiplo de lotSz (com precaução para imprecisão float)
         if lot_sz > 0:
-            qty = math.floor(qty / lot_sz) * lot_sz
+            qty = math.floor(round(qty / lot_sz, 8)) * lot_sz
         return max(0.0, round(qty, 8))
 
 
