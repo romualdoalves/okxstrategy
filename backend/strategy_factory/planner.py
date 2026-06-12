@@ -95,7 +95,9 @@ Responda APENAS com JSON válido. Sem markdown, sem explicações, sem comentár
     {"key": "atr", "description": "ATR — OBRIGATÓRIO para o Trailing Stop dinâmico do bot_manager"}
   ],
   "criteria": [
-    {"id": "c1_bias", "label": "C1 Viés", "description": "EMA macro define direção"}
+    {"id": "c1_bias", "label": "C1 Viés", "description": "EMA macro define direção"},
+    {"id": "c2_pullback", "label": "C2 Recuo", "description": "Preço recuou para zona de suporte"},
+    {"id": "c3_confirm", "label": "C3 Confirmação", "description": "Gatilho de entrada acionado (ex: engolfo, volume)"}
   ],
   "entry_buy": "pseudocódigo da condição de compra",
   "entry_sell": "pseudocódigo da condição de venda",
@@ -104,8 +106,8 @@ Responda APENAS com JSON válido. Sem markdown, sem explicações, sem comentár
   "sl_mult": 2.0,
   "tp_method": "fixed_rr",
   "tp_rr": 2.0,
-  "criteria_total": 1,
-  "interpretation_notes": "Observações sobre a interpretação da estratégia descrita"
+  "criteria_total": 3,
+  "interpretation_notes": "ATENÇÃO: Nunca limite a 1 critério se a estratégia possuir várias condições. Desmembre a lógica em c1, c2, c3..."
 }
 
 ## Valores válidos:
