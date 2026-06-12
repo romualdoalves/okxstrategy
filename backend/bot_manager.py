@@ -195,12 +195,14 @@ class BotInstance:
                 pos = await exchange.get_position(self.config.symbol)
                 if pos and pos.side == "long" and pos.size > 0:
                     real_size = abs(float(pos.size))
-                    if local_size > 0 and abs(real_size - local_size) > max(1e-8, local_size * 0.001):
+                    baseline = abs(float(getattr(self.config, "baseline_balance", 0.0) or 0.0))
+                    net_size = max(0.0, real_size - baseline)
+                    if local_size > 0 and abs(net_size - local_size) > max(1e-8, local_size * 0.001):
                         log.warning(
-                            "[Bot %d] SPOT size desync em %s: app=%.8f OKX=%.8f. Fechando saldo real.",
-                            self.config.id, self.config.symbol, local_size, real_size,
+                            "[Bot %d] SPOT size desync em %s: app=%.8f OKX líquido=%.8f (real=%.8f). Fechando líquido.",
+                            self.config.id, self.config.symbol, local_size, net_size, real_size,
                         )
-                    return real_size
+                    return net_size
             except Exception as exc:
                 log.warning("[Bot %d] Falha ao obter saldo spot real para fechamento: %s", self.config.id, exc)
         return local_size
