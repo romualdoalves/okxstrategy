@@ -49,6 +49,23 @@ class PatternScalpStrategy(BaseStrategy):
         self.atr_mult_threshold = 0.20
         self.rejection_ratio    = 2.0
         self.tp_rr              = 2.0
+            params = {
+                "atr_mult_threshold": ParamDef(
+                    type="float", default=0.20, min=0.10, max=0.50, step=0.05,
+                    description="Percentual do ATR Diário para considerar manipulação (20% recomendado)"),
+                "rejection_ratio": ParamDef(
+                    type="float", default=2.0, min=1.0, max=4.0, step=0.1,
+                    description="Tamanho da sombra vs corpo para o 'John Wick'"),
+                "tp_rr": ParamDef(
+                    type="float", default=2.0, min=1.0, max=5.0, step=0.5,
+                    description="Risk:Reward para o scalping"),
+            },
+        )
+
+    def __init__(self):
+        self.atr_mult_threshold = 0.20
+        self.rejection_ratio    = 2.0
+        self.tp_rr              = 2.0
 
     def set_params(self, params: dict) -> None:
         for k, v in params.items():
@@ -56,29 +73,39 @@ class PatternScalpStrategy(BaseStrategy):
                 setattr(self, k, v)
 
     def compute(self, candles: list) -> StrategyResult | None:
-        # Precisamos de pelo menos 1 vela diária (simplificado aqui para usar os últimos candles)
-        # Em um bot de 15m, 96 candles = 1 dia.
-        if len(candles) < 100:
+        if len(candles) < 30:
             return None
 
         df = pd.DataFrame([c.__dict__ for c in candles])
         
-        # 1. Calcular ATR Diário aproximado (usando rolling de 96 períodos no 15m)
-        # Idealmente o bot deveria receber o ATR real do D1, mas aqui estimamos:
-        df['high_low'] = df['high'] - df['low']
-        daily_range_est = df['high_low'].rolling(96).max().iloc[-1]
+        # 1. Calcular ATR verdadeiro (14 períodos) para a volatilidade atual
+        df.ta.atr(length=14, append=True)
+        atr_cols = [c for c in df.columns if c.startswith('ATRr_')]
+        if not atr_cols:
+            return None
+            
+        current_atr = df[atr_cols[0]].iloc[-1]
+        if pd.isna(current_atr) or current_atr <= 0:
+            return None
+
+        # Aproximação do ATR Diário (Volatilidade escala com raiz do tempo)
+        # 1 dia = 288 candles de 5m. sqrt(288) ≈ 17. Logo, ATR_D1 ≈ ATR_5m * 17
+        daily_atr_est = current_atr * 17.0
         
         last_candle = candles[-1]
         candle_range = last_candle.high - last_candle.low
         
         # 2. Check de Manipulação (Candle de exaustão)
-        is_manipulation = candle_range > (daily_range_est * self.atr_mult_threshold)
+        is_manipulation = candle_range > (daily_atr_est * self.atr_mult_threshold)
 
-        # 3. Identificar Padrão de Rejeição (calcula antes de montar indicators)
+        # 3. Identificar Padrão de Rejeição
         signal = Signal.HOLD
         pattern = ""
         pattern_desc = ""
-        hold_reason = "Aguardando candle de exaustão (>20% ATR Est.)"
+        hold_reason = "Aguardando candle de exaustão (> limiar ATR)"
+        
+        sl_price = 0.0
+        tp1_price = 0.0
 
         if is_manipulation:
             body       = abs(last_candle.close - last_candle.open)
@@ -106,15 +133,39 @@ class PatternScalpStrategy(BaseStrategy):
 
             if signal == Signal.HOLD:
                 hold_reason = "Manipulação detectada, aguardando gatilho de rejeição"
+            else:
+                # O SL deve ficar protegido atrás da estrutura da manipulação (o pavio/vela)
+                buffer = current_atr * 0.5
+                if signal == Signal.BUY:
+                    sl_price = last_candle.low - buffer
+                    risk = last_candle.close - sl_price
+                    tp1_price = last_candle.close + (risk * self.tp_rr)
+                else:
+                    sl_price = last_candle.high + buffer
+                    risk = sl_price - last_candle.close
+                    tp1_price = last_candle.close - (risk * self.tp_rr)
 
         indicators = {
-            "daily_range_est":  round(daily_range_est, 2),
-            "candle_range":     round(candle_range, 2),
+            "atr":              round(current_atr, 6),
+            "daily_range_est":  round(daily_atr_est, 6),
+            "candle_range":     round(candle_range, 6),
             "open_high":        last_candle.high if is_manipulation else 0,
             "open_low":         last_candle.low  if is_manipulation else 0,
             "atr_manipulation": is_manipulation,
             "pattern":          pattern,
             "pattern_desc":     pattern_desc,
         }
+        
+        metadata = {}
+        if signal in (Signal.BUY, Signal.SELL):
+            metadata["sl_price"] = round(sl_price, 6)
+            metadata["tp1_price"] = round(tp1_price, 6)
 
-        return StrategyResult(signal, indicators, hold_reason=hold_reason, criteria_met=2 if signal in (Signal.BUY, Signal.SELL) else 0, criteria_total=2)
+        return StrategyResult(
+            signal=signal, 
+            indicators=indicators, 
+            hold_reason=hold_reason, 
+            criteria_met=2 if signal in (Signal.BUY, Signal.SELL) else 0, 
+            criteria_total=2,
+            metadata=metadata
+        )
