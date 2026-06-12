@@ -56,10 +56,14 @@ services:
       # WebSocket support
       - traefik.http.services.okx_strategy.loadbalancer.server.scheme=http
       - traefik.http.routers.okx_strategy.service=okx_strategy
+    volumes:
+      - okx_strategy_factory:/app/backend/strategies/factory
 
 volumes:
   okx_strategy_pgdata:
     external: true
+  okx_strategy_factory:
+    external: false
 
 networks:
   traefik-public:
