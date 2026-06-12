@@ -142,12 +142,15 @@ async def generate_plan(description: str) -> dict:
         {"role": "user",   "content": f"Analise e gere o plano JSON para esta estratégia:\n\n{description}"},
     ]
 
-    raw = await kimi_client.chat(
-        messages,
-        temperature=0.15,
-        max_tokens=2048,
-        response_format="json",
-    )
+    try:
+        raw = await kimi_client.chat(
+            messages,
+            temperature=0.15,
+            max_tokens=2048,
+            response_format="json",
+        )
+    except Exception as e:
+        raise RuntimeError(f"Erro ao conectar com a API da IA: {e}")
 
     try:
         plan = json.loads(raw)
@@ -156,7 +159,10 @@ async def generate_plan(description: str) -> dict:
         import re
         match = re.search(r"\{[\s\S]+\}", raw)
         if match:
-            plan = json.loads(match.group())
+            try:
+                plan = json.loads(match.group())
+            except json.JSONDecodeError as e2:
+                raise RuntimeError(f"KIMI retornou JSON inválido mesmo após extração: {e2}\n\nResposta: {raw[:500]}")
         else:
             raise RuntimeError(f"KIMI retornou JSON inválido: {e}\n\nResposta: {raw[:500]}")
 
