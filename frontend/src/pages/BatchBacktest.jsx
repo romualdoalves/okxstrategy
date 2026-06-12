@@ -120,6 +120,7 @@ export default function BatchBacktest() {
   const { data: strategies = [] } = useQuery({ queryKey: ['strategies'], queryFn: getStrategies })
   const { data: bots = [] }       = useQuery({ queryKey: ['bots'],       queryFn: getBots       })
   const usedSymbols = new Set(bots.map(b => b.symbol))
+  const usedStrategies = Array.from(new Set(bots.map(b => b.strategy_id)))
 
   const strategyCounts = strategies.reduce((acc, s) => {
     const prefix = (s.id || '').match(/^([A-Z]+)/i)?.[1]?.toUpperCase()
@@ -135,7 +136,7 @@ export default function BatchBacktest() {
       const res = await fetch(`${API}/api/backtest/category`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ category, symbol }),
+        body: JSON.stringify({ category, symbol, exclude_strategies: usedStrategies }),
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))

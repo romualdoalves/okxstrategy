@@ -1938,6 +1938,7 @@ async def run_bot_backtest(bot_id: int, db: Session = Depends(get_db)):
 class CategoryBacktestRequest(BaseModel):
     category: str
     symbol: str
+    exclude_strategies: list[str] = []
 
 
 _VERDICT_ORDER = {"INICIAR": 0, "CUIDADO": 1, "NÃO INICIAR": 2, "N/A": 3}
@@ -1951,7 +1952,7 @@ async def run_category_backtest(req: CategoryBacktestRequest):
     from .strategies.registry import REGISTRY
 
     prefix = req.category.upper()
-    strategy_ids = [sid for sid in REGISTRY if sid.upper().startswith(prefix)]
+    strategy_ids = [sid for sid in REGISTRY if sid.upper().startswith(prefix) and sid not in req.exclude_strategies]
     if not strategy_ids:
         raise HTTPException(404, f"Nenhuma estratégia encontrada para categoria '{prefix}'")
 
