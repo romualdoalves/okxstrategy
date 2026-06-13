@@ -181,10 +181,6 @@ export default function BatchBacktest() {
         if (res.ok) {
           const data = await res.json()
           
-          let maxCatScore = trackingProgress[cat].bestScore
-          let bestSym = trackingProgress[cat].bestSymbol
-          let bestStrat = trackingProgress[cat].bestStrategy
-
           for (const r of data.results || []) {
              const score = r.recommendation?.score || 0
              if (score >= 7.0 && r.recommendation?.verdict === 'INICIAR') {
@@ -196,17 +192,17 @@ export default function BatchBacktest() {
                  bestStrat = r.strategy_id
              }
           }
-
-          trackingProgress[cat] = {
-            ...trackingProgress[cat],
-            current: trackingProgress[cat].current + 1,
-            bestScore: maxCatScore,
-            bestSymbol: bestSym,
-            bestStrategy: bestStrat
-          }
-          
-          setCategoryProgress({ ...trackingProgress })
         }
+
+        trackingProgress[cat] = {
+          ...trackingProgress[cat],
+          current: trackingProgress[cat].current + 1,
+          bestScore: maxCatScore,
+          bestSymbol: bestSym,
+          bestStrategy: bestStrat
+        }
+        
+        setCategoryProgress({ ...trackingProgress })
       } catch (err) {
         console.error(err)
         trackingProgress[cat] = {
@@ -217,6 +213,9 @@ export default function BatchBacktest() {
       }
       currentTotal++
       setAutoScanProgress({ current: currentTotal, total: combinations.length })
+
+      // Small delay to prevent rate limiting from OKX
+      await new Promise(resolve => setTimeout(resolve, 150))
     }
 
     allResults.sort((a, b) => (b.recommendation?.score || 0) - (a.recommendation?.score || 0))
@@ -350,7 +349,7 @@ export default function BatchBacktest() {
         {autoScanResults && !autoScanLoading && (
           autoScanResults.length === 0 ? (
             <div className="text-center py-8 text-muted border border-white/5 rounded-lg bg-white/5">
-              Nenhuma combinação atingiu score ≥ 7.0
+              Nenhuma configuração obteve veredito <strong>INICIAR</strong> (Score ≥ 7.0)
             </div>
           ) : (
             <div className="overflow-x-auto">
