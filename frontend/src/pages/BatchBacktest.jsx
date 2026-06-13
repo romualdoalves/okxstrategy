@@ -125,6 +125,20 @@ export default function BatchBacktest() {
 
   const { data: strategies = [] } = useQuery({ queryKey: ['strategies'], queryFn: getStrategies })
   const { data: bots = [] }       = useQuery({ queryKey: ['bots'],       queryFn: getBots       })
+  const { data: scanHistory = [], refetch: refetchHistory } = useQuery({ 
+    queryKey: ['autoScanHistory'], 
+    queryFn: async () => {
+      const res = await fetch(`${API}/api/backtest/auto-scan-history`)
+      if (!res.ok) return []
+      return await res.json()
+    }
+  })
+
+  const deleteHistory = async (id) => {
+    await fetch(`${API}/api/backtest/auto-scan-history/${id}`, { method: 'DELETE' })
+    refetchHistory()
+  }
+
   const usedSymbols = new Set(bots.map(b => b.symbol))
   const usedStrategies = Array.from(new Set(bots.map(b => b.strategy_id)))
 
@@ -247,6 +261,19 @@ export default function BatchBacktest() {
 
     setAutoScanResults(finalRanking)
     setAutoScanLoading(false)
+
+    if (finalRanking.length > 0) {
+        try {
+            await fetch(`${API}/api/backtest/auto-scan-history`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ results: finalRanking })
+            })
+            refetchHistory()
+        } catch(e) {
+            console.error("Falha ao salvar histórico", e)
+        }
+    }
   }
 
   const run = async () => {
@@ -429,6 +456,65 @@ export default function BatchBacktest() {
           )
         )}
       </div>
+
+      {/* Auto-Scan History Section */}
+      {scanHistory.length > 0 && (
+        <div className="card p-5 mb-6 space-y-4 border-white/10">
+          <h2 className="text-xl font-bold text-white">Históricos Salvos</h2>
+          <div className="space-y-3">
+            {scanHistory.map(hist => (
+              <details key={hist.id} className="bg-white/5 border border-white/10 rounded-lg group">
+                <summary className="p-4 cursor-pointer flex justify-between items-center hover:bg-white/5 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <span className="font-bold text-accent">{new Date(hist.created_at).toLocaleString()}</span>
+                    <span className="text-xs text-muted font-mono">{hist.results.length} Recomendações INICIAR</span>
+                  </div>
+                  <button 
+                    onClick={(e) => { e.preventDefault(); deleteHistory(hist.id); }}
+                    className="text-xs text-red-400 hover:text-red-300 px-2 py-1 rounded border border-red-500/20 bg-red-500/10"
+                  >
+                    Excluir
+                  </button>
+                </summary>
+                <div className="p-4 pt-0 border-t border-white/10">
+                  <div className="overflow-x-auto mt-3">
+                    <table className="w-full text-left text-sm whitespace-nowrap">
+                      <thead>
+                        <tr className="text-muted border-b border-white/10 text-xs uppercase tracking-wider">
+                          <th className="py-2 px-4">#</th>
+                          <th className="py-2 px-4">Estratégia</th>
+                          <th className="py-2 px-4">Ativo</th>
+                          <th className="py-2 px-4 text-right">Score</th>
+                          <th className="py-2 px-4 text-center">Ação</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5">
+                        {hist.results.map((r, i) => (
+                          <tr key={`${r.strategy_id}-${r.symbol}-${i}`} className="hover:bg-white/5 transition-colors">
+                            <td className="py-2 px-4 font-mono text-muted">{i + 1}</td>
+                            <td className="py-2 px-4 font-bold text-white">{r.strategy_id}</td>
+                            <td className="py-2 px-4 font-mono text-white">{r.symbol}</td>
+                            <td className="py-2 px-4 text-right font-mono text-green-400 font-bold">{r.recommendation?.score?.toFixed(1)}</td>
+                            <td className="py-2 px-4 text-center">
+                              <button
+                                onClick={() => nav(`/bots/new?strategy=${r.strategy_id}&symbol=${encodeURIComponent(r.symbol)}`)}
+                                className="inline-flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-bold bg-accent/15 text-accent border border-accent/30 hover:bg-accent/25 transition-colors"
+                              >
+                                <PlusCircle size={13} />
+                                Criar Bot
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </details>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Controls */}
       <div className="card p-5 mb-6 space-y-4">

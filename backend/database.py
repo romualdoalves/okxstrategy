@@ -186,6 +186,15 @@ class OrderRejectionModel(Base):
     updated_at       = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
 
+class AutoScanHistoryModel(Base):
+    """Histórico salvo de Auto-Scans para criação sequencial de bots."""
+    __tablename__ = "auto_scan_history"
+
+    id         = Column(Integer,  primary_key=True, autoincrement=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, index=True)
+    results    = Column(JSON,     default=[])  # Lista de combinações INICIAR
+
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def get_db() -> Session:
@@ -247,6 +256,14 @@ def _run_migrations():
         "CREATE INDEX IF NOT EXISTS idx_order_rejections_resolved ON order_rejections(resolved)",
         "CREATE UNIQUE INDEX IF NOT EXISTS ux_bots_symbol_upper ON bots (UPPER(symbol))",
         "ALTER TABLE bots ADD COLUMN IF NOT EXISTS baseline_balance FLOAT DEFAULT 0.0",
+        """
+        CREATE TABLE IF NOT EXISTS auto_scan_history (
+            id SERIAL PRIMARY KEY,
+            created_at TIMESTAMP DEFAULT NOW(),
+            results JSON DEFAULT '[]'::json
+        )
+        """,
+        "CREATE INDEX IF NOT EXISTS idx_auto_scan_history_created_at ON auto_scan_history(created_at)",
     ]
     try:
         with engine.connect() as conn:

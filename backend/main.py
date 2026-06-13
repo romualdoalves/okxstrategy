@@ -34,6 +34,7 @@ except ImportError:
 
 from .database import (
     AiAnalysisLogModel,
+    AutoScanHistoryModel,
     BotModel,
     BotSnapshotModel,
     StrategyModel as FactoryStrategyModel,  # alias para compatibilidade temporária
@@ -1934,6 +1935,29 @@ async def run_bot_backtest(bot_id: int, db: Session = Depends(get_db)):
     results = await engine.run(candles, stake_usd=FIXED_STAKE_USD)
     
     return results
+    
+class AutoScanHistoryPayload(BaseModel):
+    results: list
+
+@app.post("/api/backtest/auto-scan-history", status_code=201)
+def save_auto_scan_history(payload: AutoScanHistoryPayload, db: Session = Depends(get_db)):
+    record = AutoScanHistoryModel(results=payload.results)
+    db.add(record)
+    db.commit()
+    db.refresh(record)
+    return {"ok": True, "id": record.id}
+
+@app.get("/api/backtest/auto-scan-history")
+def get_auto_scan_history(db: Session = Depends(get_db)):
+    records = db.query(AutoScanHistoryModel).order_by(AutoScanHistoryModel.created_at.desc()).all()
+    return [{"id": r.id, "created_at": r.created_at.isoformat() + "Z", "results": r.results} for r in records]
+
+@app.delete("/api/backtest/auto-scan-history/{history_id}", status_code=204)
+def delete_auto_scan_history(history_id: int, db: Session = Depends(get_db)):
+    record = db.get(AutoScanHistoryModel, history_id)
+    if record:
+        db.delete(record)
+        db.commit()
 
 class CategoryBacktestRequest(BaseModel):
     category: str
