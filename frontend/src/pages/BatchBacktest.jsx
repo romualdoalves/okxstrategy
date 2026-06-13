@@ -159,7 +159,8 @@ export default function BatchBacktest() {
           total: catTotal,
           bestScore: 0,
           bestSymbol: '',
-          bestStrategy: ''
+          bestStrategy: '',
+          counts: { 'INICIAR': 0, 'CUIDADO': 0, 'NÃO INICIAR': 0 }
         }
       }
     }
@@ -172,6 +173,11 @@ export default function BatchBacktest() {
     let trackingProgress = { ...initialProgress }
 
     for (const { cat, sym } of combinations) {
+      let maxCatScore = trackingProgress[cat].bestScore || 0;
+      let bestSym = trackingProgress[cat].bestSymbol || '';
+      let bestStrat = trackingProgress[cat].bestStrategy || '';
+      let catCounts = { ...(trackingProgress[cat].counts || { 'INICIAR': 0, 'CUIDADO': 0, 'NÃO INICIAR': 0 }) };
+
       try {
         const res = await fetch(`${API}/api/backtest/category`, {
           method: 'POST',
@@ -183,7 +189,13 @@ export default function BatchBacktest() {
           
           for (const r of data.results || []) {
              const score = r.recommendation?.score || 0
-             if (score >= 7.0 && r.recommendation?.verdict === 'INICIAR') {
+             const verdict = r.recommendation?.verdict
+
+             if (verdict && catCounts[verdict] !== undefined) {
+                 catCounts[verdict] += 1
+             }
+
+             if (score >= 7.0 && verdict === 'INICIAR') {
                  allResults.push({ ...r, symbol: sym, category: cat })
              }
              if (score > maxCatScore) {
@@ -199,7 +211,8 @@ export default function BatchBacktest() {
           current: trackingProgress[cat].current + 1,
           bestScore: maxCatScore,
           bestSymbol: bestSym,
-          bestStrategy: bestStrat
+          bestStrategy: bestStrat,
+          counts: catCounts
         }
         
         setCategoryProgress({ ...trackingProgress })
@@ -321,6 +334,25 @@ export default function BatchBacktest() {
                         {catId} <span className="text-muted font-normal ml-1">({catInfo?.label})</span>
                       </span>
                       <span className="text-muted flex items-center gap-2">
+                        {prog.counts && (
+                          <div className="flex items-center gap-1.5 mr-1">
+                            {prog.counts['INICIAR'] > 0 && (
+                              <span className="text-[10px] font-bold text-green-400 bg-green-500/10 border border-green-500/20 px-1.5 py-0.5 rounded shadow-sm">
+                                {prog.counts['INICIAR']} Iniciar
+                              </span>
+                            )}
+                            {prog.counts['CUIDADO'] > 0 && (
+                              <span className="text-[10px] font-bold text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 px-1.5 py-0.5 rounded shadow-sm">
+                                {prog.counts['CUIDADO']} Cuidado
+                              </span>
+                            )}
+                            {prog.counts['NÃO INICIAR'] > 0 && (
+                              <span className="text-[10px] font-bold text-red-400 bg-red-500/10 border border-red-500/20 px-1.5 py-0.5 rounded shadow-sm">
+                                {prog.counts['NÃO INICIAR']} Não Iniciar
+                              </span>
+                            )}
+                          </div>
+                        )}
                         {prog.bestScore > 0 && (
                           <span className="text-accent font-bold px-1.5 py-0.5 bg-accent/10 border border-accent/20 rounded shadow-[0_0_8px_rgba(var(--accent-rgb),0.15)] flex items-center gap-1">
                             {prog.bestScore.toFixed(1)} <span className="font-mono text-[9px] opacity-80">({prog.bestStrategy}/{prog.bestSymbol.split('-')[0]})</span>
