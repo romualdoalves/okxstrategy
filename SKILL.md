@@ -250,6 +250,10 @@ tamanho válido, SL/TP coerentes, posição OKX flat.
 
 ## Deploy
 
+- O launcher local `..\\_backend.bat` não deve sobrescrever `DATABASE_URL`; o backend
+  precisa herdar a URL do ambiente/.env para respeitar o host correto em cada VPS.
+- O exemplo de produção usa `postgres` como host do banco dentro do compose.
+
 ### Atualização rápida (uso frequente)
 ```bash
 git -C /opt/okx-strategy pull origin main
