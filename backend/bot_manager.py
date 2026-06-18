@@ -1040,7 +1040,19 @@ class BotInstance:
         if closed and self._ts_algo_id:
             await self.force_sync_trailing(exchange)
 
-        # Verifica TP1 em tempo real (mesmo em candle aberto)
+        # ⚠️ CRÍTICO: Atualiza ATR IMEDIATAMENTE antes de verificar TP1, caso candle tenha fechado
+        # Assim _check_tp1() usa ATR fresco, não stale do candle anterior
+        if closed:
+            # Computa contexto e estratégia para ter ATR atualizado
+            await self._update_extra_candles(exchange) if self.strategy.__class__.extra_timeframes() else None
+            ctx = self._strategy_context()
+            result = self.strategy.compute_with_context(self._candles, ctx)
+            if result:
+                fresh_atr = result.indicators.get("atr", self._current_atr)
+                self._current_atr = fresh_atr
+                log.debug("[Bot %d] ATR atualizado antes de TP1: %.6f", self.config.id, fresh_atr)
+
+        # Verifica TP1 em tempo real (mesmo em candle aberto), agora com ATR fresco
         if self._direction != 0 and not self._tp1_done:
             await self._check_tp1(bar.close, exchange)
 
@@ -1079,6 +1091,43 @@ class BotInstance:
         # Bloco de trailing stop por software foi descontinuado
 
         try:
+            # ⚠️ RECUPERAÇÃO AGRESSIVA: Se TP1 foi acionado mas nenhuma proteção existe, força recuperação
+            if self._tp1_done and not self._ts_algo_id and not self._sl_algo_id:
+                log.critical("[AUDITORIA Bot %d] ⚠️ TP1 ACIONADO MAS SEM PROTEÇÃO! Recuperando agressivamente...", self.config.id)
+                current_price = self._candles[-1].close if self._candles else self._entry_price
+                cb = max(0.005, (self._current_atr * 1.5) / current_price) if self._current_atr else 0.01
+                
+                new_ts_id = await exchange.place_trailing_stop(
+                    self.config.symbol,
+                    "sell" if self._direction == 1 else "buy",
+                    self._sz,
+                    cb,
+                    current_price
+                )
+                if new_ts_id:
+                    self._ts_algo_id = new_ts_id
+                    self._ts_callback_ratio = cb
+                    log.critical("[AUDITORIA Bot %d] ✅ Proteção de emergência criada: %s @ %.2f%%", 
+                                self.config.id, new_ts_id, cb*100)
+                else:
+                    log.error("[AUDITORIA Bot %d] ❌ Proteção de emergência FALHOU. Tentando fallback SL...", self.config.id)
+                    fallback_stop = (
+                        max(self._entry_price, current_price * (1 - cb))
+                        if self._direction == 1
+                        else min(self._entry_price, current_price * (1 + cb))
+                    )
+                    fallback_id = await exchange.place_stop_loss(
+                        self.config.symbol,
+                        "sell" if self._direction == 1 else "buy",
+                        self._sz,
+                        fallback_stop
+                    )
+                    if fallback_id:
+                        self._sl_algo_id = fallback_id
+                        self._sl_price = fallback_stop
+                        log.critical("[AUDITORIA Bot %d] ✅ Fallback SL de emergência criado: %s @ %.4f", 
+                                    self.config.id, fallback_id, fallback_stop)
+
             # 1. Recupera o ID se não tivermos um, ou se for o marcador de restart
             if not self._ts_algo_id or self._ts_algo_id == "recovered_after_restart":
                 params = {"ordType": "move_order_stop", "instId": self.config.symbol}
@@ -1126,8 +1175,14 @@ class BotInstance:
                 
                 # Cancela qualquer lixo que tenha sobrado
                 if self._ts_algo_id and self._ts_algo_id != "recovered_after_restart":
-                    try: await exchange.cancel_algo(self.config.symbol, self._ts_algo_id)
-                    except: pass
+                    try:
+                        cancel_ok = await exchange.cancel_algo(self.config.symbol, self._ts_algo_id)
+                        if cancel_ok:
+                            log.info("[AUDITORIA Bot %d] Trailing anterior cancelado antes de criar novo.", self.config.id)
+                        else:
+                            log.warning("[AUDITORIA Bot %d] Falha ao cancelar trailing anterior, mesmo assim criando novo.", self.config.id)
+                    except Exception as e:
+                        log.error("[AUDITORIA Bot %d] Exceção ao cancelar: %s", self.config.id, e)
                 
                 # Cria a nova ordem de proteção
                 current_price = self._candles[-1].close if self._candles else self._entry_price
@@ -1620,13 +1675,21 @@ class BotInstance:
         
         # Gatilho de Ativação: +1.0% de PnL líquido
         if pnl_pct >= 0.01:
-            self._tp1_done = True
             close_side = "sell" if self._direction == 1 else "buy"
             
-            # Cancela a proteção de Stop Loss "burra" (estática)
+            # Proteção Dupla: Garante que trailing OU fallback SL seja criado ANTES de marcar tp1_done
+            protection_established = False
+            
+            # Cancela a proteção de Stop Loss "burra" (estática) — com validação de resposta
             if self._sl_algo_id:
-                await exchange.cancel_algo(self.config.symbol, self._sl_algo_id)
-                self._sl_algo_id = None
+                try:
+                    cancel_ok = await exchange.cancel_algo(self.config.symbol, self._sl_algo_id)
+                    if cancel_ok:
+                        self._sl_algo_id = None
+                        log.info("[Bot %d] SL fixo cancelado com sucesso antes do trailing.", self.config.id)
+                except Exception as cancel_err:
+                    log.warning("[Bot %d] Falha ao cancelar SL fixo: %s. Tentando trailing mesmo assim.", 
+                               self.config.id, cancel_err)
 
             # Ativa a Sombra Dinâmica (Trailing Stop 100% dinâmico) para toda a posição!
             # A sombra manterá uma distância baseada no ATR (volatilidade real) do momento
@@ -1639,9 +1702,12 @@ class BotInstance:
             
             ts_id = await exchange.place_trailing_stop(
                 self.config.symbol, close_side, self._sz, cb, price)
-            self._ts_algo_id = ts_id
-            self._ts_callback_ratio = cb
-            if not ts_id:
+            if ts_id:
+                self._ts_algo_id = ts_id
+                self._ts_callback_ratio = cb
+                protection_established = True
+                log.info("[Bot %d] Trailing stop nativo criado com sucesso: %s", self.config.id, ts_id)
+            else:
                 err = getattr(exchange, "last_order_error", None) or {}
                 self._record_order_rejection(
                     side=close_side,
@@ -1650,6 +1716,7 @@ class BotInstance:
                     status="fallback_attempted",
                     raw_payload=err,
                 )
+                # Tenta fallback SL fixo
                 fallback_stop = (
                     max(self._entry_price, price * (1 - cb))
                     if self._direction == 1
@@ -1664,6 +1731,7 @@ class BotInstance:
                 if fallback_id:
                     self._sl_algo_id = fallback_id
                     self._sl_price = fallback_stop
+                    protection_established = True
                     log.warning(
                         "[Bot %d] Trailing recusado; Stop Loss fixo fallback criado: %s @ %.4f",
                         self.config.id,
@@ -1679,6 +1747,14 @@ class BotInstance:
                         status="critical",
                         raw_payload=fallback_err,
                     )
+                    log.error("[Bot %d] ERRO CRÍTICO: Trailing E fallback SL foram recusados no TP1.", self.config.id)
+            
+            # APENAS marca tp1_done se proteção foi estabelecida com sucesso
+            if not protection_established:
+                log.error("[Bot %d] TP1 NÃO ATIVADO: Nenhuma proteção pôde ser estabelecida.", self.config.id)
+                return
+            
+            self._tp1_done = True
             # For software TS: set peak and initial stop immediately so get_status()
             # reflects the correct values on the same poll cycle.
             # yields closed=True, so the intracandle block never runs).

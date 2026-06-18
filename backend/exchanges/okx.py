@@ -515,11 +515,30 @@ class OKXExchange(BaseExchange):
         return None
 
     async def cancel_algo(self, symbol: str, algo_id: str) -> None:
-        body = json.dumps([{"algoId": algo_id, "instId": symbol}])
-        path = "/api/v5/trade/cancel-algos"
-        headers = _auth_headers("POST", path, body)
-        async with aiohttp.ClientSession() as s:
-            await s.post(f"{OKX_BASE}{path}", headers=headers, data=body)
+    async def cancel_algo(self, symbol: str, algo_id: str) -> bool:
+        """Cancela ordem algorítmica na exchange. Retorna True se sucesso, False se falha."""
+        try:
+            body = json.dumps([{"algoId": algo_id, "instId": symbol}])
+            path = "/api/v5/trade/cancel-algos"
+            headers = _auth_headers("POST", path, body)
+            async with aiohttp.ClientSession() as s:
+                async with s.post(f"{OKX_BASE}{path}", headers=headers, data=body) as resp:
+                    response_data = await resp.json()
+                    
+                    # Valida resposta OKX: code "0" = sucesso
+                    code = str(response_data.get("code", "1"))
+                    if code == "0":
+                        log.info("[OKX] Algo %s cancelado com sucesso em %s", algo_id, symbol)
+                        return True
+                    else:
+                        error_msg = response_data.get("msg", f"Erro desconhecido (code: {code})")
+                        log.warning("[OKX] Falha ao cancelar algo %s em %s: %s", algo_id, symbol, error_msg)
+                        self.last_order_error = {"code": code, "message": error_msg}
+                        return False
+        except Exception as e:
+            log.error("[OKX] Exceção ao cancelar algo %s em %s: %s", algo_id, symbol, e)
+            self.last_order_error = {"code": "500", "message": str(e)}
+            return False
 
     async def cancel_all_algos(self) -> int:
         path = "/api/v5/trade/orders-algo-pending?ordType=conditional,move_order_stop&instType=ANY"
