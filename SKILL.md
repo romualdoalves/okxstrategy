@@ -192,12 +192,16 @@ Migrations adicionais são executadas via lista `migrations` em `database.py` us
   como N/A no scanner — não podem ser backtestadas sem feed ao vivo.
 
 ### Scanner de Backtest (`/batch-backtest`)
-- Usuário escolhe categoria (TF/MR/PA/SC/RG/IF/NW) + ativo e clica "Executar".
+- Usuário escolhe categoria (TF/MR/PA/SC/RG/IF/NW) ou **Todas** + ativo e clica "Executar".
 - `POST /api/backtest/category`: filtra REGISTRY por prefixo, agrupa por `recommended_timeframe`,
   busca candles uma vez por TF, roda backtests em paralelo (`asyncio.gather`).
+- Falha de candles/setup de mercado não deve gerar HTTP 500 no Scanner: estratégias afetadas
+  retornam N/A com motivo claro; no modo **Todas**, falhas pontuais de categoria aparecem como aviso.
 - Resultado ordenado: INICIAR → CUIDADO → NÃO INICIAR → N/A; dentro de cada grupo por PF desc.
 - Cada card mostra Likert + métricas + bullets expansíveis + botão **Criar Bot** (navega para
   `/bots/new?strategy=ID&symbol=ATIVO` com campos pré-preenchidos).
+- Ranking permite marcar múltiplas estratégias e criar bots em lote via `POST /api/bots`;
+  a UI bloqueia seleções que violem a regra de um ativo por bot.
 
 ---
 

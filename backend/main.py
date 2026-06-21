@@ -1999,21 +1999,34 @@ async def run_category_backtest(req: CategoryBacktestRequest):
 
     # Busca candles uma vez por timeframe único
     candle_cache: dict[str, list] = {}
-    async with _aiohttp.ClientSession() as session:
-        ex = build_exchange(session)
+    try:
+        async with _aiohttp.ClientSession() as session:
+            ex = build_exchange(session)
+            for tf in tf_groups:
+                try:
+                    bar = map_timeframe_for_history(tf)
+                    candle_cache[tf] = await ex.fetch_candles(req.symbol, bar, limit=500) or []
+                except Exception as exc:
+                    log.warning(
+                        "Category backtest candle fetch error %s/%s (%s): %s",
+                        req.symbol,
+                        prefix,
+                        tf,
+                        exc,
+                    )
+                    candle_cache[tf] = []
+    except Exception as exc:
+        log.warning(
+            "Category backtest market setup error %s/%s: %s",
+            req.symbol,
+            prefix,
+            exc,
+        )
         for tf in tf_groups:
-            bar = map_timeframe_for_history(tf)
-            try:
-                candle_cache[tf] = await ex.fetch_candles(req.symbol, bar, limit=500) or []
-            except Exception as exc:
-                log.warning(
-                    "Category backtest candle fetch error %s/%s (%s): %s",
-                    req.symbol,
-                    prefix,
-                    tf,
-                    exc,
-                )
-                candle_cache[tf] = []
+            candle_cache[tf] = []
+
+    for tf in tf_groups:
+        candle_cache.setdefault(tf, [])
 
     # Executa backtests em paralelo
     async def _run(sid: str, tf: str) -> dict:

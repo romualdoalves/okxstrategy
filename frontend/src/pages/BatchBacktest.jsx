@@ -54,6 +54,17 @@ function buildBotPayload(r, symbol) {
   }
 }
 
+async function readErrorMessage(res) {
+  const text = await res.text().catch(() => '')
+  if (!text) return `HTTP ${res.status}`
+  try {
+    const err = JSON.parse(text)
+    return err.detail || err.message || text || `HTTP ${res.status}`
+  } catch {
+    return text || `HTTP ${res.status}`
+  }
+}
+
 function ResultCard({ r, symbol, selected, disabled, disabledReason, onToggle }) {
   const [open, setOpen] = useState(false)
   const nav = useNavigate()
@@ -342,8 +353,7 @@ export default function BatchBacktest() {
           body: JSON.stringify({ category: cat, symbol, exclude_strategies: usedStrategies }),
         })
         if (!res.ok) {
-          const err = await res.json().catch(() => ({}))
-          const message = err.detail || `HTTP ${res.status}`
+          const message = await readErrorMessage(res)
           if (category === 'ALL') {
             failedCategories.push(`${cat}: ${message}`)
             continue
