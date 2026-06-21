@@ -333,6 +333,7 @@ export default function BatchBacktest() {
         throw new Error('Nenhuma estratégia elegível para escanear.')
       }
       const merged = []
+      const failedCategories = []
 
       for (const cat of categoriesToScan) {
         const res = await fetch(`${API}/api/backtest/category`, {
@@ -342,14 +343,23 @@ export default function BatchBacktest() {
         })
         if (!res.ok) {
           const err = await res.json().catch(() => ({}))
-          throw new Error(err.detail || `HTTP ${res.status}`)
+          const message = err.detail || `HTTP ${res.status}`
+          if (category === 'ALL') {
+            failedCategories.push(`${cat}: ${message}`)
+            continue
+          }
+          throw new Error(message)
         }
         const data = await res.json()
         merged.push(...(data.results || []).map(r => ({ ...r, category: cat, symbol })))
       }
+      if (!merged.length && failedCategories.length) {
+        throw new Error(`Nenhuma categoria retornou resultado. ${failedCategories.join(' | ')}`)
+      }
       setResults({
         category,
         symbol,
+        failedCategories,
         total: merged.length,
         results: merged.sort((a, b) => {
           const verdictA = VERDICT_CFG[a.recommendation?.verdict] ? a.recommendation?.verdict : 'N/A'
@@ -832,6 +842,12 @@ export default function BatchBacktest() {
       {/* Summary badges */}
       {results && counts && (
         <>
+          {results.failedCategories?.length > 0 && (
+            <div className="mb-4 rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3 text-sm text-yellow-300">
+              Algumas categorias falharam e foram ignoradas: {results.failedCategories.join(' | ')}
+            </div>
+          )}
+
           <div className="flex flex-wrap items-center gap-3 mb-4">
             <span className="text-sm text-muted">{results.total} estratégias · {results.symbol}</span>
             <button

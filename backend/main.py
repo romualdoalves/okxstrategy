@@ -2003,13 +2003,28 @@ async def run_category_backtest(req: CategoryBacktestRequest):
         ex = build_exchange(session)
         for tf in tf_groups:
             bar = map_timeframe_for_history(tf)
-            candle_cache[tf] = await ex.fetch_candles(req.symbol, bar, limit=500) or []
+            try:
+                candle_cache[tf] = await ex.fetch_candles(req.symbol, bar, limit=500) or []
+            except Exception as exc:
+                log.warning(
+                    "Category backtest candle fetch error %s/%s (%s): %s",
+                    req.symbol,
+                    prefix,
+                    tf,
+                    exc,
+                )
+                candle_cache[tf] = []
 
     # Executa backtests em paralelo
     async def _run(sid: str, tf: str) -> dict:
         candles = candle_cache.get(tf, [])
         info = REGISTRY[sid].info()
         base = {"strategy_id": sid, "strategy_name": info.name, "timeframe": tf}
+        if not candles:
+            return {**base, "recommendation": {
+                "verdict": "N/A", "level": "na",
+                "reasons": [f"Dados históricos indisponíveis para {req.symbol} no timeframe {tf}."],
+            }}
         try:
             engine = BacktestEngine(sid)
             result = await engine.run(candles)
