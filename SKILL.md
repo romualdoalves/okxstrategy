@@ -193,6 +193,7 @@ Migrations adicionais são executadas via lista `migrations` em `database.py` us
 
 ### Scanner de Backtest (`/batch-backtest`)
 - Usuário escolhe categoria (TF/MR/PA/SC/RG/IF/NW) ou **Todas** + ativo e clica "Executar".
+- Não há modo Auto-Scan separado; o fluxo **Todas** cobre a varredura ampla sem histórico redundante.
 - `POST /api/backtest/category`: filtra REGISTRY por prefixo, agrupa por `recommended_timeframe`,
   busca candles uma vez por TF, roda backtests em paralelo (`asyncio.gather`).
 - Falha de candles/setup de mercado não deve gerar HTTP 500 no Scanner: estratégias afetadas
