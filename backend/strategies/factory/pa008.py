@@ -20,6 +20,11 @@ class Pa008OrbBreakoutRetestStrategy(BaseStrategy):
             description="Estratégia de rompimento do range de abertura (Opening Range Breakout) com reteste. Marca o range dos primeiros 30 minutos das bolsas americanas (09:30-10:00 NY) nos gráficos de 15/30 min. Aguarda fechamento de vela de 5 min fora do range para validar direção, depois busca reteste corretivo da linha rompida para entrada. Inclui filtros de volatilidade e tempo limite até meio-dia.",
             tags=["breakout", "intraday", "pattern"],
             recommended_timeframe="15m",
+            criteria=[
+                {"id": "c1_orb", "label": "C1 ORB", "description": "Opening range definido e dentro da volatilidade máxima."},
+                {"id": "c2_breakout", "label": "C2 Rompimento", "description": "Preço fechou fora do range."},
+                {"id": "c3_retest", "label": "C3 Reteste", "description": "Preço retestou a linha rompida."},
+            ],
             params={
                 "atr_period": ParamDef(type="int", default=14, min=5, max=50, step=1, description="Período do ATR para gestão de risco"),
                 "sl_mult": ParamDef(type="float", default=2.0, min=1.0, max=5.0, step=0.5, description="Multiplicador ATR para Stop Loss"),

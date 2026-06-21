@@ -20,6 +20,10 @@ class MartySchwartzRedLightGreenLightStrategy(BaseStrategy):
             description="Estratégia de tendência baseada no sistema Red Light Green Light de Marty Schwartz. Utiliza EMA10 em timeframe superior para definir viés (Green Light = compra, Red Light = venda) e EMA50 ou rompimento com volume em timeframe inferior como gatilho de entrada. Gestão de risco com stop curto no candle gatilho e alvo de 2x risco ou trailing stop via ATR.",
             tags=["trend", "multi-tf", "breakout", "volume"],
             recommended_timeframe="15m",
+            criteria=[
+                {"id": "c1", "label": "Viés EMA Macro", "description": "EMA macro define Green Light ou Red Light"},
+                {"id": "c2", "label": "Gatilho de Entrada", "description": "Pullback na EMA micro ou rompimento com volume"},
+            ],
             params={
                 "ema_macro_period": ParamDef(type="int", default=10, min=5, max=50, step=1, description="Período da EMA no timeframe superior para definir viés"),
                 "ema_micro_period": ParamDef(type="int", default=50, min=20, max=200, step=1, description="Período da EMA no timeframe inferior para pullback"),

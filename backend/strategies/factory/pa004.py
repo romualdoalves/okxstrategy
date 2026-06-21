@@ -253,7 +253,7 @@ class ThreeLineBarStrategy(BaseStrategy):
         if not rsi_ok:
             return StrategyResult(
                 signal=Signal.HOLD,
-                criteria_met=0,
+                criteria_met=2,
                 criteria_total=5,
                 hold_reason=f"RSI {rsi_val:.0f} >= {self.rsi_threshold} (sobrevenda nao confirmada)",
                 indicators=self._calc_indicators(
@@ -264,6 +264,50 @@ class ThreeLineBarStrategy(BaseStrategy):
                         "c2_high": round(c2_high, 2),
                         "context": context,
                         "c3_bullish": 1 if c3_bullish else 0,
+                        "vol_ratio": round(vol_ratio, 2),
+                        "entry_price": round(entry_price, 2),
+                        "rr": rr,
+                        "in_uptrend": 1 if in_uptrend else 0,
+                    }
+                ),
+            )
+
+        if not c3_bullish:
+            return StrategyResult(
+                signal=Signal.HOLD,
+                criteria_met=3,
+                criteria_total=5,
+                hold_reason="C3 ainda nao fechou como candle de alta",
+                indicators=self._calc_indicators(
+                    df, c3, ema_trend_val, rsi_val,
+                    extra={
+                        "c3_high": round(c3_high, 2),
+                        "c1_low": round(c1_low, 2),
+                        "c2_high": round(c2_high, 2),
+                        "context": context,
+                        "c3_bullish": 0,
+                        "vol_ratio": round(vol_ratio, 2),
+                        "entry_price": round(entry_price, 2),
+                        "rr": rr,
+                        "in_uptrend": 1 if in_uptrend else 0,
+                    }
+                ),
+            )
+
+        if not vol_ok:
+            return StrategyResult(
+                signal=Signal.HOLD,
+                criteria_met=4,
+                criteria_total=5,
+                hold_reason=f"Volume insuficiente ({vol_ratio:.2f}x < {self.min_volume_ratio:.2f}x)",
+                indicators=self._calc_indicators(
+                    df, c3, ema_trend_val, rsi_val,
+                    extra={
+                        "c3_high": round(c3_high, 2),
+                        "c1_low": round(c1_low, 2),
+                        "c2_high": round(c2_high, 2),
+                        "context": context,
+                        "c3_bullish": 1,
                         "vol_ratio": round(vol_ratio, 2),
                         "entry_price": round(entry_price, 2),
                         "rr": rr,
@@ -294,6 +338,9 @@ class ThreeLineBarStrategy(BaseStrategy):
             metadata={
                 "sl_price": round(sl_price, 2),
                 "tp1_price": round(tp_price, 2),
+                "sl_pct": round(risk / entry_price, 5),
+                "tp1_pct": round(risk * rr / entry_price, 5),
+                "ts_pct": round(risk * rr / entry_price, 5),
                 "rr": rr,
                 "context": context,
                 "regime_state": f"three_line_bar_{context}",

@@ -168,6 +168,9 @@ class OtrValueZonesStrategy(BaseStrategy):
             metadata={
                 "sl_price": round(sl_price, 2),
                 "tp1_price": round(tp1_price, 2),
+                "sl_pct": round(abs(close - sl_price) / close, 5) if close else 0.0,
+                "tp1_pct": round(abs(tp1_price - close) / close, 5) if close else 0.0,
+                "ts_pct": round(abs(tp1_price - close) / close, 5) if close else 0.0,
                 "zone": "bottom" if in_bottom else "top" if in_top else "middle",
             },
             hold_reason=hold_reason,

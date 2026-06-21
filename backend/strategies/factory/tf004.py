@@ -78,6 +78,7 @@ class SuperTrendStrategy(BaseStrategy):
             criteria=[
                 {"id": "c1", "label": "Flip SuperTrend", "description": "SuperTrend inverte direção"},
                 {"id": "c2", "label": "Filtro RSI", "description": "RSI confirma momentum"},
+                {"id": "c3", "label": "Distância SuperTrend", "description": "Preço mantém distância operacional da linha SuperTrend"},
             ],
         )
 

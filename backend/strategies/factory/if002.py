@@ -292,6 +292,22 @@ class DexArbitrageSentinelStrategy(BaseStrategy):
             "opportunities_count": len(opportunities),
             "estimated_profit_usd": best.estimated_profit_usd,
         }
+        if okx_price:
+            sl_pct = max(float(self.slippage_estimate_pct) / 100 * 3, 0.005)
+            tp_pct = max(float(best.net_spread_pct) / 100, sl_pct * 1.5)
+            if signal == Signal.BUY:
+                sl_price = okx_price * (1 - sl_pct)
+                tp1_price = okx_price * (1 + tp_pct)
+            else:
+                sl_price = okx_price * (1 + sl_pct)
+                tp1_price = okx_price * (1 - tp_pct)
+            metadata.update({
+                "sl_price": round(sl_price, 6),
+                "tp1_price": round(tp1_price, 6),
+                "sl_pct": round(sl_pct, 5),
+                "tp1_pct": round(tp_pct, 5),
+                "ts_pct": round(tp_pct, 5),
+            })
 
         return StrategyResult(
             signal=signal,

@@ -28,7 +28,9 @@ class MaCrossoverStrategy(BaseStrategy):
                 "Funciona bem em tendências fortes."
             ),
             tags   = ["trend", "moving_average", "crossover"],
-            criteria=[],
+            criteria=[
+                {"id": "c1", "label": "Cruzamento MA", "description": "MA rápida cruza a MA lenta"},
+            ],
             params = {
                 "fast_ma_period": ParamDef(
                     type="int", default=20, min=5, max=100, step=1,
@@ -134,7 +136,7 @@ class MaCrossoverStrategy(BaseStrategy):
                 "bullish_crossover": bullish_crossover,
                 "bearish_crossover": bearish_crossover,
                 "sl_price":  round(sl_price, 4),
-                "tp_price":  round(tp_price, 4),
+                "tp1_price": round(tp_price, 4),
                 "ma_type":   self.ma_type.upper(),
             },
         )

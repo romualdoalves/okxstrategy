@@ -28,9 +28,7 @@ class WarriorReversalStrategy(BaseStrategy):
                 {"id": "c1", "label": "Exaustão Detectada", "description": "Condição 1: Exaustão Detectada"},
                 {"id": "c2", "label": "Filtro RSI", "description": "Filtro RSI (Opcional do Ross, mas ajuda muito)"},
                 {"id": "c3", "label": "Filtro MACD", "description": "Filtro MACD (Perdendo força vendedora)"},
-                {"id": "c4", "label": "Exaustão Detectada", "description": "Condição 1: Exaustão Detectada"},
-                {"id": "c5", "label": "Filtro RSI", "description": "Filtro RSI"},
-                {"id": "c6", "label": "Filtro MACD", "description": "Filtro MACD (Perdendo força compradora)"},
+                {"id": "c4", "label": "Gatilho de Rompimento", "description": "Preço rompe o extremo da vela estendida"},
             ],
         )
 
@@ -133,12 +131,33 @@ class WarriorReversalStrategy(BaseStrategy):
             "bb_mid": round(mid_band.iloc[-1], 6),
             "ema9": round(ema9.iloc[-1], 6),
             "rsi": round(rsi.iloc[-1], 2),
-            "outside_band": 1.0 if (outside_lower or outside_upper) else 0.0
+            "outside_band": 1.0 if (outside_lower or outside_upper) else 0.0,
+            "macd_delta": round(float(macd_val.iloc[-1] - macd_val.iloc[-2]), 6),
         }
+        metadata = {}
+        if signal in (Signal.BUY, Signal.SELL):
+            entry = float(curr["close"])
+            atr = ta.atr(df["high"], df["low"], df["close"], length=14)
+            atr_val = float(atr.iloc[-1]) if atr is not None and not pd.isna(atr.iloc[-1]) else entry * 0.01
+            sl_dist = atr_val * 2.0
+            if signal == Signal.BUY:
+                sl_price = entry - sl_dist
+                tp1_price = entry + sl_dist * 2.0
+            else:
+                sl_price = entry + sl_dist
+                tp1_price = entry - sl_dist * 2.0
+            metadata = {
+                "sl_price": round(sl_price, 6),
+                "tp1_price": round(tp1_price, 6),
+                "sl_pct": round(sl_dist / entry, 5),
+                "tp1_pct": round(sl_dist * 2.0 / entry, 5),
+                "ts_pct": round(sl_dist * 2.0 / entry, 5),
+            }
         
         return StrategyResult(
             signal=signal,
             indicators=indicators,
+            metadata=metadata,
             hold_reason=reason,
             criteria_met=criteria_met,
             criteria_total=criteria_total

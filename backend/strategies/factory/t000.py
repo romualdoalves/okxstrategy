@@ -53,6 +53,9 @@ class TestPlatformStrategy(BaseStrategy):
             metadata={
                 "sl_price":  round(close * 0.99, 4),
                 "tp1_price": round(close * 1.02, 4),
+                "sl_pct": 0.01,
+                "tp1_pct": 0.02,
+                "ts_pct": 0.02,
             },
             criteria_met=1,
             criteria_total=1,

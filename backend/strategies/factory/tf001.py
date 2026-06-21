@@ -54,6 +54,7 @@ class EmaVwapStrategy(BaseStrategy):
             criteria=[
                 {"id": "c1", "label": "Tendência EMA", "description": "EMA rápida alinhada com EMA lenta"},
                 {"id": "c2", "label": "Filtro VWAP", "description": "Preço acima/abaixo do VWAP"},
+                {"id": "c3", "label": "Filtro ATR", "description": "ATR disponível para dimensionar risco"},
             ],
         )
 

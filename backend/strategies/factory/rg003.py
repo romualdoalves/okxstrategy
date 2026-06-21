@@ -75,7 +75,12 @@ class GexGammaExposureStrategy(BaseStrategy):
             ),
             recommended_timeframe="1h",
             tags=["Intelligence", "GEX", "Options", "Regime", "Institutional", "MarketMakers"],
-            criteria=[],
+            criteria=[
+                {"id": "c1_regime", "label": "C1 Regime GEX", "description": "Regime GEX positivo ou negativo confirmado."},
+                {"id": "c2_level", "label": "C2 Nível OI", "description": "Preço próximo ou rompendo nível relevante de OI."},
+                {"id": "c3_volume", "label": "C3 Volume", "description": "Volume acima da média confirma agressão."},
+                {"id": "c4_atr", "label": "C4 ATR", "description": "ATR/BBW alinhado ao regime esperado."},
+            ],
             params={
                 "level_proximity_pct": ParamDef(
                     "float", 0.8,
@@ -322,6 +327,7 @@ class GexGammaExposureStrategy(BaseStrategy):
                 "tp1_price":  tp1_price,
                 "sl_pct":     round(abs(close - sl_price) / close, 5),
                 "tp1_pct":    round(abs(close - tp1_price) / close, 5),
+                "ts_pct":     round(abs(close - tp1_price) / close, 5),
                 "entry_mode": "pos_gamma_range" if regime == "positive_gamma" else "neg_gamma_breakout",
             })
         if gex_snap:

@@ -24,8 +24,7 @@ class LiquidityClustersStrategy(BaseStrategy):
             criteria=[
                 {"id": "c1", "label": "Filtro EMA 200 OK", "description": "Filtro EMA 200 OK"},
                 {"id": "c2", "label": "Extremo de Liquidez OK", "description": "Extremo de Liquidez OK"},
-                {"id": "c3", "label": "Filtro EMA 200 OK", "description": "Filtro EMA 200 OK"},
-                {"id": "c4", "label": "Extremo de Liquidez OK", "description": "Extremo de Liquidez OK"},
+                {"id": "c3", "label": "Gatilho Trend Metric", "description": "Cruzamento da Trend Metric confirma a entrada"},
             ],
         )
 

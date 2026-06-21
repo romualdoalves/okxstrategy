@@ -407,12 +407,15 @@ class InfluencersFollowersStrategy(BaseStrategy):
                 signal=Signal.BUY if action == "BUY" else Signal.SELL,
                 hold_reason=signal_output.get("reason", ""),
                 indicators=inds,
-                metadata={
+                metadata=self._risk_metadata(
+                    candles[-1].close,
+                    signal_output.get("sl_price"),
+                    signal_output.get("tp1_price"),
+                    {
                     "influencer": self.engine.influencer,
                     "follower":   self.engine.follower,
-                    "sl_price":    signal_output.get("sl_price"),
-                    "tp1_price":   signal_output.get("tp1_price"),
-                },
+                    },
+                ),
                 criteria_met=int(signal_output.get("criteria_met", 0) or 0),
                 criteria_total=int(signal_output.get("criteria_total", 0) or 0),
             )
@@ -469,6 +472,17 @@ class InfluencersFollowersStrategy(BaseStrategy):
         inds["ema_fast"] = 0
         inds["ema_slow"] = 0
         return inds
+
+    @staticmethod
+    def _risk_metadata(entry: float, sl_price, tp1_price, extra: dict[str, Any]) -> dict[str, Any]:
+        metadata = dict(extra)
+        metadata["sl_price"] = sl_price
+        metadata["tp1_price"] = tp1_price
+        if entry and sl_price and tp1_price:
+            metadata["sl_pct"] = round(abs(float(entry) - float(sl_price)) / float(entry), 5)
+            metadata["tp1_pct"] = round(abs(float(tp1_price) - float(entry)) / float(entry), 5)
+            metadata["ts_pct"] = metadata["tp1_pct"]
+        return metadata
 
     def _base_indicators(self, candle) -> dict[str, Any]:
         return {

@@ -107,7 +107,8 @@ class WhaleFlowRegimeStrategy(BaseStrategy):
             "vah":  float(curr['vah']),
             "val":  float(curr['val']),
             "delta": float(curr['delta']),
-            "vol_ratio": float(curr['vol_ratio'])
+            "vol_ratio": float(curr['vol_ratio']),
+            "close": float(curr['close']),
         }
         
         # Contador de critérios (Explainability)
@@ -117,13 +118,29 @@ class WhaleFlowRegimeStrategy(BaseStrategy):
         if (signal == Signal.BUY and buy_delta) or (signal == Signal.SELL and sell_delta): criteria_met += 1
         if abs(curr['close_loc'] - 0.5) > 0.2: criteria_met += 1 # Rejeição de pavio
         
+        metadata = {"zone": zone, "absorption": 1 if (vol_spike and curr['body_size'] < body_ma) else 0}
+        if signal in (Signal.BUY, Signal.SELL):
+            atr = float((df["high"] - df["low"]).rolling(14, min_periods=1).mean().iloc[-1])
+            sl_dist = atr * 1.5
+            entry = float(curr["close"])
+            if signal == Signal.BUY:
+                sl_price = entry - sl_dist
+                tp1_price = entry + sl_dist * 2.0
+            else:
+                sl_price = entry + sl_dist
+                tp1_price = entry - sl_dist * 2.0
+            metadata.update({
+                "sl_price": round(sl_price, 6),
+                "tp1_price": round(tp1_price, 6),
+                "sl_pct": round(sl_dist / entry, 5) if entry else 0.0,
+                "tp1_pct": round(sl_dist * 2.0 / entry, 5) if entry else 0.0,
+                "ts_pct": round(sl_dist * 2.0 / entry, 5) if entry else 0.0,
+            })
+
         return StrategyResult(
             signal=signal,
             criteria_met=min(criteria_met, 3),
             criteria_total=3,
             indicators=indicators,
-            metadata={
-                "zone": zone, 
-                "absorption": 1 if (vol_spike and curr['body_size'] < body_ma) else 0
-            }
+            metadata=metadata,
         )

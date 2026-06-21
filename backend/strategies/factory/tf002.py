@@ -109,7 +109,7 @@ class RsiMaStrategy(BaseStrategy):
         else:
             signal = Signal.HOLD
 
-        criteria_met = 1 if signal in (Signal.BUY, Signal.SELL) else 0
+        criteria_met = 2 if signal in (Signal.BUY, Signal.SELL) else 0
         
         return StrategyResult(
             signal     = signal,

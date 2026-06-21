@@ -141,7 +141,7 @@ class MacdStrategy(BaseStrategy):
         if ma_val is not None:
             indicators["trend_ma"] = round(ma_val, 2)
 
-        criteria_met = 1 if signal in (Signal.BUY, Signal.SELL) else 0
+        criteria_met = 3 if signal in (Signal.BUY, Signal.SELL) else 0
         
         return StrategyResult(
             signal     = signal,

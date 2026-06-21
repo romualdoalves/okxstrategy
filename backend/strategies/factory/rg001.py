@@ -249,7 +249,27 @@ class MarkovRegimeStrategy(BaseStrategy):
             "stat_bear":    round(float(stationary[BEAR]), 4),
             "current_regime": float(current_state),
             "atr":          round(atr, 4),
+            "close":        round(float(candles[-1].close), 4),
         }
+        close = float(candles[-1].close)
+        sl_dist = atr * self.atr_mult_sl
+        if sig == Signal.BUY:
+            sl_price = close - sl_dist
+            tp1_price = close * (1 + self.tp1_pct / 100)
+        elif sig == Signal.SELL:
+            sl_price = close + sl_dist
+            tp1_price = close * (1 - self.tp1_pct / 100)
+        else:
+            sl_price = tp1_price = 0.0
+        risk_metadata = {}
+        if sig in (Signal.BUY, Signal.SELL):
+            risk_metadata = {
+                "sl_price": round(sl_price, 4),
+                "tp1_price": round(tp1_price, 4),
+                "sl_pct": round(sl_dist / close, 5) if close else 0.0,
+                "tp1_pct": round(abs(tp1_price - close) / close, 5) if close else 0.0,
+                "ts_pct": round(sl_dist / close, 5) if close else 0.0,
+            }
 
         return StrategyResult(
             signal        = sig,
@@ -265,5 +285,6 @@ class MarkovRegimeStrategy(BaseStrategy):
                     "Sideways": round(float(stationary[SIDE]), 4),
                     "Bear":     round(float(stationary[BEAR]), 4),
                 },
+                **risk_metadata,
             },
         )

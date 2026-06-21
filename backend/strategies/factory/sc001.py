@@ -49,23 +49,6 @@ class PatternScalpStrategy(BaseStrategy):
         self.atr_mult_threshold = 0.20
         self.rejection_ratio    = 2.0
         self.tp_rr              = 2.0
-            params = {
-                "atr_mult_threshold": ParamDef(
-                    type="float", default=0.20, min=0.10, max=0.50, step=0.05,
-                    description="Percentual do ATR Diário para considerar manipulação (20% recomendado)"),
-                "rejection_ratio": ParamDef(
-                    type="float", default=2.0, min=1.0, max=4.0, step=0.1,
-                    description="Tamanho da sombra vs corpo para o 'John Wick'"),
-                "tp_rr": ParamDef(
-                    type="float", default=2.0, min=1.0, max=5.0, step=0.5,
-                    description="Risk:Reward para o scalping"),
-            },
-        )
-
-    def __init__(self):
-        self.atr_mult_threshold = 0.20
-        self.rejection_ratio    = 2.0
-        self.tp_rr              = 2.0
 
     def set_params(self, params: dict) -> None:
         for k, v in params.items():
@@ -160,6 +143,10 @@ class PatternScalpStrategy(BaseStrategy):
         if signal in (Signal.BUY, Signal.SELL):
             metadata["sl_price"] = round(sl_price, 6)
             metadata["tp1_price"] = round(tp1_price, 6)
+            risk = abs(last_candle.close - sl_price)
+            metadata["sl_pct"] = round(risk / last_candle.close, 5) if last_candle.close else 0.0
+            metadata["tp1_pct"] = round(risk * self.tp_rr / last_candle.close, 5) if last_candle.close else 0.0
+            metadata["ts_pct"] = round(risk * self.tp_rr / last_candle.close, 5) if last_candle.close else 0.0
 
         return StrategyResult(
             signal=signal, 

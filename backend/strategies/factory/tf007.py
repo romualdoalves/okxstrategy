@@ -244,7 +244,7 @@ class MultiTFStrategy(BaseStrategy):
             sl_price  = round(close + sl_dist, 4)
             tp1_price = round(close - sl_dist * self.tp1_rr, 4)
 
-        criteria_met = 1 if signal in (Signal.BUY, Signal.SELL) else 0
+        criteria_met = 3 if signal in (Signal.BUY, Signal.SELL) else 0
         
         return StrategyResult(
             signal      = signal,

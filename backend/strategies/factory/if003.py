@@ -186,10 +186,14 @@ class AtemporalEventDrivenStrategy(BaseStrategy):
         if signal != Signal.HOLD:
             sl = last_price - (block_size * 1.1) if signal == Signal.BUY else last_price + (block_size * 1.1)
             tp = last_price + (last_price - sl) * self.params["rr_ratio"]
+            risk = abs(last_price - sl)
             metadata = {
                 "entry": round(last_price, 2),
-                "stop": round(sl, 2),
-                "tp1": round(tp, 2),
+                "sl_price": round(sl, 2),
+                "tp1_price": round(tp, 2),
+                "sl_pct": round(risk / last_price, 5) if last_price else 0.0,
+                "tp1_pct": round(abs(tp - last_price) / last_price, 5) if last_price else 0.0,
+                "ts_pct": round(abs(tp - last_price) / last_price, 5) if last_price else 0.0,
                 "poc": round(poc_price, 2)
             }
 

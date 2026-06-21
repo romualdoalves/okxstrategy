@@ -224,13 +224,27 @@ class StochasticReversalStrategy(BaseStrategy):
         if signal == Signal.BUY:
             sl_price = min(recent_low, ema144_val) * (1 - self.sl_buffer)
             dist = curr_close - sl_price
-            if dist <= 0: return StrategyResult(Signal.HOLD, "Risco inválido", self._ind(df), criteria_met=0, criteria_total=1)
+            if dist <= 0:
+                return StrategyResult(
+                    signal=Signal.HOLD,
+                    indicators=self._ind(df),
+                    hold_reason="Risco inválido",
+                    criteria_met=0,
+                    criteria_total=1,
+                )
             tp_price = curr_close + (dist * self.tp_rr)
             
         else: # SELL
             sl_price = max(recent_high, ema144_val) * (1 + self.sl_buffer)
             dist = sl_price - curr_close
-            if dist <= 0: return StrategyResult(Signal.HOLD, "Risco inválido", self._ind(df), criteria_met=0, criteria_total=1)
+            if dist <= 0:
+                return StrategyResult(
+                    signal=Signal.HOLD,
+                    indicators=self._ind(df),
+                    hold_reason="Risco inválido",
+                    criteria_met=0,
+                    criteria_total=1,
+                )
             tp_price = curr_close - (dist * self.tp_rr)
 
         return StrategyResult(
@@ -242,7 +256,9 @@ class StochasticReversalStrategy(BaseStrategy):
                 "tp1_price": round(tp_price, 4),
                 "rr": self.tp_rr,
                 "regime_state": "stochastic_first_pullback"
-            }
+            },
+            criteria_met=1,
+            criteria_total=1,
         )
 
     def _ind(self, df) -> dict:

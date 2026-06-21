@@ -1966,7 +1966,13 @@ class CategoryBacktestRequest(BaseModel):
 
 
 _VERDICT_ORDER = {"INICIAR": 0, "CUIDADO": 1, "NÃO INICIAR": 2, "N/A": 3}
-_CONTEXT_FLAGS = ("needs_gex_context", "needs_graph_context")
+_CONTEXT_FLAGS = (
+    "needs_gex_context",
+    "needs_graph_context",
+    "needs_onchain_context",
+    "needs_dex_context",
+    "needs_market_players_context",
+)
 
 
 @app.post("/api/backtest/category")

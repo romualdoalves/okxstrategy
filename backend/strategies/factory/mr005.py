@@ -161,7 +161,13 @@ class BollingerTripleThreatStrategy(BaseStrategy):
             signal=sig,
             hold_reason=reason,
             indicators=self._inds(curr),
-            metadata={"sl_price": round(sl, 2), "tp1_price": round(tp, 2)},
+            metadata={
+                "sl_price": round(sl, 2),
+                "tp1_price": round(tp, 2),
+                "sl_pct": round(sl_dist / entry, 5),
+                "tp1_pct": round(sl_dist * self.rr_ratio / entry, 5),
+                "ts_pct": round(sl_dist * self.rr_ratio / entry, 5),
+            },
             criteria_met=3,
             criteria_total=3,
         )

@@ -207,9 +207,12 @@ class LiquiditySweepStrategy(BaseStrategy):
 
         metadata = {
             "entry": round(entry_price, 2),
-            "stop": round(stop_price, 2),
-            "tp1": round(tp1_price, 2),
+            "sl_price": round(stop_price, 2),
+            "tp1_price": round(tp1_price, 2),
             "tp2": round(tp2_price, 2),
+            "sl_pct": round(risk / entry_price, 5),
+            "tp1_pct": round(self.rr_ratio * risk / entry_price, 5),
+            "ts_pct": round(self.rr_ratio * risk / entry_price, 5),
             "support_zone": round(support_level, 2),
             "sweep_low": round(sweep_low, 2),
             "channel_high": round(channel_high, 2),

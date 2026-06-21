@@ -99,7 +99,13 @@ class DoubleBollingerStrategy(BaseStrategy):
             if risk > 0:
                 signal_type = Signal.BUY
                 hold_reason = "Reversão Double B (Long)"
-                metadata = {"sl_price": round(stop, 2), "tp1_price": round(entry + (risk * self.rr_ratio), 2)}
+                metadata = {
+                    "sl_price": round(stop, 2),
+                    "tp1_price": round(entry + (risk * self.rr_ratio), 2),
+                    "sl_pct": round(risk / entry, 5),
+                    "tp1_pct": round(risk * self.rr_ratio / entry, 5),
+                    "ts_pct": round(risk * self.rr_ratio / entry, 5),
+                }
 
         # SHORT: Máxima anterior furou ambas, atual fechou dentro com rejeição
         signal_short_rev = (prev["high"] > o_upper.iloc[-2]) and (prev["high"] > i_upper.iloc[-2])
@@ -112,7 +118,13 @@ class DoubleBollingerStrategy(BaseStrategy):
             if risk > 0:
                 signal_type = Signal.SELL
                 hold_reason = "Reversão Double B (Short)"
-                metadata = {"sl_price": round(stop, 2), "tp1_price": round(entry - (risk * self.rr_ratio), 2)}
+                metadata = {
+                    "sl_price": round(stop, 2),
+                    "tp1_price": round(entry - (risk * self.rr_ratio), 2),
+                    "sl_pct": round(risk / entry, 5),
+                    "tp1_pct": round(risk * self.rr_ratio / entry, 5),
+                    "ts_pct": round(risk * self.rr_ratio / entry, 5),
+                }
 
         # ── 2. Cenário B: Rompimento (Breakout) ──────────────────────────────
         
@@ -130,7 +142,13 @@ class DoubleBollingerStrategy(BaseStrategy):
                     if risk > 0:
                         signal_type = Signal.BUY
                         hold_reason = "Rompimento Double B (Long)"
-                        metadata = {"sl_price": round(stop, 2), "tp1_price": round(entry + (risk * 2.0), 2)}
+                        metadata = {
+                            "sl_price": round(stop, 2),
+                            "tp1_price": round(entry + (risk * 2.0), 2),
+                            "sl_pct": round(risk / entry, 5),
+                            "tp1_pct": round(risk * 2.0 / entry, 5),
+                            "ts_pct": round(risk * 2.0 / entry, 5),
+                        }
                 else:
                     hold_reason = f"Rompimento Pendente: Preço ({curr['close']:.2f}) abaixo da resistência ({recent_high:.2f})"
 
@@ -143,7 +161,13 @@ class DoubleBollingerStrategy(BaseStrategy):
                     if risk > 0:
                         signal_type = Signal.SELL
                         hold_reason = "Rompimento Double B (Short)"
-                        metadata = {"sl_price": round(stop, 2), "tp1_price": round(entry - (risk * 2.0), 2)}
+                        metadata = {
+                            "sl_price": round(stop, 2),
+                            "tp1_price": round(entry - (risk * 2.0), 2),
+                            "sl_pct": round(risk / entry, 5),
+                            "tp1_pct": round(risk * 2.0 / entry, 5),
+                            "ts_pct": round(risk * 2.0 / entry, 5),
+                        }
                 else:
                     hold_reason = f"Rompimento Pendente: Preço ({curr['close']:.2f}) acima do suporte ({recent_low:.2f})"
 

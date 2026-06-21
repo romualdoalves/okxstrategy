@@ -129,7 +129,7 @@ class OnchainWhaleContextStrategy(BaseStrategy):
 
         return StrategyResult(
             signal=Signal.HOLD,
-            criteria_met=0,
+            criteria_met=1 if score >= int(self.min_score) else 0,
             criteria_total=1,
             indicators=indicators,
             metadata=metadata,

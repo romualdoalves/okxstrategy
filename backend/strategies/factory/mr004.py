@@ -120,12 +120,33 @@ class HilegaMilegaStrategy(BaseStrategy):
             "rsi": round(curr_rsi, 2),
             "ema_rsi": round(curr_ema, 2),
             "wma_rsi": round(curr_wma, 2),
-            "dist_hm": round(dist_ema_wma, 2)
+            "dist_hm": round(dist_ema_wma, 2),
+            "close": round(float(df["close"].iloc[-1]), 6),
         }
+        metadata = {}
+        if signal in (Signal.BUY, Signal.SELL):
+            close = float(df["close"].iloc[-1])
+            atr = ta.atr(df["high"], df["low"], df["close"], length=14)
+            atr_val = float(atr.iloc[-1]) if atr is not None and not pd.isna(atr.iloc[-1]) else close * 0.01
+            sl_dist = atr_val * 2.0
+            if signal == Signal.BUY:
+                sl_price = close - sl_dist
+                tp1_price = close + sl_dist * 2.0
+            else:
+                sl_price = close + sl_dist
+                tp1_price = close - sl_dist * 2.0
+            metadata = {
+                "sl_price": round(sl_price, 6),
+                "tp1_price": round(tp1_price, 6),
+                "sl_pct": round(sl_dist / close, 5),
+                "tp1_pct": round(sl_dist * 2.0 / close, 5),
+                "ts_pct": round(sl_dist * 2.0 / close, 5),
+            }
         
         return StrategyResult(
             signal=signal,
             indicators=indicators,
+            metadata=metadata,
             hold_reason=reason,
             criteria_met=criteria_met,
             criteria_total=criteria_total

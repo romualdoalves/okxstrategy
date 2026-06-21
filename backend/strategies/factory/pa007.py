@@ -20,6 +20,12 @@ class SupplyDemandCryptoStrategy(BaseStrategy):
             description="Estratégia de oferta e demanda adaptada para criptomoedas. Seleciona altcoins com volume e tendência forte, mapeia zonas em 4H, executa em 15M/5M com confirmação de quebra de estrutura e volume. Gestão de risco com stop abaixo do pavio e alvo na próxima zona.",
             tags=["trend", "breakout", "volume", "swing"],
             recommended_timeframe="15m",
+            criteria=[
+                {"id": "c1_bias", "label": "C1 Viés", "description": "EMA rápida e lenta definem direção."},
+                {"id": "c2_volume", "label": "C2 Volume", "description": "Volume acima da média."},
+                {"id": "c3_zone", "label": "C3 Zona", "description": "Preço toca zona de oferta/demanda."},
+                {"id": "c4_choch", "label": "C4 CHoCH", "description": "Quebra de estrutura confirma entrada."},
+            ],
             params={
                 "atr_period": ParamDef(type="int", default=14, min=5, max=50, step=1, description="Período do ATR para gestão de risco"),
                 "sl_mult": ParamDef(type="float", default=2.0, min=1.0, max=5.0, step=0.5, description="Multiplicador ATR para Stop Loss"),

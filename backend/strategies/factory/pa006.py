@@ -60,11 +60,11 @@ class CteStructureCaptureStrategy(BaseStrategy):
             tags=["price_action", "institutional", "CHoCH", "fibonacci",
                   "liquidity", "reversal", "multi_tf", "ICT"],
             criteria=[
-                {"id": "c1_zone", "label": "C1 Zone", "description": "Preço em zona institucional."},
-                {"id": "c2_impulse", "label": "C2 Impulse", "description": "Impulso confirma deslocamento."},
-                {"id": "c3_fvg", "label": "C3 FVG", "description": "Fair Value Gap válido."},
-                {"id": "c4_order_block", "label": "C4 OB", "description": "Order block confirma contexto."},
-                {"id": "c5_risk", "label": "C5 Risk", "description": "Risco/retorno válido."},
+                {"id": "c1_sweep", "label": "C1 Sweep HTF", "description": "Varredura HTF detectada."},
+                {"id": "c2_rejection", "label": "C2 Rejeição", "description": "Fechamento voltou ao range após a varredura."},
+                {"id": "c3_choch", "label": "C3 CHoCH", "description": "Quebra de estrutura no LTF."},
+                {"id": "c4_fib", "label": "C4 Fibonacci", "description": "Preço recuou para a zona 61.8%-78.6%."},
+                {"id": "c5_liquidity", "label": "C5 Liquidez", "description": "ATR confirma liquidez mínima."},
             ],
             params={
                 "htf_swing_lookback": ParamDef(
@@ -299,9 +299,12 @@ class CteStructureCaptureStrategy(BaseStrategy):
             ),
             metadata={
                 "entry":        round(entry, 4),
-                "stop":         round(stop, 4),
-                "tp1":          round(tp1, 4),
+                "sl_price":     round(stop, 4),
+                "tp1_price":    round(tp1, 4),
                 "tp2":          round(tp2, 4),
+                "sl_pct":       round(risk / entry, 5) if entry else 0.0,
+                "tp1_pct":      round(abs(tp1 - entry) / entry, 5) if entry else 0.0,
+                "ts_pct":       round(abs(tp1 - entry) / entry, 5) if entry else 0.0,
                 "sweep_type":   htf_sweep["type"],
                 "sweep_extreme": round(sweep_ext, 4),
                 "choch_level":  round(choch["choch_level"], 4),
