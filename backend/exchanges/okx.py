@@ -514,7 +514,6 @@ class OKXExchange(BaseExchange):
             return None
         return None
 
-    async def cancel_algo(self, symbol: str, algo_id: str) -> None:
     async def cancel_algo(self, symbol: str, algo_id: str) -> bool:
         """Cancela ordem algorítmica na exchange. Retorna True se sucesso, False se falha."""
         try:
