@@ -72,10 +72,13 @@ Trabalhe somente no repositório `E:\Dell Inspiron\W\Dev\Trading\OKXTrader\OKXSt
 ### Stop Loss e trailing stop
 - O `bot_manager` implementa um fallback dinâmico: se a estratégia não enviar `sl_price`, o Stop Loss é calculado usando `ATR(14)` dinâmico (Stop a 1.5x o ATR).
 - Proteção Estatística (Hard Floor): O stop NUNCA pode ser menor que 1.5x o ATR(14) no timeframe do bot, garantindo que o stop respeite a volatilidade do ativo (substituindo o antigo limite cego de 0.8%).
+- Entrada só é considerada operacional quando a OKX confirma Stop Loss nativo (`conditional`) ou proteção equivalente. Se o SL inicial for recusado, o bot tenta novamente com pequenos ajustes de distância; se todas as tentativas falharem, encerra a posição a mercado por segurança. Se o encerramento emergencial também falhar, o bot fica em estado crítico/pausado e registra rejeição.
 - OKX API v5: trailing stop usa `ordType="move_order_stop"` com
   `callbackRatio`/`callbackSpread`.
-- Se trailing falhar → fallback SL fixo + registra rejeição do trailing.
-- `_recover_state()` sempre recria trailing stop ao reiniciar, independente de `tp1_done`.
+- No TP1, o bot cria trailing/fallback antes de cancelar o SL fixo antigo; nunca remove a proteção antiga antes de confirmar a nova.
+- Se trailing falhar → fallback SL fixo + registra rejeição do trailing. Se trailing e fallback falharem, `tp1_done` não é marcado.
+- `_recover_state()` recupera a posição do banco e, no próximo ciclo, sincroniza a proteção real pendente na OKX; se não houver SL/trailing ativo, tenta recriar o SL e pode encerrar a posição por segurança.
+- Buscas de algo orders pendentes na OKX são feitas por `ordType` separado (`conditional` e `move_order_stop`), sem lista separada por vírgula.
 - Orphan recovery calcula `tp1 = entry × 1.02 (LONG) / 0.98 (SHORT)`.
 
 ### Telegram

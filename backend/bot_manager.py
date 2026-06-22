@@ -283,6 +283,138 @@ class BotInstance:
         )
         return False
 
+    async def _place_stop_loss_with_retry(
+        self,
+        exchange: BaseExchange,
+        side: str,
+        size: float,
+        trigger_price: float,
+        reference_price: float,
+    ) -> tuple[Optional[str], float]:
+        """Cria SL nativo com pequenos ajustes de distância antes de desistir."""
+        trigger_price = float(trigger_price or 0.0)
+        reference_price = float(reference_price or trigger_price or 0.0)
+        if trigger_price <= 0 or size <= 0:
+            return None, trigger_price
+
+        candidates = [trigger_price]
+        if reference_price > 0:
+            if side == "sell":
+                candidates.extend([
+                    min(trigger_price, reference_price * 0.995),
+                    min(trigger_price, reference_price * 0.990),
+                    min(trigger_price, reference_price * 0.985),
+                ])
+            else:
+                candidates.extend([
+                    max(trigger_price, reference_price * 1.005),
+                    max(trigger_price, reference_price * 1.010),
+                    max(trigger_price, reference_price * 1.015),
+                ])
+
+        seen: set[float] = set()
+        for candidate in candidates:
+            candidate = round(float(candidate), 8)
+            if candidate <= 0 or candidate in seen:
+                continue
+            seen.add(candidate)
+            algo_id = await exchange.place_stop_loss(self.config.symbol, side, size, candidate)
+            if algo_id:
+                if abs(candidate - trigger_price) > max(1e-12, trigger_price * 0.00001):
+                    log.warning(
+                        "[Bot %d] SL inicial aceito pela OKX após ajuste: %.8f -> %.8f",
+                        self.config.id,
+                        trigger_price,
+                        candidate,
+                    )
+                return algo_id, candidate
+            err = getattr(exchange, "last_order_error", None) or {}
+            log.warning(
+                "[Bot %d] Tentativa de Stop Loss recusada em %.8f: %s",
+                self.config.id,
+                candidate,
+                err.get("message", err),
+            )
+        return None, trigger_price
+
+    async def _emergency_close_unprotected_entry(
+        self,
+        exchange: BaseExchange,
+        side: str,
+        size: float,
+        reason: str,
+    ) -> bool:
+        """Fecha a posição recém-aberta quando a OKX recusa todas as proteções."""
+        try:
+            ord_id = await exchange.market_order(self.config.symbol, side, size, reduce_only=True)
+            if not ord_id:
+                return False
+            for _ in range(12):
+                try:
+                    pos = await exchange.get_position(self.config.symbol)
+                    if pos is None or abs(float(pos.size or 0.0)) <= 1e-9:
+                        log.critical(
+                            "[Bot %d] Entrada sem proteção encerrada a mercado. Ordem: %s Motivo: %s",
+                            self.config.id,
+                            ord_id,
+                            reason,
+                        )
+                        if self._direction != 0:
+                            close_price = self._candles[-1].close if self._candles else (self._entry_price or 0.0)
+                            await self._on_position_closed(close_price, size, exchange)
+                        else:
+                            self._reset()
+                        return True
+                except Exception:
+                    pass
+                await asyncio.sleep(0.5)
+            log.critical(
+                "[Bot %d] Encerramento emergencial enviado, mas OKX não confirmou FLAT no polling.",
+                self.config.id,
+            )
+            return False
+        except Exception as exc:
+            log.critical("[Bot %d] Falha no encerramento emergencial sem SL: %s", self.config.id, exc)
+            return False
+
+    async def _sync_protective_algo_from_exchange(self, exchange: BaseExchange) -> bool:
+        close_side = "sell" if self._direction == 1 else "buy"
+        try:
+            algo = await exchange.find_protective_algo(self.config.symbol, close_side)
+        except Exception as exc:
+            log.warning("[Bot %d] Falha ao buscar proteção pendente na OKX: %s", self.config.id, exc)
+            return False
+        if not algo:
+            return False
+
+        algo_id = algo.get("algoId")
+        ord_type = algo.get("ordType")
+        if ord_type == "move_order_stop":
+            self._ts_algo_id = algo_id
+            self._sl_algo_id = None
+        else:
+            self._sl_algo_id = algo_id
+            if not self._tp1_done:
+                self._ts_algo_id = None
+
+        move_px = float(algo.get("moveTriggerPx") or 0)
+        sl_px = float(algo.get("slTriggerPx") or 0)
+        real_sl = move_px if move_px > 0 else sl_px
+        if real_sl > 0:
+            self._sl_price = real_sl
+            self._last_persisted_sl = real_sl
+        cb_ratio = float(algo.get("callbackRatio") or 0)
+        if cb_ratio > 0:
+            self._ts_callback_ratio = cb_ratio
+        log.info(
+            "[Bot %d] Proteção OKX sincronizada: %s %s stop=%s",
+            self.config.id,
+            ord_type,
+            algo_id,
+            real_sl or "-",
+        )
+        return True
+
     @staticmethod
     def _criterion(
         *,
@@ -1040,7 +1172,7 @@ class BotInstance:
     async def _on_candle(self, bar, closed: bool, exchange: BaseExchange,
                          session=None):
         # Sincronização Dinâmica Automática: Apenas no fechamento do candle para economizar API
-        if closed and self._ts_algo_id:
+        if closed and self._direction != 0:
             await self.force_sync_trailing(exchange)
 
         # ⚠️ CRÍTICO: Atualiza ATR IMEDIATAMENTE antes de verificar TP1, caso candle tenha fechado
@@ -1094,6 +1226,47 @@ class BotInstance:
         # Bloco de trailing stop por software foi descontinuado
 
         try:
+            await self._sync_protective_algo_from_exchange(exchange)
+
+            if not self._tp1_done and not self._sl_algo_id:
+                close_side = "sell" if self._direction == 1 else "buy"
+                sl_id, sl_px = await self._place_stop_loss_with_retry(
+                    exchange,
+                    close_side,
+                    self._sz,
+                    self._sl_price,
+                    self._candles[-1].close if self._candles else self._entry_price,
+                )
+                if sl_id:
+                    self._sl_algo_id = sl_id
+                    self._sl_price = sl_px
+                    self._persist_trailing_stop_level()
+                    log.critical(
+                        "[AUDITORIA Bot %d] SL ausente recriado na OKX: %s @ %.4f",
+                        self.config.id,
+                        sl_id,
+                        sl_px,
+                    )
+                    return
+                err = getattr(exchange, "last_order_error", None) or {}
+                self._record_order_rejection(
+                    side=close_side,
+                    order_type="stop_loss_resync",
+                    reason=err.get("message", "Stop Loss ausente não pôde ser recriado."),
+                    status="critical",
+                    raw_payload=err,
+                )
+                if await self._emergency_close_unprotected_entry(
+                    exchange,
+                    close_side,
+                    self._sz,
+                    err.get("message", "Stop Loss ausente não pôde ser recriado."),
+                ):
+                    return
+                self._halted = True
+                self._hold_reason = "CRÍTICO: posição aberta sem Stop Loss confirmado na OKX."
+                return
+
             # ⚠️ RECUPERAÇÃO AGRESSIVA: Se TP1 foi acionado mas nenhuma proteção existe, força recuperação
             if self._tp1_done and not self._ts_algo_id and not self._sl_algo_id:
                 log.critical("[AUDITORIA Bot %d] ⚠️ TP1 ACIONADO MAS SEM PROTEÇÃO! Recuperando agressivamente...", self.config.id)
@@ -1602,7 +1775,13 @@ class BotInstance:
             self._entry_inflight = False
             return
 
-        sl_id = await exchange.place_stop_loss(self.config.symbol, close_side, sz, sl_px)
+        sl_id, sl_px = await self._place_stop_loss_with_retry(
+            exchange,
+            close_side,
+            sz,
+            sl_px,
+            price,
+        )
         if not sl_id:
             err = getattr(exchange, "last_order_error", None) or {}
             self._record_order_rejection(
@@ -1612,6 +1791,41 @@ class BotInstance:
                 status="critical",
                 raw_payload=err,
             )
+            emergency_closed = await self._emergency_close_unprotected_entry(
+                exchange,
+                close_side,
+                sz,
+                err.get("message", "Stop Loss fixo recusado pela exchange."),
+            )
+            self._last_order_error = {
+                **err,
+                "kind": err.get("kind", "stop_loss_rejected"),
+                "symbol": self.config.symbol,
+                "message": (
+                    "OKX recusou o Stop Loss inicial. "
+                    + ("A posição foi encerrada a mercado por segurança." if emergency_closed else "A tentativa de encerramento emergencial também falhou.")
+                ),
+            }
+            await self._broadcast({
+                "type":     "order_error",
+                "bot_id":   self.config.id,
+                "bot_name": self.config.name,
+                "symbol":   self.config.symbol,
+                "direction": direction,
+                "error":    self._last_order_error,
+            })
+            asyncio.create_task(self._notifier.send(build_order_failed_msg(
+                bot_name  = self.config.name,
+                demo      = self.config.demo,
+                symbol    = self.config.symbol,
+                direction = direction,
+                error_msg = self._last_order_error["message"],
+                sz        = sz,
+                price     = price,
+            )))
+            if emergency_closed:
+                self._entry_inflight = False
+                return
 
         self._direction    = 1 if direction == "long" else -1
         self._entry_price  = price
@@ -1623,6 +1837,9 @@ class BotInstance:
         self._sl_algo_id   = sl_id
         self._entry_ord_id = ord_id # Armazenamos o ID de entrada
         self._entry_inflight = False
+        if not sl_id:
+            self._halted = True
+            self._hold_reason = "CRÍTICO: posição aberta sem Stop Loss confirmado na OKX."
 
         # Persiste no banco e linka o signal_log que originou esta entrada
         trade_id = self._save_trade({
@@ -1683,16 +1900,7 @@ class BotInstance:
             # Proteção Dupla: Garante que trailing OU fallback SL seja criado ANTES de marcar tp1_done
             protection_established = False
             
-            # Cancela a proteção de Stop Loss "burra" (estática) — com validação de resposta
-            if self._sl_algo_id:
-                try:
-                    cancel_ok = await exchange.cancel_algo(self.config.symbol, self._sl_algo_id)
-                    if cancel_ok:
-                        self._sl_algo_id = None
-                        log.info("[Bot %d] SL fixo cancelado com sucesso antes do trailing.", self.config.id)
-                except Exception as cancel_err:
-                    log.warning("[Bot %d] Falha ao cancelar SL fixo: %s. Tentando trailing mesmo assim.", 
-                               self.config.id, cancel_err)
+            old_sl_algo_id = self._sl_algo_id
 
             # Ativa a Sombra Dinâmica (Trailing Stop 100% dinâmico) para toda a posição!
             # A sombra manterá uma distância baseada no ATR (volatilidade real) do momento
@@ -1708,8 +1916,21 @@ class BotInstance:
             if ts_id:
                 self._ts_algo_id = ts_id
                 self._ts_callback_ratio = cb
+                self._sl_price = (
+                    price * (1 - cb) if self._direction == 1
+                    else price * (1 + cb)
+                )
                 protection_established = True
                 log.info("[Bot %d] Trailing stop nativo criado com sucesso: %s", self.config.id, ts_id)
+                if old_sl_algo_id:
+                    try:
+                        cancel_ok = await exchange.cancel_algo(self.config.symbol, old_sl_algo_id)
+                        if cancel_ok:
+                            self._sl_algo_id = None
+                            log.info("[Bot %d] SL fixo cancelado após trailing confirmado.", self.config.id)
+                    except Exception as cancel_err:
+                        log.warning("[Bot %d] Falha ao cancelar SL fixo antigo após trailing: %s",
+                                   self.config.id, cancel_err)
             else:
                 err = getattr(exchange, "last_order_error", None) or {}
                 self._record_order_rejection(
@@ -1732,6 +1953,12 @@ class BotInstance:
                     fallback_stop,
                 )
                 if fallback_id:
+                    if old_sl_algo_id:
+                        try:
+                            await exchange.cancel_algo(self.config.symbol, old_sl_algo_id)
+                        except Exception as cancel_err:
+                            log.warning("[Bot %d] Falha ao cancelar SL fixo antigo após fallback: %s",
+                                        self.config.id, cancel_err)
                     self._sl_algo_id = fallback_id
                     self._sl_price = fallback_stop
                     protection_established = True
@@ -1758,13 +1985,9 @@ class BotInstance:
                 return
             
             self._tp1_done = True
-            # For software TS: set peak and initial stop immediately so get_status()
-            # reflects the correct values on the same poll cycle.
-            # yields closed=True, so the intracandle block never runs).
-            if ts_id == "sw":
+            # Mantém get_status() coerente no mesmo ciclo em que a proteção nasce.
+            if self._ts_algo_id:
                 self._peak_price = price
-                self._sl_price = (price * (1 - cb) if self._direction == 1
-                                  else price * (1 + cb))
             
             self._save_trade({
                 "type": "tp1", "event": "DYNAMIC_SHADOW_TRIGGER",
@@ -2004,12 +2227,11 @@ class BotInstance:
                 self._tp1_price    = last_trade.tp1_price or 0.0
                 self._sl_price     = last_trade.sl_price or 0.0
                 self._current_trade_id = last_trade.id
-                # Restaura estado da Sombra Dinâmica — sempre que houver posição aberta,
-                # independente de TP1 ter sido atingido ou não. O trailing stop é proteção
-                # primária, não secundária ao TP1.
+                # A ordem real será sincronizada com a OKX no próximo ciclo fechado.
                 self._tp1_done          = bool(last_trade.tp1_done)
-                self._ts_algo_id        = "sw"
-                self._ts_callback_ratio = 0.005  # mínimo seguro; force_sync_trailing recalcula
+                self._sl_algo_id        = None
+                self._ts_algo_id        = None
+                self._ts_callback_ratio = 0.005
                 if self._sl_price > 0 and self._ts_callback_ratio > 0:
                     if self._direction == 1:
                         self._peak_price = self._sl_price / (1 - self._ts_callback_ratio)
@@ -2017,7 +2239,7 @@ class BotInstance:
                         self._peak_price = self._sl_price / (1 + self._ts_callback_ratio)
                 # Marca o nível já persistido para evitar re-escrita desnecessária
                 self._last_persisted_sl = self._sl_price
-                log.info("[Bot %d] Estado recuperado do banco: %s @ %.2f (Trade ID: %d) — Sombra reativada (sl=%.4f peak=%.4f tp1_done=%s)",
+                log.info("[Bot %d] Estado recuperado do banco: %s @ %.2f (Trade ID: %d) — aguardando sync OKX (sl=%.4f peak=%.4f tp1_done=%s)",
                          self.config.id, last_trade.direction, self._entry_price,
                          self._current_trade_id, self._sl_price, self._peak_price,
                          self._tp1_done)

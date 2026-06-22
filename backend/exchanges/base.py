@@ -113,6 +113,10 @@ class BaseExchange(ABC):
         """Ordens abertas. Retorna [] se não suportado."""
         return []
 
+    async def find_protective_algo(self, symbol: str, side: str | None = None) -> Optional[dict]:
+        """Busca SL/trailing pendente para o símbolo. Retorna None se não suportado."""
+        return None
+
     async def get_all_positions(self) -> list[dict]:
         """Todas as posições abertas. Retorna [] se não suportado."""
         return []

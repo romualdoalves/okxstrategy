@@ -498,21 +498,46 @@ class OKXExchange(BaseExchange):
         items = data.get("data", [])
         return items[0].get("algoId") if items else None
 
+    async def _pending_algos(self, symbol: str | None = None, ord_types: tuple[str, ...] = ("conditional", "move_order_stop")) -> list[dict]:
+        all_algos: list[dict] = []
+        for ord_type in ord_types:
+            params = {
+                "instType": _inst_type(symbol) if symbol else "ANY",
+                "ordType": ord_type,
+            }
+            if symbol:
+                params["instId"] = symbol
+            try:
+                data = await self._get("/api/v5/trade/orders-algo-pending", params)
+            except Exception as exc:
+                log.warning("[OKX] Falha ao buscar algos pendentes (%s): %s", ord_type, exc)
+                continue
+            if str(data.get("code", "0")) == "0":
+                all_algos.extend(data.get("data", []))
+        return all_algos
+
     async def get_algo_order(self, symbol: str, algo_id: str) -> Optional[dict]:
-        params = {
-            "instType": _inst_type(symbol),
-            "instId": symbol,
-            "algoId": algo_id,
-            "ordType": "conditional,move_order_stop",
-        }
         try:
-            data = await self._get("/api/v5/trade/orders-algo-pending", params)
-            for item in data.get("data", []):
+            for item in await self._pending_algos(symbol):
                 if item.get("algoId") == algo_id:
                     return item
         except Exception:
             return None
         return None
+
+    async def find_protective_algo(self, symbol: str, side: str | None = None) -> Optional[dict]:
+        side = (side or "").lower()
+        algos = await self._pending_algos(symbol, ("move_order_stop", "conditional"))
+        matches = [
+            a for a in algos
+            if a.get("instId") == symbol
+            and ((not side) or (a.get("side") or "").lower() == side)
+            and a.get("ordType") in ("move_order_stop", "conditional")
+        ]
+        if not matches:
+            return None
+        matches.sort(key=lambda a: 0 if a.get("ordType") == "move_order_stop" else 1)
+        return matches[0]
 
     async def cancel_algo(self, symbol: str, algo_id: str) -> bool:
         """Cancela ordem algorítmica na exchange. Retorna True se sucesso, False se falha."""
@@ -540,12 +565,7 @@ class OKXExchange(BaseExchange):
             return False
 
     async def cancel_all_algos(self) -> int:
-        path = "/api/v5/trade/orders-algo-pending?ordType=conditional,move_order_stop&instType=ANY"
-        headers = _auth_headers("GET", path)
-        async with aiohttp.ClientSession() as s:
-            async with s.get(f"{OKX_BASE}{path}", headers=headers) as resp:
-                data = await resp.json()
-        algos = data.get("data", []) if str(data.get("code", "0")) == "0" else []
+        algos = await self._pending_algos()
         if not algos:
             return 0
         cancel_body = json.dumps([{"algoId": a["algoId"], "instId": a["instId"]} for a in algos])
