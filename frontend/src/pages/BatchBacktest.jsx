@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ScanSearch, Play, HelpCircle, ChevronDown, ChevronUp, PlusCircle, CheckSquare, Square } from 'lucide-react'
+import { ScanSearch, Play, HelpCircle, ChevronDown, ChevronUp, PlusCircle, CheckSquare, Square, ShieldCheck, AlertTriangle } from 'lucide-react'
 import BacktestLikert from '../components/BacktestLikert'
 import { getStrategies, getBots, createBot } from '../api'
 
@@ -24,6 +24,12 @@ const VERDICT_CFG = {
   CUIDADO:       { color: 'text-yellow-400', bg: 'bg-yellow-500/15', border: 'border-yellow-500/30' },
   'NÃO INICIAR': { color: 'text-red-400',    bg: 'bg-red-500/15',    border: 'border-red-500/30'    },
   'N/A':         { color: 'text-gray-400',   bg: 'bg-white/5',       border: 'border-white/10'      },
+}
+
+const COVERAGE_CFG = {
+  full:        { label: 'Estrito',          color: 'text-green-300',  bg: 'bg-green-500/10',  border: 'border-green-500/25',  icon: ShieldCheck },
+  partial:     { label: 'Parcial',          color: 'text-yellow-300', bg: 'bg-yellow-500/10', border: 'border-yellow-500/25', icon: AlertTriangle },
+  unsupported: { label: 'Não contemplado',  color: 'text-gray-300',   bg: 'bg-white/5',       border: 'border-white/10',      icon: HelpCircle },
 }
 
 function MetricPill({ label, value, positive }) {
@@ -73,6 +79,9 @@ function ResultCard({ r, symbol, selected, disabled, disabledReason, onToggle })
   const hasMetrics = r.trades_count !== undefined
   const isNA = rec.verdict === 'N/A'
   const canSelect = !isNA && !disabled
+  const coverage = r.coverage || { level: isNA ? 'unsupported' : 'partial', reasons: [] }
+  const coverageCfg = COVERAGE_CFG[coverage.level] || COVERAGE_CFG.partial
+  const CoverageIcon = coverageCfg.icon
 
   function handleCreateBot() {
     nav(`/bots/new?strategy=${r.strategy_id}&symbol=${encodeURIComponent(symbol)}`)
@@ -87,6 +96,13 @@ function ResultCard({ r, symbol, selected, disabled, disabledReason, onToggle })
           <span className="ml-2 text-sm text-muted truncate">{r.strategy_name}</span>
         </div>
         <span className="text-[10px] text-muted font-mono shrink-0">{r.timeframe}</span>
+        <span
+          title={(coverage.reasons || []).join(' | ')}
+          className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${coverageCfg.bg} ${coverageCfg.border} ${coverageCfg.color}`}
+        >
+          <CoverageIcon size={11} />
+          {coverage.label || coverageCfg.label}
+        </span>
         {isNA && (
           <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold text-gray-400 border border-white/10">
             <HelpCircle size={11} />N/A
@@ -144,14 +160,32 @@ function ResultCard({ r, symbol, selected, disabled, disabledReason, onToggle })
         {open ? 'Ocultar detalhes' : 'Ver detalhes'}
       </button>
       {open && (
-        <ul className="mt-2 space-y-1">
-          {rec.reasons.map((reason, i) => (
-            <li key={i} className="text-xs text-white/70 flex gap-2">
-              <span className={`shrink-0 ${cfg.color}`}>·</span>
-              <span>{reason}</span>
-            </li>
-          ))}
-        </ul>
+        <div className="mt-2 space-y-2">
+          <ul className="space-y-1">
+            {rec.reasons.map((reason, i) => (
+              <li key={i} className="text-xs text-white/70 flex gap-2">
+                <span className={`shrink-0 ${cfg.color}`}>·</span>
+                <span>{reason}</span>
+              </li>
+            ))}
+          </ul>
+          {(coverage.reasons || []).length > 0 && (
+            <div className={`rounded-lg border ${coverageCfg.border} ${coverageCfg.bg} p-2`}>
+              <div className={`flex items-center gap-1.5 text-[11px] font-bold ${coverageCfg.color}`}>
+                <CoverageIcon size={12} />
+                Cobertura do Backtest: {coverage.label || coverageCfg.label}
+              </div>
+              <ul className="mt-1 space-y-0.5">
+                {coverage.reasons.map((reason, i) => (
+                  <li key={i} className="text-[11px] text-white/65 flex gap-2">
+                    <span className="shrink-0">·</span>
+                    <span>{reason}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
       )}
     </div>
   )
@@ -202,7 +236,7 @@ export default function BatchBacktest() {
         const res = await fetch(`${API}/api/backtest/category`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ category: cat, symbol, exclude_strategies: usedStrategies }),
+          body: JSON.stringify({ category: cat, symbol, exclude_strategies: usedStrategies, strict: true }),
         })
         if (!res.ok) {
           const message = await readErrorMessage(res)
@@ -311,6 +345,11 @@ export default function BatchBacktest() {
     'NÃO INICIAR': results.results.filter(r => r.recommendation.verdict === 'NÃO INICIAR').length,
     'N/A':         results.results.filter(r => r.recommendation.verdict === 'N/A').length,
   } : null
+  const coverageCounts = results ? {
+    full:        results.results.filter(r => r.coverage?.level === 'full').length,
+    partial:     results.results.filter(r => r.coverage?.level === 'partial').length,
+    unsupported: results.results.filter(r => r.coverage?.level === 'unsupported').length,
+  } : null
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
@@ -318,7 +357,7 @@ export default function BatchBacktest() {
         <ScanSearch size={24} className="text-accent" />
         <div>
           <h1 className="text-2xl font-bold">Scanner de Backtest</h1>
-          <p className="text-sm text-muted">Testa todas as estratégias de uma categoria em um ativo e ordena do melhor ao pior</p>
+          <p className="text-sm text-muted">Backtest Estrito: dados OKX, contexto extra quando disponível, SL/TP1/trailing, taxa e slippage simulados</p>
         </div>
       </div>
 
@@ -334,6 +373,14 @@ export default function BatchBacktest() {
 
       {/* Controls */}
       <div className="card p-5 mb-6 space-y-4">
+        <div className="rounded-lg border border-green-500/20 bg-green-500/5 p-3 text-xs text-white/70">
+          <div className="flex items-center gap-2 font-bold text-green-300 mb-1">
+            <ShieldCheck size={14} />
+            Modo Estrito ativado
+          </div>
+          Estratégias marcadas como “Não contemplado” dependem de contexto externo histórico que a app ainda não reconstrói, como GEX, onchain, DEX, grafo vivo ou fluxo de players.
+        </div>
+
         {/* Category selector */}
         <div>
           <label className="text-xs text-muted uppercase tracking-wider mb-2 block">Categoria</label>
@@ -468,6 +515,23 @@ export default function BatchBacktest() {
 
           <div className="flex flex-wrap items-center gap-3 mb-4">
             <span className="text-sm text-muted">{results.total} estratégias · {results.symbol}</span>
+            {coverageCounts && (
+              <>
+                <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-green-500/10 text-green-300 border border-green-500/25">
+                  {coverageCounts.full} estrito
+                </span>
+                {coverageCounts.partial > 0 && (
+                  <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-yellow-500/10 text-yellow-300 border border-yellow-500/25">
+                    {coverageCounts.partial} parcial
+                  </span>
+                )}
+                {coverageCounts.unsupported > 0 && (
+                  <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-white/5 text-gray-300 border border-white/10">
+                    {coverageCounts.unsupported} não contemplado
+                  </span>
+                )}
+              </>
+            )}
             <button
               onClick={() => selectEligible(results.results, results.symbol)}
               className="px-2.5 py-1 rounded border border-white/10 bg-white/5 text-xs text-muted hover:text-white"

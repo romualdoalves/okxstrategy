@@ -1964,6 +1964,7 @@ class CategoryBacktestRequest(BaseModel):
     category: str
     symbol: str
     exclude_strategies: list[str] = []
+    strict: bool = True
 
 
 _VERDICT_ORDER = {"INICIAR": 0, "CUIDADO": 1, "NÃO INICIAR": 2, "N/A": 3}
@@ -1990,6 +1991,7 @@ async def run_category_backtest(req: CategoryBacktestRequest):
     # Separa estratégias que precisam de contexto externo (não backtestáveis)
     na_ids: list[str] = []
     tf_groups: dict[str, list[str]] = {}
+    extra_tf_by_sid: dict[str, list[str]] = {}
     for sid in sorted(strategy_ids):
         cls = REGISTRY[sid]
         if any(getattr(cls, flag, False) for flag in _CONTEXT_FLAGS):
@@ -1997,13 +1999,17 @@ async def run_category_backtest(req: CategoryBacktestRequest):
             continue
         tf = cls.info().recommended_timeframe or "15m"
         tf_groups.setdefault(tf, []).append(sid)
+        extra_tf_by_sid[sid] = list(cls.extra_timeframes() or [])
 
     # Busca candles uma vez por timeframe único
     candle_cache: dict[str, list] = {}
+    all_timeframes = set(tf_groups.keys())
+    for extra_tfs in extra_tf_by_sid.values():
+        all_timeframes.update(extra_tfs)
     try:
         async with _aiohttp.ClientSession() as session:
             ex = build_exchange(session)
-            for tf in tf_groups:
+            for tf in all_timeframes:
                 try:
                     bar = map_timeframe_for_history(tf)
                     candle_cache[tf] = await ex.fetch_candles(req.symbol, bar, limit=500) or []
@@ -2026,22 +2032,56 @@ async def run_category_backtest(req: CategoryBacktestRequest):
         for tf in tf_groups:
             candle_cache[tf] = []
 
-    for tf in tf_groups:
+    for tf in all_timeframes:
         candle_cache.setdefault(tf, [])
 
     # Executa backtests em paralelo
     async def _run(sid: str, tf: str) -> dict:
         candles = candle_cache.get(tf, [])
         info = REGISTRY[sid].info()
-        base = {"strategy_id": sid, "strategy_name": info.name, "timeframe": tf}
+        base = {
+            "strategy_id": sid,
+            "strategy_name": info.name,
+            "timeframe": tf,
+            "backtest_mode": "strict" if req.strict else "classic",
+        }
         if not candles:
             return {**base, "recommendation": {
                 "verdict": "N/A", "level": "na",
                 "reasons": [f"Dados históricos indisponíveis para {req.symbol} no timeframe {tf}."],
+            }, "coverage": {
+                "mode": "strict" if req.strict else "classic",
+                "level": "unsupported",
+                "label": "Não contemplado",
+                "reasons": [f"Sem candles para {req.symbol} em {tf}."],
             }}
         try:
             engine = BacktestEngine(sid)
-            result = await engine.run(candles)
+            if req.strict:
+                missing_extra = [extra_tf for extra_tf in extra_tf_by_sid.get(sid, []) if not candle_cache.get(extra_tf)]
+                if missing_extra:
+                    return {**base, "recommendation": {
+                        "verdict": "N/A", "level": "na",
+                        "reasons": [f"Backtest estrito requer candles extras ausentes: {', '.join(missing_extra)}."],
+                    }, "coverage": {
+                        "mode": "strict",
+                        "level": "unsupported",
+                        "label": "Não contemplado",
+                        "reasons": [f"Timeframes extras indisponíveis: {', '.join(missing_extra)}."],
+                    }}
+                extra_candles = {
+                    extra_tf: candle_cache.get(extra_tf, [])
+                    for extra_tf in extra_tf_by_sid.get(sid, [])
+                }
+                result = await engine.run_strict(candles, extra_candles=extra_candles)
+            else:
+                result = await engine.run(candles)
+                result["coverage"] = {
+                    "mode": "classic",
+                    "level": "partial",
+                    "label": "Parcial",
+                    "reasons": ["Backtest clássico: não simula SL/TP1/trailing, custos ou contexto extra."],
+                }
             result.update(base)
             result["recommendation"] = backtest_recommendation(result)
             result.pop("trades", None)
@@ -2052,6 +2092,11 @@ async def run_category_backtest(req: CategoryBacktestRequest):
             log.warning("Category backtest error %s: %s", sid, exc)
             return {**base, "recommendation": {
                 "verdict": "N/A", "level": "na",
+                "reasons": [f"Erro na execução: {exc}"],
+            }, "coverage": {
+                "mode": "strict" if req.strict else "classic",
+                "level": "unsupported",
+                "label": "Não contemplado",
                 "reasons": [f"Erro na execução: {exc}"],
             }}
 
@@ -2066,9 +2111,19 @@ async def run_category_backtest(req: CategoryBacktestRequest):
             "strategy_id": sid,
             "strategy_name": info.name,
             "timeframe": info.recommended_timeframe or "—",
+            "backtest_mode": "strict" if req.strict else "classic",
+            "coverage": {
+                "mode": "strict" if req.strict else "classic",
+                "level": "unsupported",
+                "label": "Não contemplado",
+                "reasons": [
+                    "Requer contexto externo ao vivo que o Scanner não reconstrói historicamente.",
+                    "Exemplos: GEX, grafo de correlação vivo, onchain, DEX ou fluxo de players.",
+                ],
+            },
             "recommendation": {
                 "verdict": "N/A", "level": "na",
-                "reasons": ["Requer contexto externo ao vivo (GEX/Graph) — backtest não suportado."],
+                "reasons": ["Não contemplada pelo Backtest Estrito: requer contexto externo ao vivo."],
             },
         })
 

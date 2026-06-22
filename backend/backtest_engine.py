@@ -7,6 +7,8 @@ log = logging.getLogger("backtest_engine")
 
 FIXED_STAKE_USD = 100.0
 INITIAL_BALANCE = 1000.0
+STRICT_FEE_RATE = 0.001
+STRICT_SLIPPAGE_RATE = 0.0005
 
 
 class BacktestEngine:
@@ -23,6 +25,308 @@ class BacktestEngine:
         self.balance = INITIAL_BALANCE
         self.events: list[dict] = []
         self.closed_trades: list[dict] = []
+
+    @staticmethod
+    def _atr(candles: list, period: int = 14, fallback_price: float = 0.0) -> float:
+        if len(candles) < 2:
+            return fallback_price * 0.005
+        trs: list[float] = []
+        start = max(1, len(candles) - period)
+        for i in range(start, len(candles)):
+            high = float(candles[i].high or 0.0)
+            low = float(candles[i].low or 0.0)
+            prev_close = float(candles[i - 1].close or 0.0)
+            trs.append(max(high - low, abs(high - prev_close), abs(low - prev_close)))
+        if not trs:
+            return fallback_price * 0.005
+        return sum(trs) / len(trs)
+
+    @staticmethod
+    def _context_until(extra_candles: dict[str, list] | None, epoch: int) -> dict:
+        if not extra_candles:
+            return {}
+        return {
+            "extra_candles": {
+                tf: [c for c in candles if int(getattr(c, "epoch", 0) or 0) <= epoch]
+                for tf, candles in extra_candles.items()
+            }
+        }
+
+    @staticmethod
+    def _risk_from_result(result, entry: float, direction: int, atr: float) -> tuple[float, float, float]:
+        meta = getattr(result, "metadata", {}) or {}
+        sl_price = float(meta.get("sl_price") or 0.0)
+        tp1_price = float(meta.get("tp1_price") or 0.0)
+
+        if direction == 1:
+            if sl_price <= 0 or sl_price >= entry:
+                sl_price = entry - atr * 1.5
+            if tp1_price <= entry:
+                tp1_price = entry * 1.02
+        else:
+            if sl_price <= entry:
+                sl_price = entry + atr * 1.5
+            if 0 < tp1_price >= entry or tp1_price <= 0:
+                tp1_price = entry * 0.98
+
+        min_sl_dist = atr * 1.5
+        current_sl_dist = abs(entry - sl_price)
+        if current_sl_dist < min_sl_dist:
+            original_tp_dist = abs(tp1_price - entry)
+            original_rr = original_tp_dist / current_sl_dist if current_sl_dist > 0 else 2.0
+            if direction == 1:
+                sl_price = entry - min_sl_dist
+                tp1_price = entry + min_sl_dist * original_rr
+            else:
+                sl_price = entry + min_sl_dist
+                tp1_price = entry - min_sl_dist * original_rr
+
+        ts_pct = float(meta.get("ts_pct") or 0.0)
+        if ts_pct <= 0:
+            ts_pct = max(0.005, min(0.05, (atr * 1.5) / entry if entry > 0 else 0.01))
+        return sl_price, tp1_price, ts_pct
+
+    async def run_strict(
+        self,
+        candles: list,
+        *,
+        extra_candles: dict[str, list] | None = None,
+        stake_usd: float = FIXED_STAKE_USD,
+        fee_rate: float = STRICT_FEE_RATE,
+        slippage_rate: float = STRICT_SLIPPAGE_RATE,
+    ):
+        """
+        Backtest estrito para o Scanner: usa compute_with_context(), simula SPOT
+        long-only, SL inicial, TP1 que arma trailing, custos e slippage.
+        """
+        stake_usd = FIXED_STAKE_USD
+        self.balance = INITIAL_BALANCE
+        self.events = []
+        self.closed_trades = []
+        equity_peak = INITIAL_BALANCE
+        max_drawdown = 0.0
+        ignored_sell_signals = 0
+        stop_exits = 0
+        trailing_exits = 0
+        signal_exits = 0
+        tp1_hits = 0
+
+        coverage = {
+            "mode": "strict",
+            "level": "full",
+            "label": "Estrito",
+            "reasons": [
+                "Usa compute_with_context() e candles OHLC reais da OKX.",
+                "Simula SL inicial, TP1, trailing stop, taxa e slippage conservadores.",
+            ],
+        }
+
+        if not candles or len(candles) < 150:
+            return {
+                "total_profit": 0.0,
+                "trades_count": 0,
+                "events_count": 0,
+                "final_balance": self.balance,
+                "trades": [],
+                "closed_trades": [],
+                "win_rate": 0.0,
+                "profit_factor": 0.0,
+                "max_drawdown": 0.0,
+                "ignored_sell_signals": 0,
+                "error": "Dados insuficientes para backtest estrito (mínimo 150 candles)",
+                "coverage": {**coverage, "level": "unsupported", "label": "Não contemplado"},
+            }
+
+        position: dict | None = None
+        warmup = 100
+
+        def close_position(exit_price: float, idx: int, reason: str, exit_type: str):
+            nonlocal position, signal_exits, stop_exits, trailing_exits
+            if not position:
+                return
+            entry_value = position["qty"] * position["entry_price"]
+            exit_value = position["qty"] * exit_price
+            fees = (entry_value + exit_value) * fee_rate
+            profit = position["qty"] * (exit_price - position["entry_price"]) - fees
+            self.balance += profit
+            closed = {
+                "type": "TRADE LONG",
+                "entry_price": position["entry_price"],
+                "exit_price": exit_price,
+                "price": exit_price,
+                "profit": profit,
+                "profit_pct": profit / stake_usd * 100,
+                "fees": fees,
+                "balance": self.balance,
+                "entry_time": position["entry_time"],
+                "exit_time": idx,
+                "bars_held": idx - position["entry_time"],
+                "reason": reason,
+                "exit_type": exit_type,
+            }
+            self.closed_trades.append(closed)
+            self.events.append({
+                "type": "EXIT LONG",
+                "side": "sell",
+                "price": exit_price,
+                "profit": profit,
+                "balance": self.balance,
+                "time": idx,
+                "reason": reason,
+            })
+            if exit_type == "signal":
+                signal_exits += 1
+            elif exit_type == "stop":
+                stop_exits += 1
+            elif exit_type == "trailing":
+                trailing_exits += 1
+            position = None
+
+        for i in range(warmup, len(candles)):
+            bar = candles[i]
+            current_slice = candles[: i + 1]
+            current_price = float(bar.close or 0.0)
+            if current_price <= 0:
+                continue
+
+            if position is not None:
+                low = float(bar.low or current_price)
+                high = float(bar.high or current_price)
+
+                if low <= position["stop_price"]:
+                    exit_px = position["stop_price"] * (1 - slippage_rate)
+                    close_position(exit_px, i, "Stop Loss simulado", "trailing" if position.get("trailing_active") else "stop")
+                else:
+                    if not position["tp1_done"] and high >= position["tp1_price"]:
+                        position["tp1_done"] = True
+                        position["trailing_active"] = True
+                        position["peak_price"] = max(position["peak_price"], high)
+                        position["stop_price"] = max(
+                            position["entry_price"],
+                            position["peak_price"] * (1 - position["ts_pct"]),
+                        )
+                        tp1_hits += 1
+                        self.events.append({
+                            "type": "TP1 / TRAILING ON",
+                            "side": "hold",
+                            "price": position["tp1_price"],
+                            "time": i,
+                            "reason": "TP1 atingido; trailing stop ativado.",
+                        })
+                    if position is not None and position.get("trailing_active"):
+                        position["peak_price"] = max(position["peak_price"], high)
+                        position["stop_price"] = max(
+                            position["stop_price"],
+                            position["peak_price"] * (1 - position["ts_pct"]),
+                        )
+                        if low <= position["stop_price"]:
+                            exit_px = position["stop_price"] * (1 - slippage_rate)
+                            close_position(exit_px, i, "Trailing Stop simulado", "trailing")
+
+            try:
+                ctx = self._context_until(extra_candles, int(getattr(bar, "epoch", 0) or 0))
+                result = self.strategy.compute_with_context(current_slice, ctx)
+                if not result:
+                    continue
+
+                exit_requested = result.signal == Signal.SELL or (
+                    bool(result.hold_reason) and "saída" in result.hold_reason.lower()
+                )
+
+                if position is None:
+                    if result.signal == Signal.BUY:
+                        atr = self._atr(current_slice, fallback_price=current_price)
+                        sl_price, tp1_price, ts_pct = self._risk_from_result(result, current_price, 1, atr)
+                        entry_price = current_price * (1 + slippage_rate)
+                        qty = stake_usd / entry_price
+                        position = {
+                            "entry_price": entry_price,
+                            "entry_time": i,
+                            "qty": qty,
+                            "reason": result.hold_reason,
+                            "stop_price": sl_price,
+                            "tp1_price": tp1_price,
+                            "ts_pct": ts_pct,
+                            "tp1_done": False,
+                            "trailing_active": False,
+                            "peak_price": entry_price,
+                        }
+                        self.events.append({
+                            "type": "ENTRY LONG",
+                            "side": "buy",
+                            "price": entry_price,
+                            "time": i,
+                            "reason": result.hold_reason,
+                            "sl_price": sl_price,
+                            "tp1_price": tp1_price,
+                        })
+                    elif result.signal == Signal.SELL:
+                        ignored_sell_signals += 1
+                    continue
+
+                unrealized = position["qty"] * (current_price - position["entry_price"])
+                equity = self.balance + unrealized
+                equity_peak = max(equity_peak, equity)
+                max_drawdown = max(max_drawdown, equity_peak - equity)
+
+                if exit_requested:
+                    exit_px = current_price * (1 - slippage_rate)
+                    close_position(exit_px, i, result.hold_reason or "Sinal SELL", "signal")
+            except Exception as exc:
+                log.error("Erro no passo %d do backtest estrito: %s", i, exc)
+                continue
+
+        open_position = None
+        if position is not None:
+            last_price = float(candles[-1].close or position["entry_price"])
+            open_position = {
+                "entry_price": position["entry_price"],
+                "last_price": last_price,
+                "unrealized": position["qty"] * (last_price - position["entry_price"]),
+                "profit_pct": (last_price - position["entry_price"]) / position["entry_price"] * 100,
+                "bars_held": len(candles) - 1 - position["entry_time"],
+                "stop_price": position["stop_price"],
+                "tp1_done": position["tp1_done"],
+            }
+
+        wins = [t for t in self.closed_trades if t["profit"] > 0]
+        losses = [t for t in self.closed_trades if t["profit"] <= 0]
+        gross_profit = sum(t["profit"] for t in wins)
+        gross_loss = abs(sum(t["profit"] for t in losses))
+        trades_count = len(self.closed_trades)
+        win_rate = (len(wins) / trades_count * 100) if trades_count else 0.0
+        profit_factor = (gross_profit / gross_loss) if gross_loss > 0 else (gross_profit if gross_profit > 0 else 0.0)
+
+        return {
+            "total_profit": round(self.balance - INITIAL_BALANCE, 2),
+            "trades_count": trades_count,
+            "events_count": len(self.events),
+            "final_balance": round(self.balance, 2),
+            "trades": self.events,
+            "closed_trades": self.closed_trades,
+            "win_rate": round(win_rate, 2),
+            "wins": len(wins),
+            "losses": len(losses),
+            "profit_factor": round(profit_factor, 2),
+            "max_drawdown": round(max_drawdown, 2),
+            "avg_trade": round((self.balance - INITIAL_BALANCE) / trades_count, 2) if trades_count else 0.0,
+            "best_trade": round(max((t["profit"] for t in self.closed_trades), default=0.0), 2),
+            "worst_trade": round(min((t["profit"] for t in self.closed_trades), default=0.0), 2),
+            "ignored_sell_signals": ignored_sell_signals,
+            "stop_exits": stop_exits,
+            "trailing_exits": trailing_exits,
+            "signal_exits": signal_exits,
+            "tp1_hits": tp1_hits,
+            "open_position": open_position,
+            "coverage": coverage,
+            "assumptions": [
+                "OKX spot-only: sinais SELL com posição flat são ignorados, não viram short.",
+                "Stake fixo de US$100 por entrada.",
+                f"Taxa conservadora simulada: {fee_rate * 100:.2f}% por lado.",
+                f"Slippage conservador simulado: {slippage_rate * 100:.2f}% por execução.",
+                "Empate intrabar entre SL e TP1 é tratado de forma conservadora: Stop Loss tem prioridade.",
+            ],
+        }
 
     async def run(self, candles: list, stake_usd: float = FIXED_STAKE_USD):
         """

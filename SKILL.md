@@ -182,7 +182,8 @@ Migrations adicionais são executadas via lista `migrations` em `database.py` us
 
 ## Backtest
 
-- **Engine:** `BacktestEngine` em `backend/backtest_engine.py`. 500 candles, stake $100, saldo inicial $1.000 (buffer de simulação).
+- **Engine:** `BacktestEngine` em `backend/backtest_engine.py`. Scanner usa Backtest Estrito por padrão; backtests individuais legados ainda podem usar o modo clássico.
+- **Backtest Estrito:** 500 candles por timeframe, `compute_with_context()`, candles extras para `extra_timeframes()`, stake $100, saldo inicial $1.000, SPOT-only, SL inicial, TP1, trailing stop, taxa conservadora e slippage simulados.
 - **SPOT-only:** BUY abre long, SELL fecha long, SELL com bot flat é ignorado.
 - **`backtest_score(r)`:** Score contínuo 0–10.00. PF como driver principal
   (PF=1.0→3.0, 2.0→5.5, 3.0→8.0), ajustado por trades (±1.0), drawdown (±0.5) e win rate (±0.3).
@@ -191,14 +192,21 @@ Migrations adicionais são executadas via lista `migrations` em `database.py` us
 - **`BacktestLikert.jsx`:** Componente visual compartilhado — track com 3 zonas coloridas,
   marcador branco na posição exata, score com 2 decimais + badge categórico.
 - **Percentuais nos bullets:** referenciados ao stake de $100 (não ao saldo simulado de $1.000).
-- **Estratégias context-dependent** (`needs_gex_context`, `needs_graph_context`): aparecem
-  como N/A no scanner — não podem ser backtestadas sem feed ao vivo.
+- **Cobertura explícita:** cada resultado do Scanner retorna `coverage.level`:
+  `full` = contemplada pelo Backtest Estrito; `partial` = modo clássico/limitado;
+  `unsupported` = não contemplada.
+- **Estratégias context-dependent** (`needs_gex_context`, `needs_graph_context`,
+  `needs_onchain_context`, `needs_dex_context`, `needs_market_players_context`):
+  aparecem como **Não contemplado/N/A** no Scanner, com motivo explícito.
+- Timeframes são normalizados sem queda silenciosa para `15m` para formatos comuns
+  (`1H`, `1h`, `1D`, `1d`, `1W`, etc.).
 
 ### Scanner de Backtest (`/batch-backtest`)
 - Usuário escolhe categoria (TF/MR/PA/SC/RG/IF/NW) ou **Todas** + ativo e clica "Executar".
 - Não há modo Auto-Scan separado; o fluxo **Todas** cobre a varredura ampla sem histórico redundante.
 - `POST /api/backtest/category`: filtra REGISTRY por prefixo, agrupa por `recommended_timeframe`,
-  busca candles uma vez por TF, roda backtests em paralelo (`asyncio.gather`).
+  busca candles uma vez por TF e timeframes extras, roda backtests estritos em paralelo (`asyncio.gather`).
+- O Scanner exibe badges de cobertura: **Estrito**, **Parcial** ou **Não contemplado**.
 - Falha de candles/setup de mercado não deve gerar HTTP 500 no Scanner: estratégias afetadas
   retornam N/A com motivo claro; no modo **Todas**, falhas pontuais de categoria aparecem como aviso.
 - Resultado ordenado: INICIAR → CUIDADO → NÃO INICIAR → N/A; dentro de cada grupo por PF desc.

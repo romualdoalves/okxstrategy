@@ -20,11 +20,29 @@ def get_default_demo_mode() -> bool:
 
 
 def map_timeframe_for_history(timeframe: str) -> str:
-    tf_map = {
-        "1m": "1m", "5m": "5m", "15m": "15m",
-        "1h": "1H", "4h": "4H", "1D": "1D",
+    tf = (timeframe or "").strip()
+    aliases = {
+        "1M": "1m",
+        "3M": "3m",
+        "5M": "5m",
+        "15M": "15m",
+        "30M": "30m",
+        "1H": "1H",
+        "2H": "2H",
+        "4H": "4H",
+        "6H": "6H",
+        "12H": "12H",
+        "1D": "1D",
+        "1W": "1W",
     }
-    return tf_map.get(timeframe, "15m")
+    if tf in aliases:
+        return aliases[tf]
+    tf_map = {
+        "1m": "1m", "3m": "3m", "5m": "5m", "15m": "15m", "30m": "30m",
+        "1h": "1H", "2h": "2H", "4h": "4H", "6h": "6H", "12h": "12H",
+        "1d": "1D", "1w": "1W",
+    }
+    return tf_map.get(tf.lower(), "15m")
 
 
 def map_timeframe_for_ws_channel(timeframe: str) -> str:
