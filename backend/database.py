@@ -9,7 +9,7 @@ import logging
 
 from sqlalchemy import (
     Boolean, Column, DateTime, Float, ForeignKey,
-    Integer, JSON, String, Text, create_engine, text,
+    Integer, JSON, String, Text, UniqueConstraint, create_engine, text,
 )
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 
@@ -195,6 +195,35 @@ class AutoScanHistoryModel(Base):
     results    = Column(JSON,     default=[])  # Lista de combinações INICIAR
 
 
+class TrackedSymbolModel(Base):
+    """Ativos spot OKX rastreados pelo serviço de Market Data."""
+    __tablename__ = "tracked_symbols"
+
+    id         = Column(Integer, primary_key=True, autoincrement=True)
+    symbol     = Column(String,  nullable=False, unique=True, index=True)
+    timeframes = Column(JSON,    default=["15m"])  # Lista de timeframes OKX
+    last_sync  = Column(DateTime, nullable=True)
+    is_active  = Column(Boolean, default=True)
+
+
+class HistoricCandleModel(Base):
+    """Candles históricos persistidos localmente para scanner/backtests."""
+    __tablename__ = "historic_candles"
+    __table_args__ = (
+        UniqueConstraint("symbol", "timeframe", "epoch", name="uq_historic_candles"),
+    )
+
+    id        = Column(Integer, primary_key=True, autoincrement=True)
+    symbol    = Column(String,  nullable=False, index=True)
+    timeframe = Column(String,  nullable=False, index=True)
+    epoch     = Column(DateTime, nullable=False, index=True)
+    open      = Column(Float,   nullable=False)
+    high      = Column(Float,   nullable=False)
+    low       = Column(Float,   nullable=False)
+    close     = Column(Float,   nullable=False)
+    volume    = Column(Float,   nullable=False)
+
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def get_db() -> Session:
@@ -264,6 +293,31 @@ def _run_migrations():
         )
         """,
         "CREATE INDEX IF NOT EXISTS idx_auto_scan_history_created_at ON auto_scan_history(created_at)",
+        """
+        CREATE TABLE IF NOT EXISTS tracked_symbols (
+            id SERIAL PRIMARY KEY,
+            symbol VARCHAR NOT NULL UNIQUE,
+            timeframes JSON DEFAULT '["15m"]'::json,
+            last_sync TIMESTAMP NULL,
+            is_active BOOLEAN DEFAULT TRUE
+        )
+        """,
+        "CREATE INDEX IF NOT EXISTS idx_tracked_symbols_symbol ON tracked_symbols(symbol)",
+        """
+        CREATE TABLE IF NOT EXISTS historic_candles (
+            id SERIAL PRIMARY KEY,
+            symbol VARCHAR NOT NULL,
+            timeframe VARCHAR NOT NULL,
+            epoch TIMESTAMP NOT NULL,
+            open FLOAT NOT NULL,
+            high FLOAT NOT NULL,
+            low FLOAT NOT NULL,
+            close FLOAT NOT NULL,
+            volume FLOAT NOT NULL
+        )
+        """,
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_historic_candles ON historic_candles(symbol, timeframe, epoch)",
+        "CREATE INDEX IF NOT EXISTS idx_historic_candles_symbol_tf_epoch ON historic_candles(symbol, timeframe, epoch)",
     ]
     try:
         with engine.connect() as conn:

@@ -37,6 +37,7 @@ from .database import (
     AutoScanHistoryModel,
     BotModel,
     BotSnapshotModel,
+    HistoricCandleModel,
     StrategyModel as FactoryStrategyModel,  # alias para compatibilidade temporária
     OrderRejectionModel,
     SettingsModel,
@@ -54,6 +55,8 @@ from .exchanges.factory import build_exchange, get_default_demo_mode, get_exchan
 from .strategies.registry import list_strategies, get_strategy
 from .feeds.economic_calendar import calendar_feed
 from .notifications import TelegramNotifier, build_balance_snapshot_msg, build_stop_msg
+from .market_data_service import MarketDataService
+from .routers import market_data
 
 logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s %(levelname)-8s %(name)s: %(message)s")
@@ -76,6 +79,9 @@ def _local_date_to_utc_range(date_str: str) -> tuple[str, str]:
 # ── App ───────────────────────────────────────────────────────────────────────
 
 app = FastAPI(title="OKXStrategy API", version="1.0.0")
+app.include_router(market_data.router, prefix="/api")
+
+market_data_svc = MarketDataService()
 
 app.add_middleware(
     CORSMiddleware,
@@ -447,6 +453,7 @@ async def startup():
 
     # Inicia o feed do calendário económico do provider atual, se configurado
     await calendar_feed.start()
+    await market_data_svc.start()
 
     # Migração automática: remove -SWAP e força stake fixo global de 100
     db = SessionLocal()
@@ -552,6 +559,8 @@ async def shutdown():
             _asyncio.gather(*pending_tasks, return_exceptions=True),
             timeout=10.0,
         )
+
+    await market_data_svc.stop()
 
     log.info("[Shutdown] Graceful shutdown completo.")
 
@@ -2037,27 +2046,68 @@ async def run_category_backtest(req: CategoryBacktestRequest):
         tf_groups.setdefault(tf, []).append(sid)
         extra_tf_by_sid[sid] = list(cls.extra_timeframes() or [])
 
-    # Busca candles uma vez por timeframe único
+    # Busca candles uma vez por timeframe único (prioriza cache local de MarketData)
     candle_cache: dict[str, list] = {}
     all_timeframes = set(tf_groups.keys())
     for extra_tfs in extra_tf_by_sid.values():
         all_timeframes.update(extra_tfs)
+
+    def _candles_from_db(symbol: str, timeframe: str, limit: int = 500):
+        db_local = SessionLocal()
+        try:
+            rows = (
+                db_local
+                .query(HistoricCandleModel)
+                .filter(HistoricCandleModel.symbol == symbol)
+                .filter(HistoricCandleModel.timeframe == timeframe)
+                .order_by(HistoricCandleModel.epoch.desc())
+                .limit(limit)
+                .all()
+            )
+        finally:
+            db_local.close()
+        if not rows:
+            return []
+        rows = list(reversed(rows))
+        from .exchanges.base import CandleBar as _CandleBar
+        return [
+            _CandleBar(
+                epoch=int(r.epoch.replace(tzinfo=timezone.utc).timestamp() * 1000),
+                open=float(r.open),
+                high=float(r.high),
+                low=float(r.low),
+                close=float(r.close),
+                volume=float(r.volume),
+            )
+            for r in rows
+        ]
+
+    for tf in all_timeframes:
+        try:
+            local = _candles_from_db(req.symbol, tf, limit=500)
+            if local:
+                candle_cache[tf] = local
+        except Exception as exc:
+            log.warning("Category backtest cache read error %s/%s (%s): %s", req.symbol, prefix, tf, exc)
+
+    missing_tfs = [tf for tf in all_timeframes if not candle_cache.get(tf)]
     try:
-        async with _aiohttp.ClientSession() as session:
-            ex = build_exchange(session)
-            for tf in all_timeframes:
-                try:
-                    bar = map_timeframe_for_history(tf)
-                    candle_cache[tf] = await ex.fetch_candles(req.symbol, bar, limit=500) or []
-                except Exception as exc:
-                    log.warning(
-                        "Category backtest candle fetch error %s/%s (%s): %s",
-                        req.symbol,
-                        prefix,
-                        tf,
-                        exc,
-                    )
-                    candle_cache[tf] = []
+        if missing_tfs:
+            async with _aiohttp.ClientSession() as session:
+                ex = build_exchange(session)
+                for tf in missing_tfs:
+                    try:
+                        bar = map_timeframe_for_history(tf)
+                        candle_cache[tf] = await ex.fetch_candles(req.symbol, bar, limit=500) or []
+                    except Exception as exc:
+                        log.warning(
+                            "Category backtest candle fetch error %s/%s (%s): %s",
+                            req.symbol,
+                            prefix,
+                            tf,
+                            exc,
+                        )
+                        candle_cache[tf] = []
     except Exception as exc:
         log.warning(
             "Category backtest market setup error %s/%s: %s",
@@ -2065,8 +2115,8 @@ async def run_category_backtest(req: CategoryBacktestRequest):
             prefix,
             exc,
         )
-        for tf in tf_groups:
-            candle_cache[tf] = []
+        for tf in missing_tfs:
+            candle_cache[tf] = candle_cache.get(tf, [])
 
     for tf in all_timeframes:
         candle_cache.setdefault(tf, [])
