@@ -4,6 +4,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..database import HistoricCandleModel, SessionLocal, TrackedSymbolModel
+from ..exchanges.factory import get_ranked_assets_universe
 from ..market_data_service import MarketDataService
 
 router = APIRouter(prefix="/market-data", tags=["Market Data"])
@@ -38,6 +39,11 @@ def get_db():
 class TrackRequest(BaseModel):
     symbol: str
     timeframes: list[str]
+
+
+class BootstrapRequest(BaseModel):
+    symbols: list[str] = []
+    timeframes: list[str] = ["15m", "1h", "4h"]
 
 
 @router.get("/tracked")
@@ -98,6 +104,58 @@ async def add_tracked_symbol(
 
     background_tasks.add_task(svc.sync_symbol, symbol)
     return {"status": "ok", "symbol": symbol, "timeframes": tracked.timeframes, "sync": "started"}
+
+
+@router.post("/bootstrap-defaults")
+async def bootstrap_defaults(
+    req: BootstrapRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    svc: MarketDataService = Depends(get_service),
+):
+    base_symbols = req.symbols or get_ranked_assets_universe()
+    symbols = []
+    for sym in base_symbols:
+        norm = _norm_symbol(sym)
+        try:
+            _assert_okx_spot_symbol(norm)
+            symbols.append(norm)
+        except HTTPException:
+            continue
+
+    if not symbols:
+        raise HTTPException(400, "Nenhum ativo spot OKX válido para bootstrap.")
+
+    tfs = []
+    for tf in (req.timeframes or []):
+        tf_norm = (tf or "").strip()
+        if tf_norm in _ALLOWED_TIMEFRAMES:
+            tfs.append(tf_norm)
+    if not tfs:
+        tfs = ["15m", "1h", "4h"]
+
+    inserted = 0
+    updated = 0
+    for symbol in symbols:
+        tracked = db.query(TrackedSymbolModel).filter(TrackedSymbolModel.symbol == symbol).first()
+        if tracked:
+            tracked.timeframes = sorted(set((tracked.timeframes or []) + tfs))
+            tracked.is_active = True
+            updated += 1
+        else:
+            db.add(TrackedSymbolModel(symbol=symbol, timeframes=sorted(set(tfs)), is_active=True))
+            inserted += 1
+        background_tasks.add_task(svc.sync_symbol, symbol)
+    db.commit()
+
+    return {
+        "status": "ok",
+        "inserted": inserted,
+        "updated": updated,
+        "symbols": symbols,
+        "timeframes": sorted(set(tfs)),
+        "sync": "started",
+    }
 
 
 @router.delete("/track/{symbol:path}/{timeframe}")

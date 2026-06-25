@@ -117,3 +117,24 @@ export const getSymbolTradability = (symbols = [], demo = true) => {
 export const getCandles      = (symbol, tf, limit = 200) =>
   req(`/market/candles?symbol=${symbol}&timeframe=${tf}&limit=${limit}`)
 export const getTicker       = (symbol) => req(`/market/ticker?symbol=${symbol}`)
+
+// Market Data cache (OKX)
+export const getTrackedMarketData = () => req('/market-data/tracked')
+export const bootstrapMarketData = (symbols = [], timeframes = ['15m', '1h', '4h']) =>
+  req('/market-data/bootstrap-defaults', {
+    method: 'POST',
+    body: JSON.stringify({ symbols, timeframes }),
+  })
+export const trackMarketDataSymbol = (symbol, timeframes = ['15m', '1h', '4h']) =>
+  req('/market-data/track', {
+    method: 'POST',
+    body: JSON.stringify({ symbol, timeframes }),
+  })
+export const forceSyncMarketData = (symbol, timeframe = null) =>
+  req(`/market-data/force-sync/${encodeURIComponent(symbol)}${timeframe ? `/${encodeURIComponent(timeframe)}` : ''}`, {
+    method: 'POST',
+  })
+export const removeTrackedMarketData = (symbol, timeframe = null) =>
+  req(`/market-data/track/${encodeURIComponent(symbol)}${timeframe ? `/${encodeURIComponent(timeframe)}` : ''}`, {
+    method: 'DELETE',
+  })
