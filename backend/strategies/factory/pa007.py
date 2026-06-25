@@ -34,6 +34,9 @@ class SupplyDemandCryptoStrategy(BaseStrategy):
                 "ema_fast": ParamDef(type="int", default=20, min=5, max=50, step=1, description="Período da EMA rápida para tendência"),
                 "ema_slow": ParamDef(type="int", default=50, min=20, max=200, step=1, description="Período da EMA lenta para tendência"),
                 "volume_ma_period": ParamDef(type="int", default=20, min=5, max=50, step=1, description="Período da média móvel de volume"),
+                "min_criteria_to_trade": ParamDef(type="int", default=3, min=2, max=4, step=1, description="Mínimo de critérios para permitir entrada"),
+                "zone_tolerance_pct": ParamDef(type="float", default=2.5, min=1.0, max=5.0, step=0.5, description="Tolerância de distância para zona de oferta/demanda (%)"),
+                "require_zone_or_choch": ParamDef(type="int", default=1, min=0, max=1, step=1, description="Exigir ao menos zona ou CHoCH para entrada"),
             },
         )
 
@@ -46,6 +49,9 @@ class SupplyDemandCryptoStrategy(BaseStrategy):
         self.ema_fast = p["ema_fast"].default
         self.ema_slow = p["ema_slow"].default
         self.volume_ma_period = p["volume_ma_period"].default
+        self.min_criteria_to_trade = p["min_criteria_to_trade"].default
+        self.zone_tolerance_pct = p["zone_tolerance_pct"].default
+        self.require_zone_or_choch = p["require_zone_or_choch"].default
 
     def set_params(self, params: dict) -> None:
         for k, v in params.items():
@@ -127,10 +133,10 @@ class SupplyDemandCryptoStrategy(BaseStrategy):
 
         if bias == 1.0:
             # Zona de demanda: próximo ao swing low
-            zone_touch = close <= swing_low * 1.02  # 2% acima do swing low
+            zone_touch = close <= swing_low * (1 + float(self.zone_tolerance_pct) / 100.0)
         elif bias == -1.0:
             # Zona de oferta: próximo ao swing high
-            zone_touch = close >= swing_high * 0.98  # 2% abaixo do swing high
+            zone_touch = close >= swing_high * (1 - float(self.zone_tolerance_pct) / 100.0)
         else:
             zone_touch = False
 
@@ -163,19 +169,24 @@ class SupplyDemandCryptoStrategy(BaseStrategy):
         signal = Signal.HOLD
         hold_reason = ""
 
-        if bias == 1.0 and c2_met and c3_met and c4_met:
+        min_required = int(self.min_criteria_to_trade)
+        zone_or_choch_ok = (c3_met or c4_met) if bool(int(self.require_zone_or_choch)) else True
+        long_ok = bias == 1.0 and c2_met and zone_or_choch_ok and criteria_met >= min_required
+        short_ok = bias == -1.0 and c2_met and zone_or_choch_ok and criteria_met >= min_required
+
+        if long_ok:
             signal = Signal.BUY
-        elif bias == -1.0 and c2_met and c3_met and c4_met:
+        elif short_ok:
             signal = Signal.SELL
         else:
             if not c1_met:
                 hold_reason = "Mercado sem direção clara (EMA fast próxima da slow)"
             elif not c2_met:
                 hold_reason = "Volume insuficiente"
-            elif not c3_met:
-                hold_reason = "Preço não tocou zona relevante"
-            elif not c4_met:
-                hold_reason = "Aguardando confirmação de quebra de estrutura"
+            elif bool(int(self.require_zone_or_choch)) and not zone_or_choch_ok:
+                hold_reason = "Sem confluência mínima de zona/estrutura"
+            elif criteria_met < min_required:
+                hold_reason = f"Confluência insuficiente ({criteria_met}/{min_required})"
             else:
                 hold_reason = "Condições não atendidas para entrada"
 
@@ -201,6 +212,8 @@ class SupplyDemandCryptoStrategy(BaseStrategy):
                 "ema_slow": round(ema_slow_val, 4),
                 "volume_ma": round(volume_ma, 4),
                 "bias": round(bias, 1),
+                "zone_touch": 1.0 if c3_met else 0.0,
+                "choch": 1.0 if c4_met else 0.0,
             },
             metadata={
                 "sl_price": sl_price,

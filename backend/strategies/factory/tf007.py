@@ -59,7 +59,7 @@ class MultiTFStrategy(BaseStrategy):
                 "são buscados automaticamente."
             ),
             tags   = ["trend", "momentum", "multi-tf"],
-            recommended_timeframe = "1h",
+            recommended_timeframe = "15m",
             params = {
                 "bias_ema": ParamDef(
                     type="int", default=20, min=10, max=50, step=5,
@@ -70,6 +70,9 @@ class MultiTFStrategy(BaseStrategy):
                 "rsi_threshold": ParamDef(
                     type="float", default=50.0, min=45.0, max=55.0, step=1.0,
                     description="RSI mínimo (BUY) / máximo (SELL) no 1H"),
+                "rsi_buffer": ParamDef(
+                    type="float", default=2.0, min=0.0, max=10.0, step=0.5,
+                    description="Margem de tolerância para RSI no 1H para evitar bloqueio por ruído"),
                 "macd_fast": ParamDef(
                     type="int", default=12, min=5, max=20, step=1,
                     description="EMA rápida do MACD (timeframe do bot)"),
@@ -91,6 +94,9 @@ class MultiTFStrategy(BaseStrategy):
                 "ts_mult": ParamDef(
                     type="float", default=3.0, min=1.5, max=6.0, step=0.5,
                     description="Multiplicador ATR para Trailing Stop (após TP1)"),
+                "allow_continuation": ParamDef(
+                    type="int", default=1, min=0, max=1, step=1,
+                    description="Permite entrada por continuidade quando multi-TF está alinhado, sem exigir crossover exato"),
             },
             criteria=[
                 {"id": "c1", "label": "Bias 4H", "description": "Tendência macro definida no 4H"},
@@ -104,6 +110,7 @@ class MultiTFStrategy(BaseStrategy):
         self.bias_ema      = p["bias_ema"].default
         self.rsi_period    = p["rsi_period"].default
         self.rsi_threshold = p["rsi_threshold"].default
+        self.rsi_buffer    = p["rsi_buffer"].default
         self.macd_fast     = p["macd_fast"].default
         self.macd_slow     = p["macd_slow"].default
         self.macd_signal   = p["macd_signal"].default
@@ -111,6 +118,7 @@ class MultiTFStrategy(BaseStrategy):
         self.sl_mult       = p["sl_mult"].default
         self.tp1_rr        = p["tp1_rr"].default
         self.ts_mult       = p["ts_mult"].default
+        self.allow_continuation = p["allow_continuation"].default
 
     def set_params(self, params: dict) -> None:
         for k, v in params.items():
@@ -162,11 +170,14 @@ class MultiTFStrategy(BaseStrategy):
 
         hist_now  = float(macd_out[hist_col].iloc[-1])
         hist_prev = float(macd_out[hist_col].iloc[-2])
+        hist_prev2 = float(macd_out[hist_col].iloc[-3]) if len(macd_out[hist_col]) >= 3 else hist_prev
         macd_val  = float(macd_out[macd_col].iloc[-1])
         sig_val   = float(macd_out[sig_col].iloc[-1])
 
         trigger_bull = hist_prev < 0 and hist_now >= 0
         trigger_bear = hist_prev > 0 and hist_now <= 0
+        continuation_bull = hist_now > 0 and hist_prev > 0 and hist_now >= hist_prev >= hist_prev2
+        continuation_bear = hist_now < 0 and hist_prev < 0 and hist_now <= hist_prev <= hist_prev2
 
         # ── ATR ───────────────────────────────────────────────────────────────
         atr_series = ta.atr(df["high"], df["low"], df["close"],
@@ -209,16 +220,21 @@ class MultiTFStrategy(BaseStrategy):
                 ef1h      = float(ema_f1.iloc[-1])
                 el1h      = float(ema_l1.iloc[-1])
                 rsi_1h_val = float(rsi_1h.iloc[-1])
-                if ef1h > el1h and rsi_1h_val > self.rsi_threshold:
+                buy_rsi = float(self.rsi_threshold) - float(self.rsi_buffer)
+                sell_rsi = float(self.rsi_threshold) + float(self.rsi_buffer)
+                if ef1h > el1h and rsi_1h_val > buy_rsi:
                     trend = 1
-                elif ef1h < el1h and rsi_1h_val < self.rsi_threshold:
+                elif ef1h < el1h and rsi_1h_val < sell_rsi:
                     trend = -1
 
         # ── Decisão final ─────────────────────────────────────────────────────
         hold_reason = ""
-        if bias == 1 and trend == 1 and trigger_bull:
+        bull_trigger_ok = trigger_bull or (bool(int(self.allow_continuation)) and continuation_bull)
+        bear_trigger_ok = trigger_bear or (bool(int(self.allow_continuation)) and continuation_bear)
+
+        if bias == 1 and trend == 1 and bull_trigger_ok:
             signal = Signal.BUY
-        elif bias == -1 and trend == -1 and trigger_bear:
+        elif bias == -1 and trend == -1 and bear_trigger_ok:
             signal = Signal.SELL
         else:
             signal = Signal.HOLD
@@ -230,7 +246,7 @@ class MultiTFStrategy(BaseStrategy):
                 hold_reason = "Tendência 1H não confirmada (EMA ou RSI divergem)"
             elif bias != trend:
                 hold_reason = f"Conflito de tendência: bias 4H {'alta' if bias==1 else 'baixa'} vs trend 1H {'alta' if trend==1 else 'baixa'}"
-            elif not (trigger_bull or trigger_bear):
+            elif not (bull_trigger_ok or bear_trigger_ok):
                 hold_reason = (
                     f"Aguardando cruzamento MACD — hist: {hist_now:+.4f}"
                 )
@@ -268,6 +284,8 @@ class MultiTFStrategy(BaseStrategy):
                 "signal_line":  round(sig_val, 6),
                 "trigger_bull": float(trigger_bull),
                 "trigger_bear": float(trigger_bear),
+                "continuation_bull": float(continuation_bull),
+                "continuation_bear": float(continuation_bear),
             },
             metadata = {
                 "sl_price":  sl_price,
@@ -280,6 +298,8 @@ class MultiTFStrategy(BaseStrategy):
                     "trend":         trend,
                     "trigger_bull":  trigger_bull,
                     "trigger_bear":  trigger_bear,
+                    "continuation_bull": continuation_bull,
+                    "continuation_bear": continuation_bear,
                     "data_4h_ok":    data_4h_ok,
                     "data_1h_ok":    data_1h_ok,
                 },

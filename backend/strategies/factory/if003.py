@@ -24,6 +24,9 @@ class AtemporalEventDrivenStrategy(BaseStrategy):
                 "atr_multiplier": ParamDef("float", 0.15, "Multiplicador do ATR para tamanho do bloco", min=0.05, max=0.5, step=0.01),
                 "vol_window": ParamDef("int", 100, "Janela para cálculo do POC", min=50, max=500),
                 "rr_ratio": ParamDef("float", 2.0, "Risco:Recompensa alvo", min=1.5, max=5.0, step=0.1),
+                "poc_tolerance": ParamDef("float", 0.008, "Distância máxima ao POC para gatilho principal", min=0.003, max=0.02, step=0.001),
+                "extended_poc_tolerance": ParamDef("float", 0.012, "Distância estendida ao POC quando há confluência forte", min=0.005, max=0.03, step=0.001),
+                "min_criteria_to_trade": ParamDef("int", 3, "Mínimo de critérios para emitir sinal", min=2, max=4, step=1),
             },
             criteria=[
                 {"id": "c1", "label": "Proximidade do POC", "description": "Proximidade do POC (Zona de Valor)"},
@@ -38,7 +41,10 @@ class AtemporalEventDrivenStrategy(BaseStrategy):
             "atr_period": 14,
             "atr_multiplier": 0.15,
             "vol_window": 100,
-            "rr_ratio": 2.0
+            "rr_ratio": 2.0,
+            "poc_tolerance": 0.008,
+            "extended_poc_tolerance": 0.012,
+            "min_criteria_to_trade": 3,
         }
 
     def set_params(self, params: dict):
@@ -134,7 +140,8 @@ class AtemporalEventDrivenStrategy(BaseStrategy):
             
             # C1: Proximidade do POC (Zona de Valor)
             dist_poc = abs(last_price - poc_price) / poc_price if poc_price > 0 else 999.0
-            near_poc = dist_poc < 0.005 # 0.5% de distância
+            near_poc = dist_poc < float(self.params["poc_tolerance"])
+            near_poc_extended = dist_poc < float(self.params["extended_poc_tolerance"])
             if near_poc: criteria_met += 1
             
             # C2: Reversão Atemporal
@@ -159,11 +166,15 @@ class AtemporalEventDrivenStrategy(BaseStrategy):
                     criteria_met += 1
             
             # Gatilhos Finais
-            if criteria_met >= 3:
-                if is_reversal_long and near_poc:
+            min_criteria = int(self.params.get("min_criteria_to_trade", 3))
+            strong_confluence = high_vol and ((is_reversal_long and strong_close_long) or (is_reversal_short and strong_close_short))
+            near_value_zone = near_poc or (near_poc_extended and strong_confluence)
+
+            if criteria_met >= min_criteria:
+                if is_reversal_long and near_value_zone:
                     signal = Signal.BUY
                     reason = "Gatilho I004 LONG: Reversão em Zona de Liquidez (POC)"
-                elif is_reversal_short and near_poc:
+                elif is_reversal_short and near_value_zone:
                     signal = Signal.SELL
                     reason = "Gatilho I004 SHORT: Reversão em Zona de Liquidez (POC)"
                 else:
@@ -176,6 +187,7 @@ class AtemporalEventDrivenStrategy(BaseStrategy):
             "num_blocks": float(len(blocks)),
             "last_block_type": 1.0 if (len(blocks) > 0 and blocks[-1]['type'] == 'bull') else -1.0 if (len(blocks) > 0) else 0.0,
             "c1_ok": 1.0 if near_poc else 0.0,
+            "near_poc_ext": 1.0 if ('near_poc_extended' in locals() and near_poc_extended) else 0.0,
             "c2_ok": 1.0 if (is_reversal_long or is_reversal_short) else 0.0,
             "c3_ok": 1.0 if high_vol else 0.0,
             "c4_ok": 1.0 if ((is_reversal_long and strong_close_long) or (is_reversal_short and strong_close_short)) else 0.0
