@@ -13,6 +13,11 @@ from ..market_data_service import MarketDataService
 router = APIRouter(prefix="/market-data", tags=["Market Data"])
 
 _ALLOWED_TIMEFRAMES = {"1m", "3m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "12h", "1D", "1W"}
+_DEFAULT_OKX_SPOT_SYMBOLS = [
+    "BTC-USDT", "ETH-USDT", "SOL-USDT", "BNB-USDT", "XRP-USDT",
+    "DOGE-USDT", "ADA-USDT", "AVAX-USDT", "DOT-USDT", "LINK-USDT",
+    "LTC-USDT", "UNI-USDT", "TRX-USDT", "BCH-USDT", "APT-USDT",
+]
 
 
 def _norm_symbol(symbol: str) -> str:
@@ -180,8 +185,14 @@ def get_tracked_symbols(db: Session = Depends(get_db)):
 
 
 @router.get("/available-symbols")
-def get_available_symbols():
-    raw = get_ranked_assets_universe() or []
+def get_available_symbols(db: Session = Depends(get_db)):
+    raw = list(get_ranked_assets_universe() or [])
+    # Inclui também ativos já rastreados para não perder opções em cenários parciais.
+    tracked = db.query(TrackedSymbolModel.symbol).all()
+    raw.extend([row[0] for row in tracked if row and row[0]])
+    # Fallback seguro para UI quando universo vier vazio/curto no ambiente.
+    if len(raw) < 3:
+        raw.extend(_DEFAULT_OKX_SPOT_SYMBOLS)
     out = []
     seen = set()
     for symbol in raw:

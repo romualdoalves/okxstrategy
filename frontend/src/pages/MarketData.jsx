@@ -13,6 +13,10 @@ import {
 } from '../api'
 
 const DEFAULT_TIMEFRAMES = ['15m', '1h', '4h']
+const FALLBACK_SYMBOLS = [
+  'BTC-USDT', 'ETH-USDT', 'SOL-USDT', 'BNB-USDT', 'XRP-USDT',
+  'DOGE-USDT', 'ADA-USDT', 'AVAX-USDT', 'DOT-USDT', 'LINK-USDT',
+]
 
 function fmtDate(iso) {
   if (!iso) return '-'
@@ -49,11 +53,18 @@ export default function MarketData() {
     staleTime: 60_000,
   })
 
-  useEffect(() => {
-    if (!symbol && availableSymbols.length > 0) {
-      setSymbol(availableSymbols[0])
+  const symbolsForSelect = useMemo(() => {
+    if (Array.isArray(availableSymbols) && availableSymbols.length >= 3) {
+      return availableSymbols
     }
-  }, [availableSymbols, symbol])
+    return FALLBACK_SYMBOLS
+  }, [availableSymbols])
+
+  useEffect(() => {
+    if (!symbol && symbolsForSelect.length > 0) {
+      setSymbol(symbolsForSelect[0])
+    }
+  }, [symbolsForSelect, symbol])
 
   const summary = useMemo(() => {
     const bySymbol = {}
@@ -262,11 +273,11 @@ export default function MarketData() {
           <select
             value={symbol}
             onChange={e => setSymbol(e.target.value)}
-            disabled={!availableSymbols.length}
+            disabled={!symbolsForSelect.length}
             className="px-3 py-2 rounded-lg bg-white/5 border border-white/10 outline-none focus:border-accent/50"
           >
-            {!availableSymbols.length && <option value="">Carregando ativos...</option>}
-            {availableSymbols.map(sym => (
+            {!symbolsForSelect.length && <option value="">Carregando ativos...</option>}
+            {symbolsForSelect.map(sym => (
               <option key={sym} value={sym}>{sym}</option>
             ))}
           </select>
@@ -278,7 +289,7 @@ export default function MarketData() {
           />
           <button
             onClick={onAdd}
-            disabled={addMut.isPending || !availableSymbols.length}
+            disabled={addMut.isPending || !symbolsForSelect.length}
             className="px-3 py-2 rounded-lg bg-green-500/15 text-green-300 border border-green-500/30 hover:bg-green-500/25 disabled:opacity-60 inline-flex items-center justify-center gap-2"
           >
             <PlusCircle size={14} />
