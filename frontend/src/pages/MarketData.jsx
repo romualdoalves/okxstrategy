@@ -268,17 +268,26 @@ export default function MarketData() {
       </div>
 
       <div className="rounded-xl bg-panel border border-border p-4 space-y-3">
-        <h2 className="text-sm font-bold uppercase tracking-wider text-muted">Adicionar rastreamento</h2>
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-muted">Adicionar rastreamento</h2>
+          <span className="text-xs text-muted">Ativos disponíveis: {symbolsForSelect.length}</span>
+        </div>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-2">
           <select
             value={symbol}
             onChange={e => setSymbol(e.target.value)}
             disabled={!symbolsForSelect.length}
-            className="px-3 py-2 rounded-lg bg-white/5 border border-white/10 outline-none focus:border-accent/50"
+            className="px-3 py-2 rounded-lg bg-slate-900 border border-white/10 text-white outline-none focus:border-accent/50"
           >
-            {!symbolsForSelect.length && <option value="">Carregando ativos...</option>}
+            {!symbolsForSelect.length && <option value="" style={{ color: '#111827', backgroundColor: '#ffffff' }}>Carregando ativos...</option>}
             {symbolsForSelect.map(sym => (
-              <option key={sym} value={sym}>{sym}</option>
+              <option
+                key={sym}
+                value={sym}
+                style={{ color: '#111827', backgroundColor: '#ffffff' }}
+              >
+                {sym}
+              </option>
             ))}
           </select>
           <input
