@@ -53,6 +53,8 @@ class StrategyOptimizer:
             "TF007": {
                 "bias_ema": [20, 30, 40],
                 "rsi_threshold": [48.0, 50.0, 52.0],
+                "rsi_buffer": [1.0, 2.0, 3.0],
+                "allow_continuation": [0, 1],
                 "sl_mult": [2.0, 2.5, 3.0],
                 "tp1_rr": [1.5, 2.0, 3.0],
             },
@@ -166,6 +168,9 @@ class StrategyOptimizer:
             "PA007": {
                 "ema_fast": [13, 20, 34],
                 "ema_slow": [50, 89],
+                "zone_tolerance_pct": [2.0, 2.5, 3.0],
+                "min_criteria_to_trade": [2, 3],
+                "require_zone_or_choch": [1],
                 "sl_mult": [1.5, 2.0, 2.5],
                 "tp1_rr": [1.5, 2.0, 3.0],
             },
@@ -206,6 +211,9 @@ class StrategyOptimizer:
             "IF003": {
                 "atr_multiplier": [0.10, 0.15, 0.25],
                 "vol_window": [80, 100, 150],
+                "poc_tolerance": [0.006, 0.008, 0.010],
+                "extended_poc_tolerance": [0.010, 0.012, 0.015],
+                "min_criteria_to_trade": [2, 3],
                 "rr_ratio": [1.5, 2.0, 3.0],
             },
             "S006": {
