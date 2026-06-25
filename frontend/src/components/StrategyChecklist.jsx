@@ -513,6 +513,154 @@ function makeCriteriaMap(t, bot) {
       { id: 'confirmation', label: 'C4 Confirm.', sub: 'Fechamento', value: ind?.c4_ok ? 'FORTE' : 'NEUTRO', status: ind?.c4_ok ? 'green' : 'grey', detail: 'Aceitação do novo preço' }
     ]),
 
+    TF009: wrap((ind) => {
+      const fast = ind?.fast_ma
+      const slow = ind?.slow_ma
+      const hasMa = fast != null && slow != null && isFinite(fast) && isFinite(slow)
+      const gap   = hasMa ? fast - slow : null
+      const gapPct = hasMa ? Math.abs(gap) / (ind.close || 1) * 100 : null
+      const maStatus = !hasMa ? 'none' : gap > 0 ? 'green' : 'red'
+      const maValue  = hasMa ? `${gap >= 0 ? '+' : ''}${fmt(gap, 0)} pts` : '—'
+      const strengthStatus = gapPct == null ? 'none' : gapPct >= 0.1 ? 'green' : gapPct >= 0.03 ? 'yellow' : 'grey'
+      return [
+        { id: 'ma_cross', label: 'C1 Cruzamento MA', sub: 'Rápida vs Lenta',
+          value: maValue,
+          status: maStatus,
+          detail: !hasMa ? 'Aguardando dados' : gap > 0 ? 'MA rápida acima da lenta — tendência de alta' : 'MA rápida abaixo da lenta — tendência de baixa' },
+        { id: 'ma_strength', label: 'C2 Força', sub: 'Distância %',
+          value: gapPct != null ? `${fmt(gapPct, 2)}%` : '—',
+          status: strengthStatus,
+          detail: gapPct != null ? `Separação entre MAs: ${fmt(gapPct, 2)}%` : 'Aguardando dados' },
+        { id: 'atr', label: `C3 ${t('sc.atr_label')}`, sub: t('sc.atr_sub'),
+          value: fmt(ind?.atr, 2),
+          status: ind?.atr ? 'green' : 'none',
+          detail: t('sc.atr_detail') },
+      ]
+    }),
+
+    TF014: wrap((ind) => {
+      const bias = ind?.bias
+      const hasBias = bias != null && bias !== 0
+      const biasLabel = bias === 1 ? 'Green Light ↑' : bias === -1 ? 'Red Light ↓' : 'Neutro'
+      const biasStatus = bias === 1 ? 'green' : bias === -1 ? 'red' : 'grey'
+      const closePx = ind?.close
+      const ema_micro = ind?.ema_micro
+      const ema_macro = ind?.ema_macro
+      const hasMicro = closePx != null && ema_micro != null
+      const microDist = hasMicro ? closePx - ema_micro : null
+      const microStatus = !hasMicro ? 'none' : bias === 1
+        ? (closePx > ema_micro ? 'green' : Math.abs(microDist / closePx) < 0.002 ? 'yellow' : 'red')
+        : bias === -1
+        ? (closePx < ema_micro ? 'green' : Math.abs(microDist / closePx) < 0.002 ? 'yellow' : 'red')
+        : 'grey'
+      return [
+        { id: 'bias', label: 'C1 Viés EMA Macro', sub: `EMA${ind ? '' : ''}`,
+          value: biasLabel,
+          status: biasStatus,
+          detail: hasBias
+            ? `Preço ${bias === 1 ? 'acima' : 'abaixo'} da EMA macro com inclinação ${bias === 1 ? 'positiva' : 'negativa'}`
+            : 'EMA macro sem inclinação clara — lateralização' },
+        { id: 'trigger', label: 'C2 Gatilho', sub: 'Pullback / Rompimento',
+          value: hasMicro ? `${microDist >= 0 ? '+' : ''}${fmt(microDist, 0)} pts` : '—',
+          status: microStatus,
+          detail: !hasMicro ? 'Aguardando dados' : bias === 1
+            ? (closePx > ema_micro ? 'Preço acima da EMA micro — pullback confirmado' : 'Aguardando recuo à EMA micro')
+            : bias === -1
+            ? (closePx < ema_micro ? 'Preço abaixo da EMA micro — pullback confirmado' : 'Aguardando recuo à EMA micro')
+            : 'Sem viés ativo' },
+      ]
+    }),
+
+    PA007: wrap((ind) => {
+      const bias = ind?.bias
+      const emaFast = ind?.ema_fast
+      const emaSlow = ind?.ema_slow
+      const hasBias = bias != null && bias !== 0
+      const biasStatus = bias === 1 ? 'green' : bias === -1 ? 'red' : 'grey'
+      const biasLabel  = bias === 1 ? 'Alta' : bias === -1 ? 'Baixa' : 'Neutro'
+      const volRatio = (ind?.close != null && ind?.volume_ma != null && ind?.volume_ma > 0)
+        ? null : null
+      const zoneTouch = ind?.zone_touch === 1.0
+      const chochOk   = ind?.choch === 1.0
+      return [
+        { id: 'bias', label: 'C1 Viés', sub: 'EMA Fast/Slow',
+          value: biasLabel,
+          status: biasStatus,
+          detail: hasBias ? `EMA rápida ${bias === 1 ? 'acima' : 'abaixo'} da lenta — tendência ${bias === 1 ? 'de alta' : 'de baixa'}` : 'EMAs próximas — sem direção clara' },
+        { id: 'volume', label: 'C2 Volume', sub: 'Acima da Média',
+          value: ind?.volume_ma != null ? 'Verificando' : '—',
+          status: ind?.volume_ma != null ? 'green' : 'grey',
+          detail: 'Volume acima da média confirma pressão direcional' },
+        { id: 'zone', label: 'C3 Zona S/D', sub: 'Oferta/Demanda',
+          value: zoneTouch ? 'TOCANDO' : 'FORA',
+          status: zoneTouch ? 'green' : 'yellow',
+          detail: zoneTouch ? 'Preço na zona de oferta/demanda identificada' : 'Aguardando toque na zona relevante' },
+        { id: 'choch', label: 'C4 CHoCH', sub: 'Quebra Estrutura',
+          value: chochOk ? 'QUEBROU' : 'ESTÁVEL',
+          status: chochOk ? 'green' : 'yellow',
+          detail: chochOk ? 'Quebra de estrutura confirmada — entrada válida' : 'Aguardando Change of Character' },
+      ]
+    }),
+
+    PA008: wrap((ind) => {
+      const orbHigh = ind?.orb_high
+      const orbLow  = ind?.orb_low
+      const orbMid  = ind?.orb_mid
+      const breakDir = ind?.breakout_direction
+      const closePx  = ind?.close
+      const orbDefined = orbHigh != null && orbLow != null && orbHigh > 0 && orbLow > 0
+      const orbRangePct = orbDefined ? ((orbHigh - orbLow) / orbLow) * 100 : null
+      const orbStatus = !orbDefined ? 'none' : orbRangePct <= 2.0 ? 'green' : 'yellow'
+      const brkStatus = !breakDir ? 'grey' : breakDir !== 0 ? 'green' : 'yellow'
+      const brkLabel  = breakDir === 1 ? 'Alta ↑' : breakDir === -1 ? 'Baixa ↓' : 'Sem Rompimento'
+      const inRetest = orbDefined && breakDir !== 0 && closePx != null
+        ? (breakDir === 1 ? (closePx <= orbHigh && closePx >= orbMid) : (closePx >= orbLow && closePx <= orbMid))
+        : false
+      return [
+        { id: 'orb', label: 'C1 ORB', sub: 'Range de Abertura',
+          value: orbDefined ? `${fmt(orbRangePct, 2)}% range` : '—',
+          status: orbStatus,
+          detail: orbDefined ? `ORB: ${fmt(orbLow, 2)} – ${fmt(orbHigh, 2)} (${fmt(orbRangePct, 2)}%)` : 'Aguardando definição do range de abertura' },
+        { id: 'breakout', label: 'C2 Rompimento', sub: 'Fora do ORB',
+          value: brkLabel,
+          status: brkStatus,
+          detail: breakDir === 1 ? `Fechou acima do ORB high (${fmt(orbHigh, 2)})` : breakDir === -1 ? `Fechou abaixo do ORB low (${fmt(orbLow, 2)})` : 'Aguardando fechamento fora do range' },
+        { id: 'retest', label: 'C3 Reteste', sub: 'Retorno à Linha',
+          value: inRetest ? 'RETESTANDO' : breakDir !== 0 ? 'AGUARDANDO' : '—',
+          status: inRetest ? 'green' : breakDir !== 0 ? 'yellow' : 'grey',
+          detail: inRetest ? 'Preço retestando a linha rompida — entrada válida' : breakDir !== 0 ? `Aguardando recuo para zona (mid: ${fmt(orbMid, 2)})` : 'Depende do rompimento' },
+      ]
+    }),
+
+    RG003: (ind) => {
+      const regime = ind?.gex_regime
+      const regimeLabel = regime === 1 ? 'Gama Positivo' : regime === -1 ? 'Gama Negativo' : 'Neutro'
+      const regimeStatus = regime === 1 ? 'green' : regime === -1 ? 'yellow' : 'grey'
+      const c2Ok = ind?.c2_level === 1.0
+      const c3Ok = ind?.c3_volume === 1.0
+      const c4Ok = ind?.c4_atr === 1.0
+      const gexVal = ind?.gex_value
+      const pcr = ind?.pcr
+      return [
+        { id: 'regime', label: 'C1 Regime GEX', sub: 'Deribit / BBW',
+          value: regimeLabel,
+          status: regimeStatus,
+          detail: regime === 1 ? 'Gama Positivo — mercado amortecido, range strategy' : regime === -1 ? 'Gama Negativo — mercado explosivo, breakout strategy' : 'Regime neutro — aguardando clareza' },
+        { id: 'level', label: 'C2 Nível OI', sub: 'Suporte/Resistência',
+          value: c2Ok ? 'PRÓXIMO' : ind?.nearest_support ? `S:${fmt(ind.nearest_support, 0)}` : '—',
+          status: c2Ok ? 'green' : 'yellow',
+          detail: c2Ok ? 'Preço próximo ou rompendo nível relevante de Open Interest' : `S:${fmt(ind?.nearest_support, 0)} / R:${fmt(ind?.nearest_resistance, 0)}` },
+        { id: 'volume', label: 'C3 Volume', sub: 'Spike Institucional',
+          value: ind?.vol_ratio != null ? `${fmt(ind.vol_ratio, 2)}x` : '—',
+          status: c3Ok ? 'green' : 'yellow',
+          detail: c3Ok ? 'Volume acima da média — agressão institucional confirmada' : 'Aguardando spike de volume' },
+        { id: 'atr_bbw', label: 'C4 ATR/BBW', sub: 'Alinhamento Regime',
+          value: pcr != null ? `PCR ${fmt(pcr, 2)}` : '—',
+          status: c4Ok ? 'green' : 'yellow',
+          detail: c4Ok ? 'ATR/BBW alinhado com o regime de gama esperado' : 'ATR/BBW divergindo do regime' },
+      ]
+    },
+
     // ── T: Testes ─────────────────────────────────────────────────────────────
     T000: (_ind) => [
       { id: 'test_ok', label: 'C1 Pipeline', sub: 'Teste ativo',
@@ -590,6 +738,11 @@ function makeExitCriteriaMap(t, bot) {
     MR003: wrapExit(reversalCriterion),
     MR004: wrapExit(reversalCriterion),
     PA006: wrapExit(reversalCriterion),
+    TF009: wrapExit(reversalCriterion),
+    TF014: wrapExit(reversalCriterion),
+    PA007: wrapExit(reversalCriterion),
+    PA008: wrapExit(reversalCriterion),
+    RG003: wrapExit(reversalCriterion),
     SC002: wrapExit(reversalCriterion),
     RG002: wrapExit(reversalCriterion),
     SC003: wrapExit(reversalCriterion),
