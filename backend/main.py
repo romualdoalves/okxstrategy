@@ -136,6 +136,40 @@ def _assert_symbol_available(db: Session, symbol: str, *, exclude_bot_id: int | 
         )
 
 
+async def _get_symbol_tradability(symbol: str, *, demo: bool = True) -> dict:
+    """Retorna status de negociabilidade do par para a conta OKX atual."""
+    sym = _norm_symbol(symbol)
+    _assert_spot_only(sym)
+    try:
+        async with aiohttp.ClientSession() as session:
+            ex = build_exchange(session, demo=demo)
+            checker = getattr(ex, "get_spot_trade_status", None)
+            if callable(checker):
+                out = await checker(sym)
+                if isinstance(out, dict):
+                    out.setdefault("symbol", sym)
+                    return out
+    except HTTPException:
+        raise
+    except Exception as exc:
+        log.warning("Falha ao validar negociabilidade de %s: %s", sym, exc)
+
+    return {
+        "symbol": sym,
+        "tradable": True,
+        "reason": "Validação de elegibilidade indisponível; criação permitida.",
+        "status": "unknown",
+        "source": "fallback",
+    }
+
+
+async def _assert_symbol_tradable(symbol: str, *, demo: bool = True):
+    status = await _get_symbol_tradability(symbol, demo=demo)
+    if status.get("tradable") is False:
+        reason = status.get("reason") or "Par indisponível para negociação nesta conta."
+        raise HTTPException(400, f"Par {_norm_symbol(symbol)} bloqueado: {reason}")
+
+
 import os
 import time
 
@@ -1100,6 +1134,7 @@ async def create_bot(payload: BotCreate, db: Session = Depends(get_db)):
 
     _assert_spot_only(payload.symbol)
     payload.symbol = _norm_symbol(payload.symbol)
+    await _assert_symbol_tradable(payload.symbol, demo=payload.demo)
     payload.leverage = 1
     payload.stake_usd = FIXED_STAKE_USD
     _assert_symbol_available(db, payload.symbol)
@@ -1138,7 +1173,7 @@ def get_bot(bot_id: int, db: Session = Depends(get_db)):
 
 
 @app.patch("/api/bots/{bot_id}")
-def update_bot(bot_id: int, payload: BotUpdate, db: Session = Depends(get_db)):
+async def update_bot(bot_id: int, payload: BotUpdate, db: Session = Depends(get_db)):
     bot = db.get(BotModel, bot_id)
     if not bot:
         raise HTTPException(404, "Bot não encontrado")
@@ -1147,6 +1182,7 @@ def update_bot(bot_id: int, payload: BotUpdate, db: Session = Depends(get_db)):
     if payload.symbol:
         _assert_spot_only(payload.symbol)
         payload.symbol = _norm_symbol(payload.symbol)
+        await _assert_symbol_tradable(payload.symbol, demo=bool(bot.demo))
     if payload.symbol and payload.symbol != _norm_symbol(bot.symbol):
         _assert_symbol_available(db, payload.symbol, exclude_bot_id=bot_id)
     update_data = payload.model_dump(exclude_none=True)
@@ -1248,6 +1284,7 @@ async def switch_bot_symbol(
 
     _assert_spot_only(payload.symbol)
     payload.symbol = _norm_symbol(payload.symbol)
+    await _assert_symbol_tradable(payload.symbol, demo=bool(bot.demo))
     _assert_symbol_available(db, payload.symbol, exclude_bot_id=bot_id)
 
     was_active = bool(bot.active)
@@ -3053,6 +3090,48 @@ async def account_snapshot(demo: bool = False, db: Session = Depends(get_db)):
 
 
 # ── Rotas: Mercado ────────────────────────────────────────────────────────────
+
+@app.get("/api/market/symbol-tradability")
+async def market_symbol_tradability(symbols: str, demo: bool = True):
+    """Valida elegibilidade de negociação para uma lista de pares (CSV)."""
+    raw = [s.strip() for s in (symbols or "").split(",") if s.strip()]
+    if not raw:
+        raise HTTPException(400, "Informe ao menos um símbolo em 'symbols' (CSV).")
+
+    normalized: list[str] = []
+    for s in raw:
+        try:
+            _assert_spot_only(s)
+            normalized.append(_norm_symbol(s))
+        except HTTPException as exc:
+            normalized.append(_norm_symbol(s))
+
+    unique_symbols = list(dict.fromkeys(normalized))
+    statuses = await asyncio.gather(
+        *[_get_symbol_tradability(sym, demo=demo) for sym in unique_symbols],
+        return_exceptions=True,
+    )
+
+    rows: list[dict] = []
+    for sym, st in zip(unique_symbols, statuses):
+        if isinstance(st, Exception):
+            rows.append({
+                "symbol": sym,
+                "tradable": True,
+                "reason": f"Falha no precheck: {st}",
+                "status": "unknown",
+                "source": "exception",
+            })
+            continue
+        rows.append(st)
+
+    blocked = [r for r in rows if r.get("tradable") is False]
+    return {
+        "demo": bool(demo),
+        "symbols": rows,
+        "blocked_count": len(blocked),
+        "checked_at": datetime.now(timezone.utc).isoformat(),
+    }
 
 @app.get("/api/market/rank-assets")
 async def rank_assets(strategy_id: str = "graph_regime", timeframe: str = "15m"):

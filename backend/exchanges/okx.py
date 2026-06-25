@@ -56,12 +56,13 @@ async def _fetch_inst_info(symbol: str) -> dict:
                 "ctVal":    float(items[0].get("ctVal")  or 1.0),
                 "lotSz":    float(items[0].get("lotSz")  or 1.0),
                 "minSz":    float(items[0].get("minSz")  or 1.0),
+                "state":    (items[0].get("state") or "").lower(),
             }
             _INST_CACHE[symbol] = info
             return info
     except Exception:
         pass
-    default = {"instType": inst_t, "ctVal": 1.0, "lotSz": 1.0, "minSz": 0.0}
+    default = {"instType": inst_t, "ctVal": 1.0, "lotSz": 1.0, "minSz": 0.0, "state": ""}
     _INST_CACHE[symbol] = default
     return default
 
@@ -173,6 +174,120 @@ class OKXExchange(BaseExchange):
     async def warmup_instrument(self, symbol: str) -> None:
         """Pré-aquece o cache de instrumento para que num_contracts() seja preciso desde o início."""
         await _fetch_inst_info(symbol)
+
+    async def get_spot_trade_status(self, symbol: str) -> dict:
+        """Valida se o par spot está operacional e elegível para trade na conta atual."""
+        sym = symbol.upper()
+        if _inst_type(sym) != "SPOT":
+            return {
+                "symbol": sym,
+                "tradable": False,
+                "reason": "Este app opera somente spot.",
+                "source": "local",
+            }
+
+        info = await _fetch_inst_info(sym)
+        state = (info.get("state") or "").lower()
+        if state and state != "live":
+            return {
+                "symbol": sym,
+                "tradable": False,
+                "reason": f"Par {sym} indisponível na OKX (state={state}).",
+                "source": "public_instruments",
+            }
+
+        # Precheck autenticado: detecta bloqueios por compliance/permissão
+        # sem enviar ordem real.
+        min_sz = float(info.get("minSz") or 0.0)
+        test_size = min_sz if min_sz > 0 else 0.001
+        body = {
+            "instId": sym,
+            "tdMode": "cash",
+            "side": "buy",
+            "ordType": "market",
+            "sz": str(round(test_size, 8)),
+            "tgtCcy": "base_ccy",
+        }
+        try:
+            data = await self._request("POST", "/api/v5/trade/order-precheck", body=body)
+        except RuntimeError as exc:
+            msg = str(exc)
+            if "Credenciais OKX não configuradas" in msg:
+                return {
+                    "symbol": sym,
+                    "tradable": True,
+                    "reason": "Credenciais OKX ausentes; validação de elegibilidade não executada.",
+                    "source": "order_precheck",
+                    "status": "unknown",
+                }
+            return {
+                "symbol": sym,
+                "tradable": True,
+                "reason": f"Precheck indisponível agora: {msg}",
+                "source": "order_precheck",
+                "status": "unknown",
+            }
+        except Exception as exc:
+            return {
+                "symbol": sym,
+                "tradable": True,
+                "reason": f"Precheck indisponível agora: {exc}",
+                "source": "order_precheck",
+                "status": "unknown",
+            }
+
+        if str(data.get("code", "0")) != "0":
+            msg = (data.get("msg") or "precheck falhou").strip()
+            low = msg.lower()
+            blocked_tokens = (
+                "compliance",
+                "can't trade",
+                "cannot trade",
+                "not allowed",
+                "restricted",
+            )
+            blocked = any(tok in low for tok in blocked_tokens)
+            return {
+                "symbol": sym,
+                "tradable": not blocked,
+                "reason": f"OKX: {msg}",
+                "source": "order_precheck",
+                "code": str(data.get("code")),
+                "status": "blocked" if blocked else "unknown",
+            }
+
+        rows = data.get("data") or []
+        row = rows[0] if rows else {}
+        s_code = str(row.get("sCode") or "0")
+        if s_code != "0":
+            msg = (row.get("sMsg") or "Par não elegível para trade nesta conta.").strip()
+            low = msg.lower()
+            blocked_tokens = (
+                "compliance",
+                "can't trade",
+                "cannot trade",
+                "not allowed",
+                "restricted",
+                "instrument does not exist",
+                "not exist",
+            )
+            blocked = any(tok in low for tok in blocked_tokens)
+            return {
+                "symbol": sym,
+                "tradable": not blocked,
+                "reason": msg,
+                "source": "order_precheck",
+                "code": s_code,
+                "status": "blocked" if blocked else "unknown",
+            }
+
+        return {
+            "symbol": sym,
+            "tradable": True,
+            "reason": None,
+            "source": "order_precheck",
+            "status": "ok",
+        }
 
     async def _request(self, method: str, path: str, *, body: dict | list | None = None) -> dict:
         payload = json.dumps(body) if body is not None else ""

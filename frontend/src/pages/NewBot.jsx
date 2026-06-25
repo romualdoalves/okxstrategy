@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { getStrategies, createBot, rankAssets, getBots, getMarketClock } from '../api'
+import { getStrategies, createBot, rankAssets, getBots, getMarketClock, getSymbolTradability } from '../api'
 import { ArrowLeft, Sparkles, List, Loader2, AlertTriangle, CheckCircle2, Clock } from 'lucide-react'
 import { useLanguage } from '../i18n/LanguageContext'
 import AiUsageNotice from '../components/AiUsageNotice'
@@ -30,12 +30,13 @@ const LABEL_I18N_KEY = {
 }
 
 // ── Componente de card de ativo ranqueado ──────────────────────────────────────
-function AssetCard({ asset, selected, onSelect, disabled, closedMarket }) {
+function AssetCard({ asset, selected, onSelect, disabled, closedMarket, blockedReason }) {
   const { t } = useLanguage()
   const details = asset.details ?? {}
   const [baseSymbol, ...quoteParts] = asset.symbol.split('-')
   const suffix = quoteParts.join('-')
-  const isDisabled = disabled || closedMarket
+  const isBlocked = Boolean(blockedReason)
+  const isDisabled = disabled || closedMarket || isBlocked
   return (
     <button
       type="button"
@@ -62,6 +63,8 @@ function AssetCard({ asset, selected, onSelect, disabled, closedMarket }) {
         <div className="flex items-center gap-2">
           {closedMarket
             ? <span className="text-[10px] font-bold text-red-400/70 bg-red-500/10 px-1.5 py-0.5 rounded border border-red-500/20">FECHADO</span>
+            : isBlocked
+            ? <span className="text-[10px] font-bold text-yellow-300 bg-yellow-500/10 px-1.5 py-0.5 rounded border border-yellow-500/20">BLOQUEADO</span>
             : disabled
             ? <span className="text-[10px] font-bold text-muted bg-white/5 px-1.5 py-0.5 rounded border border-white/10">EM USO</span>
             : <span className={`text-xs font-semibold ${LABEL_COLORS[asset.label] ?? 'text-muted'}`}>
@@ -93,6 +96,11 @@ function AssetCard({ asset, selected, onSelect, disabled, closedMarket }) {
                 mom:   details.momentum_pct,
               })
           }
+        </p>
+      )}
+      {isBlocked && (
+        <p className="text-xs text-yellow-300/80 mt-1.5 line-clamp-2">
+          {blockedReason}
         </p>
       )}
     </button>
@@ -130,6 +138,19 @@ export default function NewBot() {
     stop_loss_usd:   -50,
     strategy_params: {},
   })
+  const { data: tradabilityData } = useQuery({
+    queryKey: ['symbol-tradability', form.demo],
+    queryFn: () => getSymbolTradability(SYMBOLS, form.demo),
+    staleTime: 60_000,
+  })
+
+  const tradabilityRows = tradabilityData?.symbols ?? []
+  const tradabilityMap = new Map(tradabilityRows.map(r => [r.symbol, r]))
+  const blockedReasonFor = sym => {
+    const row = tradabilityMap.get(sym)
+    return row && row.tradable === false ? (row.reason || 'Par indisponível para negociação nesta conta.') : ''
+  }
+  const isBlockedSymbol = sym => Boolean(blockedReasonFor(sym))
   const [customParams, setCustomParams] = useState({})
   const [error, setError]     = useState('')
   const [loading, setLoading] = useState(false)
@@ -191,7 +212,8 @@ export default function NewBot() {
       const data = await rankAssets(form.strategy_id, form.timeframe)
       setRanking(data)
       if (data.assets?.length > 0) {
-        setField('symbol', data.assets[0].symbol)
+        const candidate = data.assets.find(a => !usedSymbols.has(a.symbol) && !isBlockedSymbol(a.symbol))
+        if (candidate) setField('symbol', candidate.symbol)
       }
     } catch (err) {
       setError(t('nb.err_assets', { msg: err.message }))
@@ -372,6 +394,7 @@ export default function NewBot() {
                   {ranking.assets.map(asset => {
                     const assetIsCrypto = asset.symbol.includes('/') || asset.symbol.includes('-')
                     const assetClosed   = !assetIsCrypto && clock && !clock.is_open
+                    const blockedReason = blockedReasonFor(asset.symbol)
                     return (
                       <AssetCard
                         key={asset.symbol}
@@ -380,6 +403,7 @@ export default function NewBot() {
                         onSelect={sym => setField('symbol', sym)}
                         disabled={usedSymbols.has(asset.symbol)}
                         closedMarket={assetClosed}
+                        blockedReason={blockedReason}
                       />
                     )
                   })}
@@ -424,12 +448,17 @@ export default function NewBot() {
                       ['LINK-USDT','Chainlink'],['LTC-USDT','Litecoin'],
                       ['DOT-USDT','Polkadot'],['UNI-USDT','Uniswap'],
                     ].map(([sym, name]) => (
-                      <option key={sym} value={sym} disabled={usedSymbols.has(sym)}>
-                        {sym} ({name}){usedSymbols.has(sym) ? ' — em uso' : ''}
+                      <option key={sym} value={sym} disabled={usedSymbols.has(sym) || isBlockedSymbol(sym)}>
+                        {sym} ({name}){usedSymbols.has(sym) ? ' — em uso' : isBlockedSymbol(sym) ? ' — bloqueado' : ''}
                       </option>
                     ))}
                   </optgroup>
                 </select>
+                {blockedReasonFor(form.symbol) && (
+                  <p className="text-xs text-yellow-300/90">
+                    Par bloqueado pela corretora: {blockedReasonFor(form.symbol)}
+                  </p>
+                )}
                 <p className="text-[10px] text-muted/60">
                   Não encontrou? Digite diretamente no campo acima o instId spot OKX (ex: OP-USDT).
                 </p>

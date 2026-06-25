@@ -110,6 +110,10 @@ export const factoryDisable  = (id) => req(`/strategy-factory/strategies/${id}`,
 // Mercado
 export const rankAssets  = (strategyId, timeframe) =>
   req(`/market/rank-assets?strategy_id=${strategyId}&timeframe=${timeframe}`)
+export const getSymbolTradability = (symbols = [], demo = true) => {
+  const csv = symbols.join(',')
+  return req(`/market/symbol-tradability?symbols=${encodeURIComponent(csv)}&demo=${demo}`)
+}
 export const getCandles      = (symbol, tf, limit = 200) =>
   req(`/market/candles?symbol=${symbol}&timeframe=${tf}&limit=${limit}`)
 export const getTicker       = (symbol) => req(`/market/ticker?symbol=${symbol}`)
