@@ -125,7 +125,7 @@ class BotInstance:
         self._losses      = 0
         self._halted      = False
         self._hold_reason     : str = ""
-        self._last_indicators : dict = {}
+        self._last_indicators : dict = self._seed_initial_indicators()
         self._last_order_criteria: dict = self._empty_order_criteria()
         self._last_order_error: Optional[dict] = None
         self._entry_inflight  = False
@@ -145,6 +145,35 @@ class BotInstance:
         self._market_players: dict | None = None    # snapshot OKX Rubik long/short
         self._market_players_feed = OkxMarketPlayersFeed() if getattr(self.strategy, 'needs_market_players_context', False) else None
         self._last_persisted_sl: float = 0.0        # último sl_price salvo no banco (trailing)
+
+    def _seed_initial_indicators(self) -> dict:
+        """Inicializa critérios oficiais para o checklist antes da primeira vela."""
+        strategy_id = (self.config.strategy_id or "").strip().upper()
+        indicators = {
+            "_signal": Signal.HOLD.value,
+            "_hold_reason": "",
+            "_signal_executable": False,
+            "_criteria_met": 0,
+            "_criteria_total": 0,
+        }
+
+        canonical_names = CANONICAL_ENTRY_CRITERIA.get(strategy_id)
+        if canonical_names:
+            indicators["_criteria_names"] = list(canonical_names)
+            indicators["_criteria_total"] = len(canonical_names)
+            return indicators
+
+        try:
+            info = self.strategy.info()
+            criteria = getattr(info, "criteria", None) or []
+            if criteria:
+                names = [c.get("label", c.get("id", f"C{i+1}")) for i, c in enumerate(criteria)]
+                indicators["_criteria_names"] = names
+                indicators["_criteria_total"] = len(names)
+        except Exception:
+            pass
+
+        return indicators
 
     @staticmethod
     def _is_spot_symbol(symbol: str) -> bool:
