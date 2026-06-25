@@ -12,7 +12,7 @@ import {
   trackMarketDataSymbol,
 } from '../api'
 
-const DEFAULT_TIMEFRAMES = ['15m', '1h', '4h']
+const DEFAULT_TIMEFRAMES = ['1m', '5m', '15m', '1h', '1d']
 const FALLBACK_SYMBOLS = [
   'BTC-USDT', 'ETH-USDT', 'SOL-USDT', 'BNB-USDT', 'XRP-USDT',
   'DOGE-USDT', 'ADA-USDT', 'AVAX-USDT', 'DOT-USDT', 'LINK-USDT',
@@ -293,7 +293,7 @@ export default function MarketData() {
           <input
             value={timeframes}
             onChange={e => setTimeframes(e.target.value)}
-            placeholder="15m,1h,4h"
+            placeholder="1m,5m,15m,1h,1d"
             className="px-3 py-2 rounded-lg bg-white/5 border border-white/10 outline-none focus:border-accent/50"
           />
           <button

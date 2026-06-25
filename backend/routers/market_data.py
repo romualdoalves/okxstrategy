@@ -51,11 +51,22 @@ class TrackRequest(BaseModel):
 
 class BootstrapRequest(BaseModel):
     symbols: list[str] = []
-    timeframes: list[str] = ["15m", "1h", "4h"]
+    timeframes: list[str] = ["1m", "5m", "15m", "1h", "1d"]
 
 
 class BulkSyncRequest(BaseModel):
     timeframe: str | None = None
+
+
+def _normalize_timeframe(tf: str) -> str:
+    raw = (tf or "").strip()
+    if not raw:
+        return ""
+    aliases = {
+        "1d": "1D",
+        "1w": "1W",
+    }
+    return aliases.get(raw.lower(), raw)
 
 
 def _create_sync_job(db: Session, symbol: str, timeframe: str | None, trigger: str, batch_id: str | None = None):
@@ -230,7 +241,7 @@ async def add_tracked_symbol(
 
     tfs = []
     for tf in (req.timeframes or []):
-        tf_norm = (tf or "").strip()
+        tf_norm = _normalize_timeframe(tf)
         if tf_norm in _ALLOWED_TIMEFRAMES:
             tfs.append(tf_norm)
     if not tfs:
@@ -278,11 +289,11 @@ async def bootstrap_defaults(
 
     tfs = []
     for tf in (req.timeframes or []):
-        tf_norm = (tf or "").strip()
+        tf_norm = _normalize_timeframe(tf)
         if tf_norm in _ALLOWED_TIMEFRAMES:
             tfs.append(tf_norm)
     if not tfs:
-        tfs = ["15m", "1h", "4h"]
+        tfs = ["1m", "5m", "15m", "1h", "1D"]
 
     inserted = 0
     updated = 0
@@ -321,7 +332,7 @@ async def force_sync_all(
     db: Session = Depends(get_db),
     svc: MarketDataService = Depends(get_service),
 ):
-    tf = (req.timeframe or "").strip() if req.timeframe else None
+    tf = _normalize_timeframe(req.timeframe) if req.timeframe else None
     if tf and tf not in _ALLOWED_TIMEFRAMES:
         raise HTTPException(400, "Timeframe inválido para sync em lote.")
 
@@ -396,7 +407,7 @@ async def force_sync_timeframe(
 ):
     sym = _norm_symbol(symbol)
     _assert_okx_spot_symbol(sym)
-    tf = (timeframe or "").strip()
+    tf = _normalize_timeframe(timeframe)
     if tf not in _ALLOWED_TIMEFRAMES:
         raise HTTPException(400, "Timeframe inválido.")
     job = _create_sync_job(db, symbol=sym, timeframe=tf, trigger="manual")
