@@ -199,6 +199,7 @@ export default function BatchBacktest() {
   const [selectedRows, setSelectedRows] = useState({})
   const [bulkCreating, setBulkCreating] = useState(false)
   const [bulkMessage, setBulkMessage] = useState(null)
+  const [scanProgress, setScanProgress] = useState(null)
 
   const { data: strategies = [] } = useQuery({ queryKey: ['strategies'], queryFn: getStrategies })
   const { data: bots = [] }       = useQuery({ queryKey: ['bots'],       queryFn: getBots       })
@@ -214,8 +215,21 @@ export default function BatchBacktest() {
     return acc
   }, {})
 
+  function setCategoryProgress(catId, status, extra = {}) {
+    setScanProgress(prev => {
+      if (!prev) return prev
+      const items = prev.items.map(item =>
+        item.id === catId ? { ...item, status, ...extra } : item
+      )
+      const completed = items.filter(item => item.status === 'done' || item.status === 'failed').length
+      const current = items.find(item => item.status === 'running')?.id || null
+      return { ...prev, items, completed, current }
+    })
+  }
+
   const run = async () => {
     setLoading(true)
+    setScanProgress(null)
     setResults(null)
     setSelectedRows({})
     setBulkMessage(null)
@@ -227,10 +241,17 @@ export default function BatchBacktest() {
       if (!categoriesToScan.length) {
         throw new Error('Nenhuma estratégia elegível para escanear.')
       }
+      setScanProgress({
+        total: categoriesToScan.length,
+        completed: 0,
+        current: null,
+        items: categoriesToScan.map(cat => ({ id: cat, status: 'pending', resultCount: 0, error: '' })),
+      })
       const merged = []
       const failedCategories = []
 
       for (const cat of categoriesToScan) {
+        setCategoryProgress(cat, 'running', { error: '' })
         const res = await fetch(`/api/backtest/category`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -238,6 +259,7 @@ export default function BatchBacktest() {
         })
         if (!res.ok) {
           const message = await readErrorMessage(res)
+          setCategoryProgress(cat, 'failed', { error: message })
           if (category === 'ALL') {
             failedCategories.push(`${cat}: ${message}`)
             continue
@@ -245,6 +267,7 @@ export default function BatchBacktest() {
           throw new Error(message)
         }
         const data = await res.json()
+        setCategoryProgress(cat, 'done', { resultCount: (data.results || []).length })
         merged.push(...(data.results || []).map(r => ({ ...r, category: cat, symbol })))
       }
       if (!merged.length && failedCategories.length) {
@@ -265,6 +288,17 @@ export default function BatchBacktest() {
         }),
       })
     } catch (e) {
+      setScanProgress(prev => {
+        if (!prev) return prev
+        const items = prev.items.map(item => {
+          if (item.status === 'pending' || item.status === 'running') {
+            return { ...item, status: 'failed', error: item.error || e.message }
+          }
+          return item
+        })
+        const completed = items.filter(item => item.status === 'done' || item.status === 'failed').length
+        return { ...prev, items, completed, current: null }
+      })
       setError(e.message)
     } finally {
       setLoading(false)
@@ -495,10 +529,57 @@ export default function BatchBacktest() {
       )}
 
       {loading && (
-        <div className="flex flex-col items-center justify-center py-16 gap-3 text-muted">
-          <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm">Executando backtest para {category === 'ALL' ? 'todas as categorias' : `todas as estratégias ${category}`}…</p>
-          <p className="text-xs">Isso pode levar alguns segundos</p>
+        <div className="card p-5 mb-6 space-y-4">
+          <div className="flex items-center gap-2 text-muted">
+            <div className="w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+            <p className="text-sm">Executando backtest para {category === 'ALL' ? 'todas as categorias' : `todas as estratégias ${category}`}…</p>
+          </div>
+          <p className="text-xs text-muted">Isso pode levar alguns segundos</p>
+
+          {scanProgress && (
+            <>
+              <div>
+                <div className="flex items-center justify-between text-xs text-muted mb-1.5">
+                  <span>Progresso geral</span>
+                  <span>{scanProgress.completed}/{scanProgress.total}</span>
+                </div>
+                <div className="h-2 rounded-full bg-white/10 overflow-hidden">
+                  <div
+                    className="h-2 bg-accent transition-all"
+                    style={{ width: `${Math.round((scanProgress.completed / Math.max(1, scanProgress.total)) * 100)}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                {scanProgress.items.map(item => {
+                  const meta = CATEGORIES.find(c => c.id === item.id)
+                  const isRunning = item.status === 'running'
+                  const isDone = item.status === 'done'
+                  const isFailed = item.status === 'failed'
+                  return (
+                    <div key={item.id} className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <div className="text-xs font-bold text-white">{item.id} {meta ? `- ${meta.label}` : ''}</div>
+                        <div className={`text-[10px] font-bold ${isDone ? 'text-green-400' : isFailed ? 'text-red-400' : isRunning ? 'text-accent' : 'text-muted'}`}>
+                          {isDone ? `Concluida (${item.resultCount})` : isFailed ? 'Falhou' : isRunning ? 'Executando' : 'Pendente'}
+                        </div>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+                        <div
+                          className={`h-1.5 transition-all ${isDone ? 'bg-green-400' : isFailed ? 'bg-red-400' : isRunning ? 'bg-accent animate-pulse' : 'bg-transparent'}`}
+                          style={{ width: isDone || isFailed ? '100%' : isRunning ? '55%' : '0%' }}
+                        />
+                      </div>
+                      {isFailed && item.error && (
+                        <div className="text-[10px] text-red-300/90 mt-1 truncate" title={item.error}>{item.error}</div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </>
+          )}
         </div>
       )}
 
