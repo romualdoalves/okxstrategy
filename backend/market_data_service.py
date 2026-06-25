@@ -3,6 +3,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional
 
+import aiohttp
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -79,8 +80,8 @@ class MarketDataService:
             return
 
         bar = map_timeframe_for_history(tf)
-        async with __import__("aiohttp").ClientSession() as session:
-            ex = build_exchange(session)
+        async with aiohttp.ClientSession() as http_session:
+            ex = build_exchange(http_session)
             candles = await ex.fetch_candles(symbol, bar, limit=1500)
 
         if not candles:
