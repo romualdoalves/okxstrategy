@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Database, RefreshCw, PlusCircle, Trash2, DownloadCloud } from 'lucide-react'
 import {
+  getAvailableMarketDataSymbols,
   bootstrapMarketData,
   forceSyncAllMarketData,
   forceSyncMarketData,
@@ -27,6 +28,8 @@ export default function MarketData() {
   const [bulkTimeframe, setBulkTimeframe] = useState('')
   const [busyId, setBusyId] = useState('')
   const [activeBatchId, setActiveBatchId] = useState('')
+  const [addFeedback, setAddFeedback] = useState('')
+  const [addFeedbackKind, setAddFeedbackKind] = useState('muted')
 
   const { data = [], isLoading, error } = useQuery({
     queryKey: ['market-data-tracked'],
@@ -39,6 +42,18 @@ export default function MarketData() {
     queryFn: () => getMarketDataSyncJobs(120),
     refetchInterval: 5000,
   })
+
+  const { data: availableSymbols = [] } = useQuery({
+    queryKey: ['market-data-available-symbols'],
+    queryFn: getAvailableMarketDataSymbols,
+    staleTime: 60_000,
+  })
+
+  useEffect(() => {
+    if (!symbol && availableSymbols.length > 0) {
+      setSymbol(availableSymbols[0])
+    }
+  }, [availableSymbols, symbol])
 
   const summary = useMemo(() => {
     const bySymbol = {}
@@ -96,9 +111,14 @@ export default function MarketData() {
 
   const addMut = useMutation({
     mutationFn: ({ sym, tfs }) => trackMarketDataSymbol(sym, tfs),
-    onSuccess: () => {
-      setSymbol('')
+    onSuccess: (resp) => {
+      setAddFeedbackKind('success')
+      setAddFeedback(`Rastreamento adicionado para ${resp?.symbol || 'ativo'} (job ${resp?.job_id || '-'})`)
       invalidate()
+    },
+    onError: (err) => {
+      setAddFeedbackKind('error')
+      setAddFeedback(err?.message || 'Falha ao adicionar rastreamento.')
     },
   })
 
@@ -130,9 +150,19 @@ export default function MarketData() {
   }
 
   function onAdd() {
-    const sym = symbol.trim().toUpperCase().replace('/', '-')
+    const sym = (symbol || '').trim().toUpperCase().replace('/', '-')
     const tfs = parseTimeframes(timeframes)
-    if (!sym || !tfs.length) return
+    if (!sym) {
+      setAddFeedbackKind('error')
+      setAddFeedback('Selecione um ativo.')
+      return
+    }
+    if (!tfs.length) {
+      setAddFeedbackKind('error')
+      setAddFeedback('Informe ao menos um timeframe válido.')
+      return
+    }
+    setAddFeedback('')
     addMut.mutate({ sym, tfs })
   }
 
@@ -229,12 +259,17 @@ export default function MarketData() {
       <div className="rounded-xl bg-panel border border-border p-4 space-y-3">
         <h2 className="text-sm font-bold uppercase tracking-wider text-muted">Adicionar rastreamento</h2>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-2">
-          <input
+          <select
             value={symbol}
             onChange={e => setSymbol(e.target.value)}
-            placeholder="BTC-USDT"
+            disabled={!availableSymbols.length}
             className="px-3 py-2 rounded-lg bg-white/5 border border-white/10 outline-none focus:border-accent/50"
-          />
+          >
+            {!availableSymbols.length && <option value="">Carregando ativos...</option>}
+            {availableSymbols.map(sym => (
+              <option key={sym} value={sym}>{sym}</option>
+            ))}
+          </select>
           <input
             value={timeframes}
             onChange={e => setTimeframes(e.target.value)}
@@ -243,13 +278,18 @@ export default function MarketData() {
           />
           <button
             onClick={onAdd}
-            disabled={addMut.isPending}
+            disabled={addMut.isPending || !availableSymbols.length}
             className="px-3 py-2 rounded-lg bg-green-500/15 text-green-300 border border-green-500/30 hover:bg-green-500/25 disabled:opacity-60 inline-flex items-center justify-center gap-2"
           >
             <PlusCircle size={14} />
             Adicionar
           </button>
         </div>
+        {!!addFeedback && (
+          <div className={`text-xs ${addFeedbackKind === 'error' ? 'text-red-400' : addFeedbackKind === 'success' ? 'text-green-300' : 'text-muted'}`}>
+            {addFeedback}
+          </div>
+        )}
       </div>
 
       <div className="rounded-xl bg-panel border border-border overflow-hidden">

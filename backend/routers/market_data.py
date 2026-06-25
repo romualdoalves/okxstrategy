@@ -179,6 +179,24 @@ def get_tracked_symbols(db: Session = Depends(get_db)):
     return out
 
 
+@router.get("/available-symbols")
+def get_available_symbols():
+    raw = get_ranked_assets_universe() or []
+    out = []
+    seen = set()
+    for symbol in raw:
+        sym = _norm_symbol(symbol)
+        if not sym or sym in seen:
+            continue
+        try:
+            _assert_okx_spot_symbol(sym)
+        except HTTPException:
+            continue
+        out.append(sym)
+        seen.add(sym)
+    return out
+
+
 @router.get("/sync-jobs")
 def get_sync_jobs(limit: int = 60, batch_id: str | None = None, db: Session = Depends(get_db)):
     lim = max(1, min(int(limit or 60), 500))

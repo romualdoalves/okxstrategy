@@ -120,6 +120,7 @@ export const getTicker       = (symbol) => req(`/market/ticker?symbol=${symbol}`
 
 // Market Data cache (OKX)
 export const getTrackedMarketData = () => req('/market-data/tracked')
+export const getAvailableMarketDataSymbols = () => req('/market-data/available-symbols')
 export const bootstrapMarketData = (symbols = [], timeframes = ['15m', '1h', '4h']) =>
   req('/market-data/bootstrap-defaults', {
     method: 'POST',
