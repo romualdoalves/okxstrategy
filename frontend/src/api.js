@@ -134,6 +134,11 @@ export const forceSyncMarketData = (symbol, timeframe = null) =>
   req(`/market-data/force-sync/${encodeURIComponent(symbol)}${timeframe ? `/${encodeURIComponent(timeframe)}` : ''}`, {
     method: 'POST',
   })
+export const forceSyncAllMarketData = (timeframe = null) =>
+  req('/market-data/force-sync-all', {
+    method: 'POST',
+    body: JSON.stringify({ timeframe }),
+  })
 export const removeTrackedMarketData = (symbol, timeframe = null) =>
   req(`/market-data/track/${encodeURIComponent(symbol)}${timeframe ? `/${encodeURIComponent(timeframe)}` : ''}`, {
     method: 'DELETE',

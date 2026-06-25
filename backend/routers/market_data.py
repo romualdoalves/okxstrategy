@@ -46,6 +46,10 @@ class BootstrapRequest(BaseModel):
     timeframes: list[str] = ["15m", "1h", "4h"]
 
 
+class BulkSyncRequest(BaseModel):
+    timeframe: str | None = None
+
+
 @router.get("/tracked")
 def get_tracked_symbols(db: Session = Depends(get_db)):
     tracked = db.query(TrackedSymbolModel).all()
@@ -155,6 +159,35 @@ async def bootstrap_defaults(
         "symbols": symbols,
         "timeframes": sorted(set(tfs)),
         "sync": "started",
+    }
+
+
+@router.post("/force-sync-all")
+async def force_sync_all(
+    req: BulkSyncRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    svc: MarketDataService = Depends(get_service),
+):
+    tf = (req.timeframe or "").strip() if req.timeframe else None
+    if tf and tf not in _ALLOWED_TIMEFRAMES:
+        raise HTTPException(400, "Timeframe inválido para sync em lote.")
+
+    tracked = db.query(TrackedSymbolModel).filter(TrackedSymbolModel.is_active == True).all()
+    symbols = []
+    for row in tracked:
+        try:
+            _assert_okx_spot_symbol(row.symbol)
+        except HTTPException:
+            continue
+        symbols.append(row.symbol)
+        background_tasks.add_task(svc.force_sync, row.symbol, tf)
+
+    return {
+        "status": "sync_started",
+        "symbols_queued": len(symbols),
+        "timeframe": tf,
+        "symbols": symbols,
     }
 
 

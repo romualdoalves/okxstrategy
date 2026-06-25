@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Database, RefreshCw, PlusCircle, Trash2, DownloadCloud } from 'lucide-react'
 import {
   bootstrapMarketData,
+  forceSyncAllMarketData,
   forceSyncMarketData,
   getTrackedMarketData,
   removeTrackedMarketData,
@@ -22,12 +23,13 @@ export default function MarketData() {
   const qc = useQueryClient()
   const [symbol, setSymbol] = useState('')
   const [timeframes, setTimeframes] = useState(DEFAULT_TIMEFRAMES.join(','))
+  const [bulkTimeframe, setBulkTimeframe] = useState('')
   const [busyId, setBusyId] = useState('')
 
   const { data = [], isLoading, error } = useQuery({
     queryKey: ['market-data-tracked'],
     queryFn: getTrackedMarketData,
-    refetchInterval: 30_000,
+    refetchInterval: 10_000,
   })
 
   const summary = useMemo(() => {
@@ -42,6 +44,18 @@ export default function MarketData() {
       timeframes: data.length,
       candles: data.reduce((acc, r) => acc + Number(r.candle_count || 0), 0),
     }
+  }, [data])
+
+  const readiness = useMemo(() => {
+    const total = data.length
+    if (!total) return { ready: 0, total: 0, percent: 0 }
+    const now = Date.now()
+    const ready = data.filter(row => {
+      const hasCandles = Number(row.candle_count || 0) > 0
+      const recentSync = row.last_sync ? (now - new Date(row.last_sync).getTime()) < 45 * 60 * 1000 : false
+      return hasCandles && recentSync
+    }).length
+    return { ready, total, percent: Math.round((ready / total) * 100) }
   }, [data])
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ['market-data-tracked'] })
@@ -63,6 +77,11 @@ export default function MarketData() {
     mutationFn: ({ sym, tf }) => forceSyncMarketData(sym, tf || null),
     onSuccess: invalidate,
     onSettled: () => setBusyId(''),
+  })
+
+  const bulkSyncMut = useMutation({
+    mutationFn: () => forceSyncAllMarketData(bulkTimeframe || null),
+    onSuccess: invalidate,
   })
 
   const delMut = useMutation({
@@ -95,15 +114,47 @@ export default function MarketData() {
           </h1>
           <p className="text-sm text-muted mt-1">Gerencie o cache local de candles para acelerar scanner e backtests.</p>
         </div>
-        <button
-          onClick={() => bootstrapMut.mutate()}
-          disabled={bootstrapMut.isPending}
-          className="px-3 py-2 rounded-lg bg-accent/15 text-accent border border-accent/30 hover:bg-accent/25 disabled:opacity-60 inline-flex items-center gap-2"
-        >
-          <DownloadCloud size={14} />
-          Bootstrap padrão
-        </button>
+        <div className="flex items-center gap-2">
+          <input
+            value={bulkTimeframe}
+            onChange={e => setBulkTimeframe(e.target.value)}
+            placeholder="TF opcional (ex: 1h)"
+            className="px-3 py-2 rounded-lg bg-white/5 border border-white/10 outline-none focus:border-accent/50 text-sm"
+          />
+          <button
+            onClick={() => bulkSyncMut.mutate()}
+            disabled={bulkSyncMut.isPending}
+            className="px-3 py-2 rounded-lg bg-blue-500/15 text-blue-300 border border-blue-500/30 hover:bg-blue-500/25 disabled:opacity-60 inline-flex items-center gap-2"
+          >
+            <RefreshCw size={14} />
+            Sync em lote
+          </button>
+          <button
+            onClick={() => bootstrapMut.mutate()}
+            disabled={bootstrapMut.isPending}
+            className="px-3 py-2 rounded-lg bg-accent/15 text-accent border border-accent/30 hover:bg-accent/25 disabled:opacity-60 inline-flex items-center gap-2"
+          >
+            <DownloadCloud size={14} />
+            Bootstrap padrão
+          </button>
+        </div>
       </header>
+
+      <div className="rounded-xl bg-panel border border-border p-4 space-y-2">
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-muted">Prontidão do cache</span>
+          <span className="font-mono">{readiness.ready}/{readiness.total} ({readiness.percent}%)</span>
+        </div>
+        <div className="h-2 rounded-full bg-white/10 overflow-hidden">
+          <div
+            className="h-full bg-green-400/80 transition-all duration-500"
+            style={{ width: `${readiness.percent}%` }}
+          />
+        </div>
+        <div className="text-xs text-muted">
+          Considera pronto quando tem candles e sync recente (ult. 45 min).
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div className="rounded-xl bg-panel border border-border p-4">
