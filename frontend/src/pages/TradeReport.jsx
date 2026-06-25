@@ -4,12 +4,10 @@ import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, TrendingUp, TrendingDown, Clock, Target, ShieldAlert, Bot, ChevronDown } from 'lucide-react'
 import Chart from '../components/Chart'
 
-const API = import.meta.env.VITE_API_URL ?? ''
-
 async function fetchReport(botId, tradeId) {
   const url = tradeId
-    ? `${API}/api/bots/${botId}/trade-report?trade_id=${tradeId}`
-    : `${API}/api/bots/${botId}/trade-report`
+    ? `/api/bots/${botId}/trade-report?trade_id=${tradeId}`
+    : `/api/bots/${botId}/trade-report`
   const r = await fetch(url)
   if (!r.ok) throw new Error(await r.text())
   return r.json()

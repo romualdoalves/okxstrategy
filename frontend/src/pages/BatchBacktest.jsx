@@ -5,8 +5,6 @@ import { ScanSearch, Play, HelpCircle, ChevronDown, ChevronUp, PlusCircle, Check
 import BacktestLikert from '../components/BacktestLikert'
 import { getStrategies, getBots, createBot } from '../api'
 
-const API = import.meta.env.VITE_API_URL || ''
-
 const CATEGORIES = [
   { id: 'TF', label: 'Trend Following',  description: 'Estratégias que seguem a tendência (EMA, MACD, SuperTrend…)' },
   { id: 'MR', label: 'Mean Reversion',   description: 'Reversão à média (Bollinger, RSI extremos…)' },
@@ -233,7 +231,7 @@ export default function BatchBacktest() {
       const failedCategories = []
 
       for (const cat of categoriesToScan) {
-        const res = await fetch(`${API}/api/backtest/category`, {
+        const res = await fetch(`/api/backtest/category`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ category: cat, symbol, exclude_strategies: usedStrategies, strict: true }),

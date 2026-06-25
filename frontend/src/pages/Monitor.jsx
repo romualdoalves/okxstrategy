@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Activity, TrendingUp, TrendingDown, Minus, AlertTriangle, Clock, Zap } from 'lucide-react'
 
-const API = import.meta.env.VITE_API_URL || ''
-
 export default function Monitor() {
   const [bots, setBots] = useState([])
   const [loading, setLoading] = useState(true)
@@ -13,7 +11,7 @@ export default function Monitor() {
 
   const fetchData = async () => {
     try {
-      const res = await fetch(`${API}/api/monitor`)
+      const res = await fetch('/api/monitor')
       if (!res.ok) throw new Error('Falha ao carregar')
       const data = await res.json()
       setBots(data.bots || [])
@@ -37,7 +35,7 @@ export default function Monitor() {
     setLiquidating(bot.bot_id)
     setLiquidateMsg(null)
     try {
-      const res = await fetch(`${API}/api/bots/${bot.bot_id}/liquidate`, { method: 'POST' })
+      const res = await fetch(`/api/bots/${bot.bot_id}/liquidate`, { method: 'POST' })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
         throw new Error(err.detail || `HTTP ${res.status}`)
