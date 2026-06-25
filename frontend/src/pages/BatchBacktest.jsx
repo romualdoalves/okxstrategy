@@ -69,6 +69,43 @@ async function readErrorMessage(res) {
   }
 }
 
+async function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+async function requestCategoryScan(payload, maxAttempts = 3) {
+  let lastError = null
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const res = await fetch('/api/backtest/category', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) {
+        const message = await readErrorMessage(res)
+        return { ok: false, status: res.status, message, attempts: attempt }
+      }
+      const data = await res.json()
+      return { ok: true, data, attempts: attempt }
+    } catch (err) {
+      lastError = err
+      const isLast = attempt === maxAttempts
+      if (!isLast) {
+        // Backoff curto para falhas transitórias de rede/proxy.
+        await sleep(500 * attempt)
+        continue
+      }
+    }
+  }
+  return {
+    ok: false,
+    status: 0,
+    message: `Falha de rede após ${maxAttempts} tentativas: ${lastError?.message || 'erro desconhecido'}`,
+    attempts: maxAttempts,
+  }
+}
+
 function ResultCard({ r, symbol, selected, disabled, disabledReason, onToggle }) {
   const [open, setOpen] = useState(false)
   const nav = useNavigate()
@@ -252,13 +289,12 @@ export default function BatchBacktest() {
 
       for (const cat of categoriesToScan) {
         setCategoryProgress(cat, 'running', { error: '' })
-        const res = await fetch(`/api/backtest/category`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ category: cat, symbol, exclude_strategies: usedStrategies, strict: true }),
-        })
-        if (!res.ok) {
-          const message = await readErrorMessage(res)
+        const scan = await requestCategoryScan(
+          { category: cat, symbol, exclude_strategies: usedStrategies, strict: true },
+          3,
+        )
+        if (!scan.ok) {
+          const message = scan.message
           setCategoryProgress(cat, 'failed', { error: message })
           if (category === 'ALL') {
             failedCategories.push(`${cat}: ${message}`)
@@ -266,7 +302,7 @@ export default function BatchBacktest() {
           }
           throw new Error(message)
         }
-        const data = await res.json()
+        const data = scan.data
         setCategoryProgress(cat, 'done', { resultCount: (data.results || []).length })
         merged.push(...(data.results || []).map(r => ({ ...r, category: cat, symbol })))
       }
