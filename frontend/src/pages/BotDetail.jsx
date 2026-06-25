@@ -371,7 +371,7 @@ export default function BotDetail() {
               {isRunning && rt.started_at && (
                 <span className="flex items-center gap-1 text-xs text-muted/70">
                   <Clock size={11} />
-                  {new Date(rt.started_at).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}
+                  {new Date(rt.started_at).toLocaleDateString(locale, { day: '2-digit', month: '2-digit', year: '2-digit' })} {new Date(rt.started_at).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}
                   {elapsed && <span className="text-accent font-mono">{elapsed}</span>}
                 </span>
               )}
