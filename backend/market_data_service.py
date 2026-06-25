@@ -143,11 +143,7 @@ class MarketDataService:
                 return
             tfs = [timeframe] if (timeframe and timeframe in (tracked.timeframes or [])) else list(tracked.timeframes or [])
             for tf in tfs:
-                db.query(HistoricCandleModel).filter(
-                    HistoricCandleModel.symbol == sym,
-                    HistoricCandleModel.timeframe == tf,
-                ).delete()
-                db.commit()
+                # Mantem histórico: apenas upsert incremental sem truncar candles antigos.
                 await self._sync_symbol_timeframe(db, sym, tf)
             tracked.last_sync = datetime.now(timezone.utc).replace(tzinfo=None)
             db.commit()

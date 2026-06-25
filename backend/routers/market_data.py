@@ -339,12 +339,8 @@ def remove_tracked_symbol_timeframe(symbol: str, timeframe: str, db: Session = D
         db.delete(tracked)
     else:
         tracked.timeframes = tfs
-    db.query(HistoricCandleModel).filter(
-        HistoricCandleModel.symbol == sym,
-        HistoricCandleModel.timeframe == tf,
-    ).delete()
     db.commit()
-    return {"status": "deleted", "symbol": sym, "timeframe": tf}
+    return {"status": "deleted", "symbol": sym, "timeframe": tf, "history_preserved": True}
 
 
 @router.delete("/track/{symbol:path}")
@@ -357,9 +353,8 @@ def remove_tracked_symbol(symbol: str, db: Session = Depends(get_db)):
         raise HTTPException(404, "Símbolo não rastreado")
 
     db.delete(tracked)
-    db.query(HistoricCandleModel).filter(HistoricCandleModel.symbol == sym).delete()
     db.commit()
-    return {"status": "deleted", "symbol": sym}
+    return {"status": "deleted", "symbol": sym, "history_preserved": True}
 
 
 @router.post("/force-sync/{symbol:path}/{timeframe}")
