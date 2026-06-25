@@ -139,6 +139,12 @@ export const forceSyncAllMarketData = (timeframe = null) =>
     method: 'POST',
     body: JSON.stringify({ timeframe }),
   })
+export const getMarketDataSyncJobs = (limit = 60, batchId = null) => {
+  const qs = new URLSearchParams()
+  qs.set('limit', String(limit))
+  if (batchId) qs.set('batch_id', batchId)
+  return req(`/market-data/sync-jobs?${qs.toString()}`)
+}
 export const removeTrackedMarketData = (symbol, timeframe = null) =>
   req(`/market-data/track/${encodeURIComponent(symbol)}${timeframe ? `/${encodeURIComponent(timeframe)}` : ''}`, {
     method: 'DELETE',

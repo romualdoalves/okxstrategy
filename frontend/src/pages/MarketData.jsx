@@ -5,6 +5,7 @@ import {
   bootstrapMarketData,
   forceSyncAllMarketData,
   forceSyncMarketData,
+  getMarketDataSyncJobs,
   getTrackedMarketData,
   removeTrackedMarketData,
   trackMarketDataSymbol,
@@ -25,11 +26,18 @@ export default function MarketData() {
   const [timeframes, setTimeframes] = useState(DEFAULT_TIMEFRAMES.join(','))
   const [bulkTimeframe, setBulkTimeframe] = useState('')
   const [busyId, setBusyId] = useState('')
+  const [activeBatchId, setActiveBatchId] = useState('')
 
   const { data = [], isLoading, error } = useQuery({
     queryKey: ['market-data-tracked'],
     queryFn: getTrackedMarketData,
     refetchInterval: 10_000,
+  })
+
+  const { data: syncJobs = [] } = useQuery({
+    queryKey: ['market-data-sync-jobs'],
+    queryFn: () => getMarketDataSyncJobs(120),
+    refetchInterval: 5000,
   })
 
   const summary = useMemo(() => {
@@ -58,11 +66,32 @@ export default function MarketData() {
     return { ready, total, percent: Math.round((ready / total) * 100) }
   }, [data])
 
+  const activeBatchJobs = useMemo(() => {
+    if (!activeBatchId) return []
+    return syncJobs.filter(j => j.batch_id === activeBatchId)
+  }, [syncJobs, activeBatchId])
+
+  const activeBatchProgress = useMemo(() => {
+    if (!activeBatchJobs.length) {
+      return { total: 0, done: 0, running: 0, failed: 0, percent: 0, finished: false }
+    }
+    const total = activeBatchJobs.length
+    const done = activeBatchJobs.filter(j => j.status === 'success').length
+    const running = activeBatchJobs.filter(j => j.status === 'running' || j.status === 'queued').length
+    const failed = activeBatchJobs.filter(j => j.status === 'failed').length
+    const finished = done + failed >= total
+    const percent = Math.round(((done + failed) / total) * 100)
+    return { total, done, running, failed, percent, finished }
+  }, [activeBatchJobs])
+
   const invalidate = () => qc.invalidateQueries({ queryKey: ['market-data-tracked'] })
 
   const bootstrapMut = useMutation({
     mutationFn: () => bootstrapMarketData([], DEFAULT_TIMEFRAMES),
-    onSuccess: invalidate,
+    onSuccess: (resp) => {
+      if (resp?.batch_id) setActiveBatchId(resp.batch_id)
+      invalidate()
+    },
   })
 
   const addMut = useMutation({
@@ -81,7 +110,10 @@ export default function MarketData() {
 
   const bulkSyncMut = useMutation({
     mutationFn: () => forceSyncAllMarketData(bulkTimeframe || null),
-    onSuccess: invalidate,
+    onSuccess: (resp) => {
+      if (resp?.batch_id) setActiveBatchId(resp.batch_id)
+      invalidate()
+    },
   })
 
   const delMut = useMutation({
@@ -155,6 +187,29 @@ export default function MarketData() {
           Considera pronto quando tem candles e sync recente (ult. 45 min).
         </div>
       </div>
+
+      {activeBatchId && (
+        <div className="rounded-xl bg-panel border border-border p-4 space-y-2">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted">Lote ativo</span>
+            <span className="font-mono">
+              {activeBatchProgress.done}/{activeBatchProgress.total} concluídos
+              {activeBatchProgress.failed > 0 ? ` • ${activeBatchProgress.failed} falhas` : ''}
+            </span>
+          </div>
+          <div className="h-2 rounded-full bg-white/10 overflow-hidden">
+            <div
+              className="h-full bg-blue-400/80 transition-all duration-300"
+              style={{ width: `${activeBatchProgress.percent}%` }}
+            />
+          </div>
+          <div className="text-xs text-muted">
+            {activeBatchProgress.finished
+              ? 'Lote finalizado.'
+              : `${activeBatchProgress.running} jobs ainda em execução/fila.`}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div className="rounded-xl bg-panel border border-border p-4">
@@ -254,6 +309,53 @@ export default function MarketData() {
                     </tr>
                   )
                 })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-xl bg-panel border border-border overflow-hidden">
+        <div className="px-4 py-3 border-b border-border text-sm font-semibold">Histórico de sync</div>
+        {syncJobs.length === 0 && <div className="p-4 text-sm text-muted">Sem jobs recentes.</div>}
+        {syncJobs.length > 0 && (
+          <div className="overflow-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-white/5 text-muted">
+                <tr>
+                  <th className="text-left px-4 py-2">Status</th>
+                  <th className="text-left px-4 py-2">Símbolo</th>
+                  <th className="text-left px-4 py-2">TF</th>
+                  <th className="text-right px-4 py-2">Candles</th>
+                  <th className="text-left px-4 py-2">Trigger</th>
+                  <th className="text-left px-4 py-2">Início</th>
+                  <th className="text-left px-4 py-2">Fim</th>
+                </tr>
+              </thead>
+              <tbody>
+                {syncJobs.slice(0, 40).map(job => (
+                  <tr key={job.id} className="border-t border-border">
+                    <td className="px-4 py-2">
+                      <span className={`px-2 py-0.5 rounded text-xs font-bold border ${
+                        job.status === 'success'
+                          ? 'text-green-300 bg-green-500/10 border-green-500/30'
+                          : job.status === 'failed'
+                          ? 'text-red-300 bg-red-500/10 border-red-500/30'
+                          : job.status === 'running'
+                          ? 'text-blue-300 bg-blue-500/10 border-blue-500/30'
+                          : 'text-yellow-300 bg-yellow-500/10 border-yellow-500/30'
+                      }`}>
+                        {job.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2 font-mono">{job.symbol}</td>
+                    <td className="px-4 py-2">{job.timeframe || '-'}</td>
+                    <td className="px-4 py-2 text-right">{job.candles_synced ?? '-'}</td>
+                    <td className="px-4 py-2">{job.trigger}</td>
+                    <td className="px-4 py-2 text-muted">{fmtDate(job.started_at || job.created_at)}</td>
+                    <td className="px-4 py-2 text-muted">{fmtDate(job.finished_at)}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>

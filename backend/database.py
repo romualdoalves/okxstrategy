@@ -224,6 +224,23 @@ class HistoricCandleModel(Base):
     volume    = Column(Float,   nullable=False)
 
 
+class MarketDataSyncJobModel(Base):
+    """Histórico de jobs de sincronização de Market Data."""
+    __tablename__ = "market_data_sync_jobs"
+
+    id             = Column(Integer, primary_key=True, autoincrement=True)
+    batch_id       = Column(String,  nullable=True, index=True)
+    symbol         = Column(String,  nullable=False, index=True)
+    timeframe      = Column(String,  nullable=True, index=True)
+    trigger        = Column(String,  nullable=False, default="manual")
+    status         = Column(String,  nullable=False, default="queued", index=True)  # queued|running|success|failed
+    candles_synced = Column(Integer, nullable=True)
+    error          = Column(Text,    nullable=True)
+    created_at     = Column(DateTime, default=datetime.datetime.utcnow, index=True)
+    started_at     = Column(DateTime, nullable=True)
+    finished_at    = Column(DateTime, nullable=True)
+
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def get_db() -> Session:
@@ -318,6 +335,24 @@ def _run_migrations():
         """,
         "CREATE UNIQUE INDEX IF NOT EXISTS uq_historic_candles ON historic_candles(symbol, timeframe, epoch)",
         "CREATE INDEX IF NOT EXISTS idx_historic_candles_symbol_tf_epoch ON historic_candles(symbol, timeframe, epoch)",
+        """
+        CREATE TABLE IF NOT EXISTS market_data_sync_jobs (
+            id SERIAL PRIMARY KEY,
+            batch_id VARCHAR NULL,
+            symbol VARCHAR NOT NULL,
+            timeframe VARCHAR NULL,
+            trigger VARCHAR NOT NULL DEFAULT 'manual',
+            status VARCHAR NOT NULL DEFAULT 'queued',
+            candles_synced INTEGER NULL,
+            error TEXT NULL,
+            created_at TIMESTAMP DEFAULT NOW(),
+            started_at TIMESTAMP NULL,
+            finished_at TIMESTAMP NULL
+        )
+        """,
+        "CREATE INDEX IF NOT EXISTS idx_market_data_sync_jobs_created_at ON market_data_sync_jobs(created_at)",
+        "CREATE INDEX IF NOT EXISTS idx_market_data_sync_jobs_batch_id ON market_data_sync_jobs(batch_id)",
+        "CREATE INDEX IF NOT EXISTS idx_market_data_sync_jobs_status ON market_data_sync_jobs(status)",
     ]
     try:
         with engine.connect() as conn:

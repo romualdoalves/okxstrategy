@@ -1,9 +1,12 @@
+from datetime import datetime
+from uuid import uuid4
+
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from ..database import HistoricCandleModel, SessionLocal, TrackedSymbolModel
+from ..database import HistoricCandleModel, MarketDataSyncJobModel, SessionLocal, TrackedSymbolModel
 from ..exchanges.factory import get_ranked_assets_universe
 from ..market_data_service import MarketDataService
 
@@ -50,6 +53,103 @@ class BulkSyncRequest(BaseModel):
     timeframe: str | None = None
 
 
+def _create_sync_job(db: Session, symbol: str, timeframe: str | None, trigger: str, batch_id: str | None = None):
+    job = MarketDataSyncJobModel(
+        batch_id=batch_id,
+        symbol=symbol,
+        timeframe=timeframe,
+        trigger=trigger,
+        status="queued",
+        created_at=datetime.utcnow(),
+    )
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+    return job
+
+
+def _job_payload(job: MarketDataSyncJobModel):
+    return {
+        "id": job.id,
+        "batch_id": job.batch_id,
+        "symbol": job.symbol,
+        "timeframe": job.timeframe,
+        "trigger": job.trigger,
+        "status": job.status,
+        "candles_synced": job.candles_synced,
+        "error": job.error,
+        "created_at": job.created_at.isoformat() if job.created_at else None,
+        "started_at": job.started_at.isoformat() if job.started_at else None,
+        "finished_at": job.finished_at.isoformat() if job.finished_at else None,
+    }
+
+
+async def _run_sync_symbol_job(job_id: int, symbol: str, svc: MarketDataService):
+    db = SessionLocal()
+    try:
+        job = db.query(MarketDataSyncJobModel).filter(MarketDataSyncJobModel.id == job_id).first()
+        if not job:
+            return
+        job.status = "running"
+        job.started_at = datetime.utcnow()
+        job.error = None
+        db.commit()
+
+        await svc.sync_symbol(symbol)
+
+        count = db.query(func.count(HistoricCandleModel.id)).filter(
+            HistoricCandleModel.symbol == symbol,
+        ).scalar() or 0
+        job.status = "success"
+        job.candles_synced = int(count)
+        job.finished_at = datetime.utcnow()
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        job = db.query(MarketDataSyncJobModel).filter(MarketDataSyncJobModel.id == job_id).first()
+        if job:
+            job.status = "failed"
+            job.error = str(exc)
+            job.finished_at = datetime.utcnow()
+            db.commit()
+    finally:
+        db.close()
+
+
+async def _run_force_sync_job(job_id: int, symbol: str, timeframe: str | None, svc: MarketDataService):
+    db = SessionLocal()
+    try:
+        job = db.query(MarketDataSyncJobModel).filter(MarketDataSyncJobModel.id == job_id).first()
+        if not job:
+            return
+        job.status = "running"
+        job.started_at = datetime.utcnow()
+        job.error = None
+        db.commit()
+
+        await svc.force_sync(symbol, timeframe)
+
+        q = db.query(func.count(HistoricCandleModel.id)).filter(HistoricCandleModel.symbol == symbol)
+        if timeframe:
+            q = q.filter(HistoricCandleModel.timeframe == timeframe)
+        count = q.scalar() or 0
+
+        job.status = "success"
+        job.candles_synced = int(count)
+        job.finished_at = datetime.utcnow()
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        job = db.query(MarketDataSyncJobModel).filter(MarketDataSyncJobModel.id == job_id).first()
+        if job:
+            job.status = "failed"
+            job.error = str(exc)
+            job.finished_at = datetime.utcnow()
+            db.commit()
+    finally:
+        db.close()
+
+
 @router.get("/tracked")
 def get_tracked_symbols(db: Session = Depends(get_db)):
     tracked = db.query(TrackedSymbolModel).all()
@@ -79,6 +179,16 @@ def get_tracked_symbols(db: Session = Depends(get_db)):
     return out
 
 
+@router.get("/sync-jobs")
+def get_sync_jobs(limit: int = 60, batch_id: str | None = None, db: Session = Depends(get_db)):
+    lim = max(1, min(int(limit or 60), 500))
+    q = db.query(MarketDataSyncJobModel)
+    if batch_id:
+        q = q.filter(MarketDataSyncJobModel.batch_id == batch_id)
+    rows = q.order_by(MarketDataSyncJobModel.created_at.desc()).limit(lim).all()
+    return [_job_payload(row) for row in rows]
+
+
 @router.post("/track")
 async def add_tracked_symbol(
     req: TrackRequest,
@@ -106,8 +216,15 @@ async def add_tracked_symbol(
         db.add(tracked)
     db.commit()
 
-    background_tasks.add_task(svc.sync_symbol, symbol)
-    return {"status": "ok", "symbol": symbol, "timeframes": tracked.timeframes, "sync": "started"}
+    job = _create_sync_job(db, symbol=symbol, timeframe=None, trigger="track")
+    background_tasks.add_task(_run_sync_symbol_job, job.id, symbol, svc)
+    return {
+        "status": "ok",
+        "symbol": symbol,
+        "timeframes": tracked.timeframes,
+        "sync": "queued",
+        "job_id": job.id,
+    }
 
 
 @router.post("/bootstrap-defaults")
@@ -140,6 +257,8 @@ async def bootstrap_defaults(
 
     inserted = 0
     updated = 0
+    batch_id = str(uuid4())
+    jobs = []
     for symbol in symbols:
         tracked = db.query(TrackedSymbolModel).filter(TrackedSymbolModel.symbol == symbol).first()
         if tracked:
@@ -149,16 +268,20 @@ async def bootstrap_defaults(
         else:
             db.add(TrackedSymbolModel(symbol=symbol, timeframes=sorted(set(tfs)), is_active=True))
             inserted += 1
-        background_tasks.add_task(svc.sync_symbol, symbol)
+        job = _create_sync_job(db, symbol=symbol, timeframe=None, trigger="bootstrap", batch_id=batch_id)
+        jobs.append(job.id)
+        background_tasks.add_task(_run_sync_symbol_job, job.id, symbol, svc)
     db.commit()
 
     return {
         "status": "ok",
+        "batch_id": batch_id,
         "inserted": inserted,
         "updated": updated,
         "symbols": symbols,
         "timeframes": sorted(set(tfs)),
-        "sync": "started",
+        "sync": "queued",
+        "jobs_queued": len(jobs),
     }
 
 
@@ -174,6 +297,8 @@ async def force_sync_all(
         raise HTTPException(400, "Timeframe inválido para sync em lote.")
 
     tracked = db.query(TrackedSymbolModel).filter(TrackedSymbolModel.is_active == True).all()
+    batch_id = str(uuid4())
+    jobs = []
     symbols = []
     for row in tracked:
         try:
@@ -181,10 +306,14 @@ async def force_sync_all(
         except HTTPException:
             continue
         symbols.append(row.symbol)
-        background_tasks.add_task(svc.force_sync, row.symbol, tf)
+        job = _create_sync_job(db, symbol=row.symbol, timeframe=tf, trigger="bulk", batch_id=batch_id)
+        jobs.append(job.id)
+        background_tasks.add_task(_run_force_sync_job, job.id, row.symbol, tf, svc)
 
     return {
-        "status": "sync_started",
+        "status": "sync_queued",
+        "batch_id": batch_id,
+        "jobs_queued": len(jobs),
         "symbols_queued": len(symbols),
         "timeframe": tf,
         "symbols": symbols,
@@ -238,22 +367,28 @@ async def force_sync_timeframe(
     symbol: str,
     timeframe: str,
     background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
     svc: MarketDataService = Depends(get_service),
 ):
     sym = _norm_symbol(symbol)
     _assert_okx_spot_symbol(sym)
     tf = (timeframe or "").strip()
-    background_tasks.add_task(svc.force_sync, sym, tf)
-    return {"status": "sync_started", "symbol": sym, "timeframe": tf}
+    if tf not in _ALLOWED_TIMEFRAMES:
+        raise HTTPException(400, "Timeframe inválido.")
+    job = _create_sync_job(db, symbol=sym, timeframe=tf, trigger="manual")
+    background_tasks.add_task(_run_force_sync_job, job.id, sym, tf, svc)
+    return {"status": "sync_queued", "symbol": sym, "timeframe": tf, "job_id": job.id}
 
 
 @router.post("/force-sync/{symbol:path}")
 async def force_sync(
     symbol: str,
     background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
     svc: MarketDataService = Depends(get_service),
 ):
     sym = _norm_symbol(symbol)
     _assert_okx_spot_symbol(sym)
-    background_tasks.add_task(svc.force_sync, sym)
-    return {"status": "sync_started", "symbol": sym}
+    job = _create_sync_job(db, symbol=sym, timeframe=None, trigger="manual")
+    background_tasks.add_task(_run_force_sync_job, job.id, sym, None, svc)
+    return {"status": "sync_queued", "symbol": sym, "job_id": job.id}
