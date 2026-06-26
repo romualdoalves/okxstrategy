@@ -40,6 +40,22 @@ function MetricPill({ label, value, positive }) {
   )
 }
 
+function ScorePill({ label, value, tone = 'white' }) {
+  const color = tone === 'green'
+    ? 'text-green-400'
+    : tone === 'yellow'
+    ? 'text-yellow-400'
+    : tone === 'red'
+    ? 'text-red-400'
+    : 'text-white'
+  return (
+    <div className="flex flex-col px-3 py-2 rounded-lg bg-black/20 border border-white/8 min-w-[92px]">
+      <span className="text-[10px] text-muted uppercase tracking-wider mb-0.5">{label}</span>
+      <span className={`text-sm font-bold font-mono ${color}`}>{value}</span>
+    </div>
+  )
+}
+
 function resultKey(r, fallbackSymbol = '') {
   return `${r.strategy_id}:${r.symbol || fallbackSymbol}`
 }
@@ -113,6 +129,9 @@ function ResultCard({ r, symbol, selected, disabled, disabledReason, onToggle })
   const cfg = VERDICT_CFG[rec.verdict] || VERDICT_CFG['N/A']
   const hasMetrics = r.trades_count !== undefined
   const isNA = rec.verdict === 'N/A'
+  const predictive = r.predictive || null
+  const predScore = rec.predictive_score ?? predictive?.predictive_score
+  const historicalScore = rec.historical_score ?? rec.score
   const canSelect = !isNA && !disabled
   const coverage = r.coverage || { level: isNA ? 'unsupported' : 'partial', reasons: [] }
   const coverageCfg = COVERAGE_CFG[coverage.level] || COVERAGE_CFG.partial
@@ -173,6 +192,14 @@ function ResultCard({ r, symbol, selected, disabled, disabledReason, onToggle })
 
       {/* Likert scale (non-N/A strategies) */}
       {!isNA && <BacktestLikert score={rec.score ?? 0} />}
+      {!isNA && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2 mb-2">
+          <ScorePill label="Score Final" value={(rec.score ?? 0).toFixed(2)} tone={(rec.score ?? 0) >= 6.67 ? 'green' : (rec.score ?? 0) >= 3.33 ? 'yellow' : 'red'} />
+          <ScorePill label="Histórico" value={(historicalScore ?? 0).toFixed(2)} />
+          <ScorePill label="Preditivo" value={predScore != null ? Number(predScore).toFixed(2) : '—'} tone={Number(predScore ?? 0) >= 6.67 ? 'green' : Number(predScore ?? 0) >= 3.33 ? 'yellow' : 'red'} />
+          <ScorePill label="Confiança" value={predictive?.confidence != null ? `${Math.round(predictive.confidence * 100)}%` : '—'} />
+        </div>
+      )}
 
       {/* Metrics row */}
       {hasMetrics && (
@@ -183,6 +210,7 @@ function ResultCard({ r, symbol, selected, disabled, disabledReason, onToggle })
           <MetricPill label="Prof. Factor" value={r.profit_factor?.toFixed(2)} positive={r.profit_factor >= 1.2} />
           <MetricPill label="Drawdown" value={`$${r.max_drawdown?.toFixed(2)}`} positive={false} />
           <MetricPill label="Saldo Final" value={`$${r.final_balance?.toFixed(2)}`} />
+          {predictive?.regime && <MetricPill label="Regime" value={predictive.regime} />}
         </div>
       )}
 
@@ -214,6 +242,22 @@ function ResultCard({ r, symbol, selected, disabled, disabledReason, onToggle })
                 {coverage.reasons.map((reason, i) => (
                   <li key={i} className="text-[11px] text-white/65 flex gap-2">
                     <span className="shrink-0">·</span>
+                    <span>{reason}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {predictive && (
+            <div className="rounded-lg border border-accent/20 bg-accent/5 p-2">
+              <div className="flex items-center justify-between gap-2 text-[11px] font-bold text-accent">
+                <span>Modelo Preditivo: {predictive.model || 'rule_based'}</span>
+                <span>{Number(predictive.predictive_score ?? 0).toFixed(2)}/10 · {Math.round(Number(predictive.confidence ?? 0) * 100)}%</span>
+              </div>
+              <ul className="mt-1 space-y-0.5">
+                {(predictive.reasons || []).map((reason, i) => (
+                  <li key={i} className="text-[11px] text-white/65 flex gap-2">
+                    <span className="shrink-0 text-accent">·</span>
                     <span>{reason}</span>
                   </li>
                 ))}
@@ -425,7 +469,7 @@ export default function BatchBacktest() {
         <ScanSearch size={24} className="text-accent" />
         <div>
           <h1 className="text-2xl font-bold">Scanner de Backtest</h1>
-          <p className="text-sm text-muted">Backtest Estrito: dados OKX, contexto extra quando disponível, SL/TP1/trailing, taxa e slippage simulados</p>
+          <p className="text-sm text-muted">Backtest Estrito + score preditivo: histórico OKX, regime recente, volatilidade, liquidez e momentum</p>
         </div>
       </div>
 
@@ -444,9 +488,9 @@ export default function BatchBacktest() {
         <div className="rounded-lg border border-green-500/20 bg-green-500/5 p-3 text-xs text-white/70">
           <div className="flex items-center gap-2 font-bold text-green-300 mb-1">
             <ShieldCheck size={14} />
-            Modo Estrito ativado
+            Modo Estrito + Preditivo ativado
           </div>
-          Estratégias marcadas como “Não contemplado” dependem de contexto externo histórico que a app ainda não reconstrói, como GEX, onchain, DEX, grafo vivo ou fluxo de players.
+          O score final combina backtest histórico, oportunidade preditiva recente, robustez da amostra e cobertura operacional. Estratégias “Não contemplado” dependem de contexto externo histórico que a app ainda não reconstrói.
         </div>
 
         {/* Category selector */}

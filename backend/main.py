@@ -50,6 +50,7 @@ from .database import (
 )
 from .bot_manager import manager
 from .backtest_engine import BacktestEngine, backtest_recommendation, backtest_score
+from .predictive_scoring import PredictiveScoringService
 from .optimizer import StrategyOptimizer
 from .exchanges.factory import build_exchange, get_default_demo_mode, get_exchange_provider, get_ranked_assets_universe, map_timeframe_for_history
 from .strategies.registry import list_strategies, get_strategy
@@ -2275,6 +2276,85 @@ _CONTEXT_FLAGS = (
 )
 
 
+def _verdict_from_score(score: float) -> tuple[str, str]:
+    if score >= 6.67:
+        return "INICIAR", "success"
+    if score >= 3.33:
+        return "CUIDADO", "warning"
+    return "NÃO INICIAR", "danger"
+
+
+def _compose_predictive_recommendation(result: dict, predictive: dict) -> dict:
+    rec = dict(result.get("recommendation") or {})
+    if rec.get("verdict") == "N/A":
+        return rec
+
+    historical_score = float(rec.get("score") or 0.0)
+    predictive_score = float(predictive.get("predictive_score") or 0.0)
+    trades_count = int(result.get("trades_count") or 0)
+    coverage = result.get("coverage") or {}
+    rejections = int(result.get("ignored_sell_signals") or 0)
+
+    robustness_score = 0.0
+    if trades_count >= 10:
+        robustness_score = 10.0
+    elif trades_count >= 5:
+        robustness_score = 7.0
+    elif trades_count >= 3:
+        robustness_score = 5.0
+    elif trades_count > 0:
+        robustness_score = 2.5
+
+    operational_score = 10.0 if coverage.get("level") == "full" else 6.0
+    if result.get("error"):
+        operational_score = 0.0
+    elif rejections > 8:
+        operational_score = max(0.0, operational_score - 2.0)
+
+    final_score = round(
+        0.60 * historical_score
+        + 0.25 * predictive_score
+        + 0.10 * robustness_score
+        + 0.05 * operational_score,
+        2,
+    )
+
+    # Guardrail: backtest negativo ou sem trades não vira INICIAR só por contexto recente.
+    if (result.get("trades_count") or 0) == 0 or (result.get("total_profit") or 0.0) <= 0:
+        final_score = min(final_score, 3.32)
+
+    verdict, level = _verdict_from_score(final_score)
+    reasons = list(rec.get("reasons") or [])
+    pred_reasons = predictive.get("reasons") or []
+    if pred_reasons:
+        reasons.append(
+            f"Score preditivo {predictive_score:.2f}/10 ({predictive.get('regime', 'regime indefinido')}, confiança {float(predictive.get('confidence') or 0.0) * 100:.0f}%): "
+            + pred_reasons[0]
+        )
+    reasons.append(
+        f"Score final combina histórico ({historical_score:.2f}), preditivo ({predictive_score:.2f}), robustez ({robustness_score:.2f}) e operacional ({operational_score:.2f})."
+    )
+
+    rec.update({
+        "verdict": verdict,
+        "level": level,
+        "score": final_score,
+        "historical_score": round(historical_score, 2),
+        "predictive_score": round(predictive_score, 2),
+        "robustness_score": round(robustness_score, 2),
+        "operational_score": round(operational_score, 2),
+        "score_model": "composite_v1",
+        "score_weights": {
+            "historical": 0.60,
+            "predictive": 0.25,
+            "robustness": 0.10,
+            "operational": 0.05,
+        },
+        "reasons": reasons,
+    })
+    return rec
+
+
 @app.post("/api/backtest/category")
 async def run_category_backtest(req: CategoryBacktestRequest):
     """Executa backtest de todas as estratégias de uma categoria para um símbolo."""
@@ -2375,6 +2455,8 @@ async def run_category_backtest(req: CategoryBacktestRequest):
         candle_cache.setdefault(tf, [])
 
     # Executa backtests em paralelo
+    predictive_service = PredictiveScoringService()
+
     async def _run(sid: str, tf: str) -> dict:
         candles = candle_cache.get(tf, [])
         info = REGISTRY[sid].info()
@@ -2422,7 +2504,15 @@ async def run_category_backtest(req: CategoryBacktestRequest):
                     "reasons": ["Backtest clássico: não simula SL/TP1/trailing, custos ou contexto extra."],
                 }
             result.update(base)
+            result["predictive"] = predictive_service.score(
+                sid,
+                req.symbol,
+                tf,
+                candles,
+                backtest_result=result,
+            )
             result["recommendation"] = backtest_recommendation(result)
+            result["recommendation"] = _compose_predictive_recommendation(result, result["predictive"])
             result.pop("trades", None)
             result.pop("closed_trades", None)
             result.pop("assumptions", None)

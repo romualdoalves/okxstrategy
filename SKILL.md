@@ -206,6 +206,13 @@ Migrations adicionais são executadas via lista `migrations` em `database.py` us
 - Não há modo Auto-Scan separado; o fluxo **Todas** cobre a varredura ampla sem histórico redundante.
 - `POST /api/backtest/category`: filtra REGISTRY por prefixo, agrupa por `recommended_timeframe`,
   busca candles uma vez por TF e timeframes extras, roda backtests estritos em paralelo (`asyncio.gather`).
+- Recomendações do Scanner usam score composto `composite_v1`:
+  60% backtest histórico, 25% score preditivo recente, 10% robustez da amostra e
+  5% cobertura operacional. O score histórico original fica em `historical_score`.
+- Score preditivo inicial (`backend/predictive_scoring.py`, `rule_based_v1`) é explicável,
+  sem ML treinado: usa regime recente, ATR/volatilidade, momentum, tendência, distância
+  das EMAs, RSI e volume relativo. Backtests negativos ou sem trades não podem virar
+  **INICIAR** apenas por score preditivo.
 - O Scanner exibe badges de cobertura: **Estrito**, **Parcial** ou **Não contemplado**.
 - Falha de candles/setup de mercado não deve gerar HTTP 500 no Scanner: estratégias afetadas
   retornam N/A com motivo claro; no modo **Todas**, falhas pontuais de categoria aparecem como aviso.
