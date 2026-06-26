@@ -244,6 +244,16 @@ tamanho válido, SL/TP coerentes, posição OKX flat.
 
 - Sem sinal BUY/SELL os critérios O2–O11 ficam dormentes (`status="none"`).
 - Frontend usa `_criteria_met/_criteria_total/_criteria_names` do backend — nunca heurísticas locais.
+- `GET /api/ops/diagnostics?days=7` agrega `signal_logs`, `trades`,
+  `order_rejections` e o status runtime para classificar cada bot como:
+  **Mercado/filtro**, **Bloqueio operacional**, **Rejeição OKX/proteção**,
+  **Operacional** ou **Sem dados**.
+- Dashboard exibe o diagnóstico operacional agregado por período; é a tela padrão
+  para responder se dias sem ordens vieram de mercado, gate algorítmico ou rejeição.
+- Cards de bot exibem `started_at` como timestamp de início do runtime
+  (`dd/mm/aa hh:mm:ss`) antes do primeiro ciclo/candle. O ciclo de execução é
+  exibido separadamente via `runtime.execution_cycle` com timeframe, último candle
+  fechado e contagem de ciclos processados.
 
 ### Fábrica IA
 - Menu "Fábrica IA" → `/strategy-factory` (wizard 5 etapas: plan → generate → validate → deploy → hot-load).

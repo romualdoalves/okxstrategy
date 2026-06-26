@@ -11,10 +11,21 @@ import { useMarketStatus } from '../hooks/useMarketStatus'
 const FIXED_STAKE_USD = 100
 
 function fmtStarted(iso) {
+  if (!iso) return ''
   const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
   const date = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
-  const time = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+  const time = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
   return `Iniciado ${date} ${time}`
+}
+
+function fmtShortTimestamp(iso) {
+  if (!iso) return 'aguardando'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return 'aguardando'
+  const date = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
+  const time = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  return `${date} ${time}`
 }
 
 const DOT_COLOR = {
@@ -49,6 +60,9 @@ export default function BotCard({ bot, liveStatus }) {
     : null
 
   const startedAt   = rt.started_at ?? null
+  const cycle       = rt.execution_cycle ?? {}
+  const cycleTf     = cycle.timeframe ?? bot.timeframe
+  const cycleCount  = Number(cycle.closed_candles ?? 0)
 
   const criteria   = getCriteriaCount(botForCriteria, hasIndicators ? indicators : null)
   const { isOpen: isMarketOpen, opensIn } = useMarketStatus()
@@ -123,6 +137,10 @@ export default function BotCard({ bot, liveStatus }) {
               {fmtStarted(startedAt)}
             </p>
           )}
+          <p className="text-[10px] text-muted flex items-center gap-1 mt-0.5 opacity-70">
+            <Activity size={9} />
+            Ciclo {cycleTf} · último {fmtShortTimestamp(cycle.last_closed_at)} · {cycleCount} fech.
+          </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <span className={bot.demo ? 'badge-muted' : 'badge-bull'}>

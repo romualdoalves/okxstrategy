@@ -52,6 +52,7 @@ export const syncTradeFees    = (days = 30) => req(`/trades/sync-fees?days_back=
 
 // Sistema
 export const getAiUsageStatus    = () => req('/system/ai-usage')
+export const getOpsDiagnostics   = (days = 7) => req(`/ops/diagnostics?days=${days}`)
 export const getTelegramStatus   = () => req('/system/telegram-status')
 export const testTelegram        = () => req('/system/telegram-test', { method: 'POST' })
 

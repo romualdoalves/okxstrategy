@@ -131,6 +131,8 @@ class BotInstance:
         self._entry_inflight  = False
         self._maintenance     : Optional[str] = None
         self._started_at      : Optional[str] = None   # ISO timestamp de início
+        self._last_closed_candle_at: Optional[str] = None
+        self._closed_candle_count: int = 0
         self._last_signal_log_id : Optional[int] = None
         self._task        : Optional[asyncio.Task] = None
         self.status       = "stopped"   # stopped | running | maintenance | error
@@ -688,6 +690,10 @@ class BotInstance:
 
                 if candles:
                     self._candles = candles
+                    self._last_closed_candle_at = datetime.fromtimestamp(
+                        float(candles[-1].epoch) / 1000,
+                        tz=timezone.utc,
+                    ).isoformat()
 
                     # Para estratégias de grafo: calcular grafo ANTES do compute()
                     # Sem isso, o bot ficaria esperando o próximo candle fechar
@@ -1243,6 +1249,11 @@ class BotInstance:
         # Atualiza histórico
         if not self._candles or self._candles[-1].epoch != bar.epoch:
             self._candles.append(bar)
+            self._last_closed_candle_at = datetime.fromtimestamp(
+                float(bar.epoch) / 1000 if float(bar.epoch) > 10_000_000_000 else float(bar.epoch),
+                tz=timezone.utc,
+            ).isoformat()
+            self._closed_candle_count += 1
             if len(self._candles) > 300:
                 self._candles.pop(0)
             await self._process_strategy(bar, exchange, session)
@@ -1528,6 +1539,11 @@ class BotInstance:
             "criteria_total": getattr(result, "criteria_total", 0),
             "order_criteria": order_criteria,
             "guaranteed_pnl": round(guaranteed_pnl, 2),
+            "execution_cycle": {
+                "timeframe": self.config.timeframe,
+                "closed_candles": self._closed_candle_count,
+                "last_closed_at": self._last_closed_candle_at,
+            },
             "ts":          bar.epoch,
         })
 
@@ -1583,6 +1599,11 @@ class BotInstance:
                 "criteria_met": getattr(result, "criteria_met", 0),
                 "criteria_total": getattr(result, "criteria_total", 0),
                 "order_criteria": order_gate,
+                "execution_cycle": {
+                    "timeframe": self.config.timeframe,
+                    "closed_candles": self._closed_candle_count,
+                    "last_closed_at": self._last_closed_candle_at,
+                },
                 "ts":          int(datetime.now(timezone.utc).timestamp() * 1000),
             })
             return
@@ -1603,6 +1624,11 @@ class BotInstance:
                 "criteria_met": 2, 
                 "criteria_total": 3,
                 "order_criteria": self._last_order_criteria,
+                "execution_cycle": {
+                    "timeframe": self.config.timeframe,
+                    "closed_candles": self._closed_candle_count,
+                    "last_closed_at": self._last_closed_candle_at,
+                },
                 "ts":          int(datetime.now(timezone.utc).timestamp() * 1000),
             })
             return
@@ -2338,12 +2364,19 @@ class BotInstance:
     def get_status(self) -> dict:
         # Preço atual vindo do último candle
         last_price = self._candles[-1].close if self._candles else 0.0
+        execution_cycle = {
+            "timeframe": self.config.timeframe,
+            "closed_candles": self._closed_candle_count,
+            "last_closed_at": self._last_closed_candle_at,
+        }
         
         # Se não tem candles ainda, retorna status básico
         if not self._candles:
             return {
                 "bot_id":      self.config.id,
                 "status":      self.status,
+                "started_at":  self._started_at,
+                "execution_cycle": execution_cycle,
                 "direction":   0,
                 "size":        0.0,
                 "entry_price": 0.0,
@@ -2397,6 +2430,7 @@ class BotInstance:
             "last_order_error": self._last_order_error,
             "maintenance":     self._maintenance,
             "started_at":      self._started_at,
+            "execution_cycle":  execution_cycle,
             "last_price":      self._candles[-1].close if self._candles else 0.0,
             "graph_state":     self._graph_state,
             "onchain_events":  self._onchain_events,

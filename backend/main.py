@@ -8,7 +8,7 @@ import asyncio
 import json
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Optional
 
@@ -395,6 +395,259 @@ def system_ai_usage():
                 "source": "deepseek" if deepseek_enabled else "rules_fallback",
             },
         },
+    }
+
+
+def _pct(part: int | float, total: int | float) -> float:
+    return round((float(part or 0) / float(total or 1)) * 100.0, 2) if total else 0.0
+
+
+def _diagnostic_verdict(
+    *,
+    signal_total: int,
+    executable_signals: int,
+    linked_signals: int,
+    rejections: int,
+    current_order_ready: bool | None,
+    current_order_reason: str,
+) -> tuple[str, str, str]:
+    if signal_total <= 0:
+        return (
+            "no_data",
+            "Sem dados",
+            "Nenhum signal_log no período. Verifique se o bot estava ativo e recebendo candles.",
+        )
+    if rejections > 0:
+        return (
+            "rejection",
+            "Rejeição OKX/proteção",
+            "Houve falha ou recusa persistida em order_rejections.",
+        )
+    if executable_signals <= 0:
+        return (
+            "market",
+            "Mercado/filtro",
+            "A estratégia avaliou candles, mas não emitiu BUY/SELL no período.",
+        )
+    if linked_signals <= 0:
+        detail = current_order_reason or "Houve BUY/SELL sem trade vinculado."
+        return ("blocked", "Bloqueio operacional", detail)
+    if current_order_ready is False and current_order_reason:
+        return ("blocked", "Bloqueio operacional atual", current_order_reason)
+    return (
+        "operational",
+        "Operacional",
+        "BUY/SELL gerou trade no período; ausência recente tende a ser seletividade de mercado.",
+    )
+
+
+@app.get("/api/ops/diagnostics")
+def ops_diagnostics(days: int = 7, bot_id: Optional[int] = None, db: Session = Depends(get_db)):
+    """Diagnóstico agregado para separar falta de mercado, bloqueio operacional e rejeição OKX."""
+    days = max(1, min(int(days or 7), 90))
+    cutoff = datetime.utcnow() - timedelta(days=days)
+
+    bots_q = db.query(BotModel)
+    if bot_id is not None:
+        bots_q = bots_q.filter(BotModel.id == bot_id)
+    bots = bots_q.order_by(BotModel.active.desc(), BotModel.id.asc()).all()
+    bot_ids = [b.id for b in bots]
+    if not bot_ids:
+        return {
+            "period_days": days,
+            "since": cutoff.isoformat() + "Z",
+            "totals": {
+                "bots": 0,
+                "signals": 0,
+                "executable_signals": 0,
+                "linked_signals": 0,
+                "trades": 0,
+                "rejections": 0,
+            },
+            "bots": [],
+            "top_causes": [],
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+    signal_rows = db.query(
+        SignalLogModel.bot_id,
+        SignalLogModel.signal,
+        func.count(SignalLogModel.id),
+    ).filter(
+        SignalLogModel.bot_id.in_(bot_ids),
+        SignalLogModel.timestamp >= cutoff,
+    ).group_by(SignalLogModel.bot_id, SignalLogModel.signal).all()
+
+    linked_rows = db.query(
+        SignalLogModel.bot_id,
+        func.count(SignalLogModel.id),
+    ).filter(
+        SignalLogModel.bot_id.in_(bot_ids),
+        SignalLogModel.timestamp >= cutoff,
+        SignalLogModel.resulted_in_trade_id.isnot(None),
+    ).group_by(SignalLogModel.bot_id).all()
+
+    hold_rows = db.query(
+        SignalLogModel.bot_id,
+        SignalLogModel.hold_reason,
+        func.count(SignalLogModel.id),
+    ).filter(
+        SignalLogModel.bot_id.in_(bot_ids),
+        SignalLogModel.timestamp >= cutoff,
+        SignalLogModel.signal == "hold",
+        SignalLogModel.hold_reason.isnot(None),
+    ).group_by(SignalLogModel.bot_id, SignalLogModel.hold_reason).order_by(
+        func.count(SignalLogModel.id).desc()
+    ).limit(80).all()
+
+    trade_rows = db.query(
+        TradeModel.bot_id,
+        TradeModel.type,
+        func.count(TradeModel.id),
+    ).filter(
+        TradeModel.bot_id.in_(bot_ids),
+        TradeModel.timestamp >= cutoff,
+    ).group_by(TradeModel.bot_id, TradeModel.type).all()
+
+    closed_trade_rows = db.query(
+        TradeModel.bot_id,
+        func.count(TradeModel.id),
+        func.coalesce(func.sum(TradeModel.pnl), 0.0),
+    ).filter(
+        TradeModel.bot_id.in_(bot_ids),
+        TradeModel.timestamp >= cutoff,
+        TradeModel.type == "entry",
+        TradeModel.exit_price.isnot(None),
+    ).group_by(TradeModel.bot_id).all()
+
+    rejection_rows = db.query(
+        OrderRejectionModel.bot_id,
+        func.count(OrderRejectionModel.id),
+    ).filter(
+        OrderRejectionModel.bot_id.in_(bot_ids),
+        OrderRejectionModel.created_at >= cutoff,
+    ).group_by(OrderRejectionModel.bot_id).all()
+
+    rejection_reason_rows = db.query(
+        OrderRejectionModel.bot_id,
+        OrderRejectionModel.reason,
+        func.count(OrderRejectionModel.id),
+    ).filter(
+        OrderRejectionModel.bot_id.in_(bot_ids),
+        OrderRejectionModel.created_at >= cutoff,
+        OrderRejectionModel.reason.isnot(None),
+    ).group_by(OrderRejectionModel.bot_id, OrderRejectionModel.reason).order_by(
+        func.count(OrderRejectionModel.id).desc()
+    ).limit(80).all()
+
+    signal_dist: dict[int, dict[str, int]] = {bid: {"hold": 0, "buy": 0, "sell": 0} for bid in bot_ids}
+    for bid, signal, count in signal_rows:
+        signal_dist.setdefault(bid, {"hold": 0, "buy": 0, "sell": 0})[str(signal or "hold")] = int(count or 0)
+
+    linked_by_bot = {int(bid): int(count or 0) for bid, count in linked_rows}
+    rejections_by_bot = {int(bid): int(count or 0) for bid, count in rejection_rows}
+    trades_by_bot: dict[int, dict[str, int]] = {bid: {"entry": 0, "exit": 0, "tp1": 0} for bid in bot_ids}
+    for bid, typ, count in trade_rows:
+        trades_by_bot.setdefault(int(bid), {"entry": 0, "exit": 0, "tp1": 0})[str(typ or "")] = int(count or 0)
+    closed_by_bot = {
+        int(bid): {"closed": int(count or 0), "pnl": round(float(pnl or 0.0), 4)}
+        for bid, count, pnl in closed_trade_rows
+    }
+
+    hold_by_bot: dict[int, list[dict]] = {bid: [] for bid in bot_ids}
+    for bid, reason, count in hold_rows:
+        bucket = hold_by_bot.setdefault(int(bid), [])
+        if len(bucket) < 5:
+            bucket.append({"reason": str(reason or "HOLD sem motivo"), "count": int(count or 0)})
+
+    rejection_reasons_by_bot: dict[int, list[dict]] = {bid: [] for bid in bot_ids}
+    for bid, reason, count in rejection_reason_rows:
+        bucket = rejection_reasons_by_bot.setdefault(int(bid), [])
+        if len(bucket) < 5:
+            bucket.append({"reason": str(reason or "Rejeição sem motivo"), "count": int(count or 0)})
+
+    statuses = {st.get("bot_id"): st for st in manager.all_statuses()}
+    cause_counts: dict[str, int] = {}
+    bot_reports = []
+
+    for bot in bots:
+        dist = signal_dist.get(bot.id, {"hold": 0, "buy": 0, "sell": 0})
+        signal_total = int(sum(dist.values()))
+        executable = int(dist.get("buy", 0) + dist.get("sell", 0))
+        linked = linked_by_bot.get(bot.id, 0)
+        rejections = rejections_by_bot.get(bot.id, 0)
+        runtime = statuses.get(bot.id) or {}
+        order_criteria = runtime.get("order_criteria") or {}
+        current_ready = order_criteria.get("ready") if order_criteria else None
+        current_reason = order_criteria.get("reason") or runtime.get("hold_reason") or ""
+        verdict, label, detail = _diagnostic_verdict(
+            signal_total=signal_total,
+            executable_signals=executable,
+            linked_signals=linked,
+            rejections=rejections,
+            current_order_ready=current_ready,
+            current_order_reason=current_reason,
+        )
+        cause_counts[label] = cause_counts.get(label, 0) + 1
+        trades = trades_by_bot.get(bot.id, {"entry": 0, "exit": 0, "tp1": 0})
+        closed = closed_by_bot.get(bot.id, {"closed": 0, "pnl": 0.0})
+
+        bot_reports.append({
+            "bot_id": bot.id,
+            "name": bot.name,
+            "strategy_id": bot.strategy_id,
+            "symbol": bot.symbol,
+            "timeframe": bot.timeframe,
+            "active": bool(bot.active),
+            "runtime_status": runtime.get("status") or ("active" if bot.active else "stopped"),
+            "verdict": verdict,
+            "verdict_label": label,
+            "detail": detail,
+            "signals": {
+                "total": signal_total,
+                "hold": int(dist.get("hold", 0)),
+                "buy": int(dist.get("buy", 0)),
+                "sell": int(dist.get("sell", 0)),
+                "executable": executable,
+                "linked_to_trade": linked,
+                "untraded_executable": max(0, executable - linked),
+                "hold_rate": _pct(dist.get("hold", 0), signal_total),
+                "trade_conversion_rate": _pct(linked, executable),
+            },
+            "trades": {
+                "entries": int(trades.get("entry", 0)),
+                "exits": int(trades.get("exit", 0)),
+                "tp1": int(trades.get("tp1", 0)),
+                "closed": int(closed.get("closed", 0)),
+                "pnl": closed.get("pnl", 0.0),
+            },
+            "rejections": {
+                "count": rejections,
+                "top_reasons": rejection_reasons_by_bot.get(bot.id, []),
+            },
+            "top_hold_reasons": hold_by_bot.get(bot.id, []),
+            "current_order_criteria": order_criteria,
+        })
+
+    totals = {
+        "bots": len(bot_reports),
+        "signals": sum(b["signals"]["total"] for b in bot_reports),
+        "executable_signals": sum(b["signals"]["executable"] for b in bot_reports),
+        "linked_signals": sum(b["signals"]["linked_to_trade"] for b in bot_reports),
+        "trades": sum(b["trades"]["entries"] for b in bot_reports),
+        "rejections": sum(b["rejections"]["count"] for b in bot_reports),
+    }
+
+    return {
+        "period_days": days,
+        "since": cutoff.isoformat() + "Z",
+        "totals": totals,
+        "top_causes": [
+            {"label": label, "count": count}
+            for label, count in sorted(cause_counts.items(), key=lambda item: item[1], reverse=True)
+        ],
+        "bots": bot_reports,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
     }
 
 @app.get("/api/system/telegram-status")

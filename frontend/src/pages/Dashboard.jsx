@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Activity, Bot, DollarSign, ShieldAlert, Target, TrendingUp, RefreshCcw, Bell, BellOff, Send, AlertTriangle, X } from 'lucide-react'
-import { getBots, getTradesSummary, getBalance, getAccountSnapshot, resetAccount, getTelegramStatus, testTelegram } from '../api'
+import { Activity, Bot, DollarSign, ShieldAlert, Target, TrendingUp, RefreshCcw, Bell, BellOff, Send, AlertTriangle, X, BarChart3, LockKeyhole, Waves, Ban, CheckCircle2 } from 'lucide-react'
+import { getBots, getTradesSummary, getBalance, getAccountSnapshot, resetAccount, getTelegramStatus, testTelegram, getOpsDiagnostics } from '../api'
 import { useWebSocket } from '../hooks/useWebSocket'
 import { useLanguage } from '../i18n/LanguageContext'
 import StatCard from '../components/StatCard'
@@ -128,6 +128,135 @@ function ResetModal({ onClose, onConfirm }) {
   )
 }
 
+const DIAG_STYLE = {
+  market: {
+    icon: Waves,
+    cls: 'border-blue-500/25 bg-blue-500/8 text-blue-300',
+    dot: 'bg-blue-400',
+  },
+  blocked: {
+    icon: LockKeyhole,
+    cls: 'border-yellow-500/25 bg-yellow-500/8 text-yellow-300',
+    dot: 'bg-yellow-400',
+  },
+  rejection: {
+    icon: Ban,
+    cls: 'border-red-500/25 bg-red-500/8 text-red-300',
+    dot: 'bg-red-400',
+  },
+  operational: {
+    icon: CheckCircle2,
+    cls: 'border-green-500/25 bg-green-500/8 text-green-300',
+    dot: 'bg-green-400',
+  },
+  no_data: {
+    icon: BarChart3,
+    cls: 'border-white/10 bg-white/5 text-muted',
+    dot: 'bg-white/30',
+  },
+}
+
+function OpsDiagnosticsPanel({ data, loading, days, setDays }) {
+  const bots = data?.bots ?? []
+  const totals = data?.totals ?? {}
+  const priority = { rejection: 0, blocked: 1, no_data: 2, market: 3, operational: 4 }
+  const visibleBots = [...bots]
+    .sort((a, b) => (priority[a.verdict] ?? 9) - (priority[b.verdict] ?? 9) || b.signals.total - a.signals.total)
+    .slice(0, 6)
+
+  return (
+    <div className="card space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <BarChart3 size={16} className="text-accent" />
+          <h2 className="font-semibold text-sm">Diagnóstico operacional</h2>
+          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-accent/10 text-accent border border-accent/20">
+            {days}D
+          </span>
+        </div>
+        <select
+          value={days}
+          onChange={e => setDays(Number(e.target.value))}
+          className="input h-8 py-1 text-xs w-28"
+        >
+          <option value={1}>1 dia</option>
+          <option value={3}>3 dias</option>
+          <option value={7}>7 dias</option>
+          <option value={14}>14 dias</option>
+          <option value={30}>30 dias</option>
+        </select>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <DiagMetric label="Sinais" value={totals.signals ?? 0} />
+        <DiagMetric label="BUY/SELL" value={totals.executable_signals ?? 0} />
+        <DiagMetric label="Trades" value={totals.trades ?? 0} />
+        <DiagMetric label="Vinculados" value={totals.linked_signals ?? 0} />
+        <DiagMetric label="Rejeições" value={totals.rejections ?? 0} tone={(totals.rejections ?? 0) > 0 ? 'bear' : 'white'} />
+      </div>
+
+      {loading ? (
+        <div className="text-xs text-muted py-4">Carregando diagnóstico...</div>
+      ) : visibleBots.length === 0 ? (
+        <div className="text-xs text-muted py-4">Sem bots para diagnosticar.</div>
+      ) : (
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+          {visibleBots.map(bot => {
+            const style = DIAG_STYLE[bot.verdict] ?? DIAG_STYLE.no_data
+            const Icon = style.icon
+            const topHold = bot.top_hold_reasons?.[0]?.reason
+            const topRejection = bot.rejections?.top_reasons?.[0]?.reason
+            const reason = topRejection || topHold || bot.detail
+            return (
+              <div key={bot.bot_id} className={`rounded-lg border p-3 ${style.cls}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Icon size={14} className="shrink-0" />
+                      <p className="text-sm font-semibold text-white truncate">{bot.name}</p>
+                      <span className="text-[10px] font-mono text-white/45">{bot.strategy_id}</span>
+                    </div>
+                    <p className="text-[11px] text-white/45 mt-0.5">
+                      {bot.symbol} · {bot.timeframe} · {bot.runtime_status}
+                    </p>
+                  </div>
+                  <span className="text-[10px] font-bold uppercase shrink-0">{bot.verdict_label}</span>
+                </div>
+                <div className="grid grid-cols-4 gap-2 mt-3 text-[11px]">
+                  <TinyStat label="HOLD" value={`${bot.signals.hold_rate.toFixed(0)}%`} />
+                  <TinyStat label="BUY" value={bot.signals.buy} />
+                  <TinyStat label="SELL" value={bot.signals.sell} />
+                  <TinyStat label="Conv." value={`${bot.signals.trade_conversion_rate.toFixed(0)}%`} />
+                </div>
+                <p className="mt-3 text-[11px] text-white/70 line-clamp-2">{reason}</p>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function DiagMetric({ label, value, tone = 'white' }) {
+  const color = tone === 'bear' ? 'text-bear' : tone === 'bull' ? 'text-bull' : 'text-white'
+  return (
+    <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+      <p className="text-[10px] uppercase tracking-wider text-muted">{label}</p>
+      <p className={`text-lg font-bold tabular-nums ${color}`}>{value}</p>
+    </div>
+  )
+}
+
+function TinyStat({ label, value }) {
+  return (
+    <div>
+      <p className="text-white/35 uppercase tracking-wider">{label}</p>
+      <p className="font-mono text-white/90">{value}</p>
+    </div>
+  )
+}
+
 
 export default function Dashboard() {
   const { t } = useLanguage()
@@ -137,6 +266,7 @@ export default function Dashboard() {
   const { data: telegram = {} } = useQuery({ queryKey: ['telegram-status'], queryFn: getTelegramStatus, refetchInterval: 60_000 })
   const [liveStatuses, setLiveStatuses] = useState({})
   const [sortBy, setSortBy] = useState('criteria')
+  const [diagDays, setDiagDays] = useState(7)
   const [resetting, setResetting] = useState(false)
   const [showResetModal, setShowResetModal] = useState(false)
   const [balanceMode, setBalanceMode] = useState('demo')
@@ -153,6 +283,12 @@ export default function Dashboard() {
     queryKey: ['account-snapshot', balanceMode],
     queryFn:  () => getAccountSnapshot(balanceMode === 'demo'),
     refetchInterval: 30_000,
+  })
+
+  const { data: opsDiagnostics, isLoading: opsDiagnosticsLoading } = useQuery({
+    queryKey: ['ops-diagnostics', diagDays],
+    queryFn: () => getOpsDiagnostics(diagDays),
+    refetchInterval: 60_000,
   })
 
   const handleTelegramTest = async () => {
@@ -185,6 +321,7 @@ export default function Dashboard() {
           last_indicators: wsMsg.indicators,
           hold_reason: wsMsg.hold_reason,
           order_criteria: wsMsg.order_criteria,
+          execution_cycle: wsMsg.execution_cycle,
         },
       }))
     }
@@ -462,6 +599,13 @@ export default function Dashboard() {
           icon={ShieldAlert}
         />
       </div>
+
+      <OpsDiagnosticsPanel
+        data={opsDiagnostics}
+        loading={opsDiagnosticsLoading}
+        days={diagDays}
+        setDays={setDiagDays}
+      />
 
       <div>
         <div className="flex items-center justify-between mb-4">
