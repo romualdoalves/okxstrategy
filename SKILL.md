@@ -253,7 +253,9 @@ tamanho válido, SL/TP coerentes, posição OKX flat.
 - Cards de bot exibem `started_at` como timestamp de início do runtime
   (`dd/mm/aa hh:mm:ss`) antes do primeiro ciclo/candle. O ciclo de execução é
   exibido separadamente via `runtime.execution_cycle` com timeframe, último candle
-  fechado e contagem de ciclos processados.
+  fechado conhecido e contagem de ciclos fechados após o início do runtime.
+- Se `runtime.direction != 0`, o card não exibe botão **Iniciar**; mostra estado
+  **Em posição** desabilitado e mantém apenas **Fechar** como ação operacional.
 
 ### Fábrica IA
 - Menu "Fábrica IA" → `/strategy-factory` (wizard 5 etapas: plan → generate → validate → deploy → hot-load).

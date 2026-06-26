@@ -131,8 +131,10 @@ class BotInstance:
         self._entry_inflight  = False
         self._maintenance     : Optional[str] = None
         self._started_at      : Optional[str] = None   # ISO timestamp de início
+        self._started_epoch_ms: int = 0
         self._last_closed_candle_at: Optional[str] = None
         self._closed_candle_count: int = 0
+        self._last_counted_closed_epoch: int = 0
         self._last_signal_log_id : Optional[int] = None
         self._task        : Optional[asyncio.Task] = None
         self.status       = "stopped"   # stopped | running | maintenance | error
@@ -533,7 +535,11 @@ class BotInstance:
     # ── Controle ─────────────────────────────────────────────────────────────
 
     def start(self):
-        self._started_at = datetime.now(timezone.utc).isoformat()
+        started = datetime.now(timezone.utc)
+        self._started_at = started.isoformat()
+        self._started_epoch_ms = int(started.timestamp() * 1000)
+        self._closed_candle_count = 0
+        self._last_counted_closed_epoch = 0
         self._task       = asyncio.create_task(self._run())
         self.status      = "running"
 
@@ -1249,11 +1255,19 @@ class BotInstance:
         # Atualiza histórico
         if not self._candles or self._candles[-1].epoch != bar.epoch:
             self._candles.append(bar)
+            bar_epoch = int(bar.epoch)
             self._last_closed_candle_at = datetime.fromtimestamp(
-                float(bar.epoch) / 1000 if float(bar.epoch) > 10_000_000_000 else float(bar.epoch),
+                float(bar_epoch) / 1000 if float(bar_epoch) > 10_000_000_000 else float(bar_epoch),
                 tz=timezone.utc,
             ).isoformat()
-            self._closed_candle_count += 1
+            bar_epoch_ms = bar_epoch if bar_epoch > 10_000_000_000 else bar_epoch * 1000
+            if (
+                self._started_epoch_ms > 0
+                and bar_epoch_ms > self._started_epoch_ms
+                and bar_epoch != self._last_counted_closed_epoch
+            ):
+                self._closed_candle_count += 1
+                self._last_counted_closed_epoch = bar_epoch
             if len(self._candles) > 300:
                 self._candles.pop(0)
             await self._process_strategy(bar, exchange, session)

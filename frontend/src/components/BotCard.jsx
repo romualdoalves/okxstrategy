@@ -126,7 +126,9 @@ export default function BotCard({ bot, liveStatus }) {
             <h3 className="font-bold truncate text-white/90 group-hover:text-accent transition-colors">
               {bot.name}
             </h3>
-            <span className={`w-2 h-2 rounded-full shrink-0 ${isRunning ? 'bg-bull animate-pulse' : 'bg-border'}`} />
+            <span className={`w-2 h-2 rounded-full shrink-0 ${
+              isRunning ? 'bg-bull animate-pulse' : isPositioned ? 'bg-yellow-400' : 'bg-border'
+            }`} />
           </div>
           <p className="text-xs text-muted truncate">
             {bot.symbol} · {bot.timeframe}
@@ -139,7 +141,7 @@ export default function BotCard({ bot, liveStatus }) {
           )}
           <p className="text-[10px] text-muted flex items-center gap-1 mt-0.5 opacity-70">
             <Activity size={9} />
-            Ciclo {cycleTf} · último {fmtShortTimestamp(cycle.last_closed_at)} · {cycleCount} fech.
+            Ciclo {cycleTf} · último {fmtShortTimestamp(cycle.last_closed_at)} · {cycleCount} pós-início
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -295,17 +297,28 @@ export default function BotCard({ bot, liveStatus }) {
       {/* ── Ações ── */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <button
-            onClick={toggle}
-            disabled={!isOpen}
-            title={!isOpen ? t('market.ops_suspended') : undefined}
-            className={`btn flex items-center gap-1.5 text-xs ${isRunning ? 'btn-danger' : 'btn-success'} ${!isOpen ? 'opacity-40 cursor-not-allowed' : ''}`}
-          >
-            {isRunning
-              ? <><Square size={12} /> {t('c.stop')}</>
-              : <><Play  size={12} /> {t('c.start')}</>
-            }
-          </button>
+          {isPositioned ? (
+            <button
+              type="button"
+              disabled
+              title="Há posição aberta; use Fechar para encerrar a operação."
+              className="btn flex items-center gap-1.5 text-xs bg-yellow-500/10 text-yellow-300 border border-yellow-500/20 opacity-80 cursor-not-allowed"
+            >
+              <Activity size={12} /> Em posição
+            </button>
+          ) : (
+            <button
+              onClick={toggle}
+              disabled={!isOpen}
+              title={!isOpen ? t('market.ops_suspended') : undefined}
+              className={`btn flex items-center gap-1.5 text-xs ${isRunning ? 'btn-danger' : 'btn-success'} ${!isOpen ? 'opacity-40 cursor-not-allowed' : ''}`}
+            >
+              {isRunning
+                ? <><Square size={12} /> {t('c.stop')}</>
+                : <><Play  size={12} /> {t('c.start')}</>
+              }
+            </button>
+          )}
 
           {!isPositioned && (
             <button
