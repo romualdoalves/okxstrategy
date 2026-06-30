@@ -74,7 +74,7 @@ function makeCriteriaMap(t, bot) {
   const isSpot  = bot && !isDeriv
 
   const spotCriterion = (ind) => {
-    if (!isSpot) return null
+    if (!isSpot || !ind) return null
     const signal = ind?.signal || 'hold'
     const isShort = signal === 'sell'
     return {
