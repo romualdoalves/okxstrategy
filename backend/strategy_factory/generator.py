@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import unicodedata
 from pathlib import Path
 
 from . import kimi_client
@@ -338,10 +339,23 @@ def _basic_code_check(code: str, class_name: str) -> None:
         if f in code:
             raise RuntimeError(f"Código gerado contém padrão proibido: '{f}'")
 
-    if f"class {class_name}Strategy" not in code:
+    expected_class = f"{class_name}Strategy"
+    class_defs = re.findall(r"^\s*class\s+([^\s(:]+)", code, flags=re.MULTILINE)
+
+    def _norm_identifier(value: str) -> str:
+        # Normaliza para comparação semântica (acentos/case/símbolos).
+        value = unicodedata.normalize("NFKD", value)
+        value = "".join(ch for ch in value if not unicodedata.combining(ch))
+        return "".join(ch.lower() for ch in value if ch.isalnum())
+
+    expected_norm = _norm_identifier(expected_class)
+    has_expected_class = any(_norm_identifier(c) == expected_norm for c in class_defs)
+
+    if not has_expected_class:
+        found = ", ".join(class_defs) if class_defs else "nenhuma"
         raise RuntimeError(
-            f"Código não contém a classe esperada '{class_name}Strategy'. "
-            f"Verifique se o modelo gerou o nome correto."
+            f"Código não contém a classe esperada '{expected_class}'. "
+            f"Classes encontradas: {found}. Verifique se o modelo gerou o nome correto."
         )
     if "def compute_with_context" not in code and "def compute(" not in code:
         raise RuntimeError("Código não contém método compute() ou compute_with_context()")
