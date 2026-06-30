@@ -2451,6 +2451,12 @@ async def run_category_backtest(req: CategoryBacktestRequest):
         for tf in missing_tfs:
             candle_cache[tf] = candle_cache.get(tf, [])
 
+    # Atualiza MarketData incrementalmente com os candles recém-buscados da OKX.
+    # Fire-and-forget: não bloqueia a resposta do Scanner.
+    _fresh = {tf: candle_cache[tf] for tf in missing_tfs if candle_cache.get(tf)}
+    if _fresh:
+        asyncio.create_task(market_data_svc.persist_candles(req.symbol, _fresh))
+
     for tf in all_timeframes:
         candle_cache.setdefault(tf, [])
 

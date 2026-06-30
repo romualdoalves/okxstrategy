@@ -150,3 +150,53 @@ class MarketDataService:
             db.commit()
         finally:
             db.close()
+
+    async def persist_candles(self, symbol: str, candles_by_tf: dict) -> None:
+        """Persiste incrementalmente candles já buscados (ex: Scanner) em historic_candles.
+
+        Reutiliza o mesmo upsert do _sync_symbol_timeframe sem chamar a OKX novamente.
+        Silencia exceções para não interromper o chamador (fire-and-forget).
+        """
+        if not candles_by_tf:
+            return
+        db: Session = SessionLocal()
+        try:
+            total = 0
+            for tf, candles in candles_by_tf.items():
+                if not candles or tf not in _ALLOWED_TIMEFRAMES:
+                    continue
+                records = [
+                    {
+                        "symbol": symbol,
+                        "timeframe": tf,
+                        "epoch": datetime.fromtimestamp(int(c.epoch) / 1000, tz=timezone.utc).replace(tzinfo=None),
+                        "open": float(c.open),
+                        "high": float(c.high),
+                        "low": float(c.low),
+                        "close": float(c.close),
+                        "volume": float(c.volume),
+                    }
+                    for c in candles
+                ]
+                if not records:
+                    continue
+                stmt = insert(HistoricCandleModel).values(records)
+                stmt = stmt.on_conflict_do_update(
+                    index_elements=["symbol", "timeframe", "epoch"],
+                    set_={
+                        "open": stmt.excluded.open,
+                        "high": stmt.excluded.high,
+                        "low": stmt.excluded.low,
+                        "close": stmt.excluded.close,
+                        "volume": stmt.excluded.volume,
+                    },
+                )
+                db.execute(stmt)
+                total += len(records)
+            if total:
+                db.commit()
+                log.info("[MarketData] Scanner: %d candles persistidos para %s", total, symbol)
+        except Exception as exc:
+            log.warning("[MarketData] Falha ao persistir candles do Scanner (%s): %s", symbol, exc)
+        finally:
+            db.close()
