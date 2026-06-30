@@ -14,7 +14,7 @@ from typing import Optional
 
 import aiohttp
 
-from .database import BotModel, TradeModel, BotSnapshotModel, OrderRejectionModel, SignalLogModel, SessionLocal
+from .database import BotModel, TradeModel, BotSnapshotModel, OrderRejectionModel, SignalLogModel, SessionLocal, StrategyModel
 from .exchanges.base import BaseExchange
 from .exchanges.factory import (
     build_exchange,
@@ -174,10 +174,36 @@ class BotInstance:
                 names = [c.get("label", c.get("id", f"C{i+1}")) for i, c in enumerate(criteria)]
                 indicators["_criteria_names"] = names
                 indicators["_criteria_total"] = len(names)
+                return indicators
         except Exception:
             pass
 
+        # Fallback: usa critérios persistidos no plano da estratégia no banco.
+        db_names = self._load_plan_criteria_names(strategy_id)
+        if db_names:
+            indicators["_criteria_names"] = db_names
+            indicators["_criteria_total"] = len(db_names)
+
         return indicators
+
+    def _load_plan_criteria_names(self, strategy_id: str) -> list[str]:
+        """Lê nomes de critérios do plan_json salvo em strategies para fallback de checklist."""
+        if not strategy_id:
+            return []
+        db = SessionLocal()
+        try:
+            row = db.query(StrategyModel).filter_by(strategy_id=strategy_id).first()
+            if not row:
+                return []
+            plan = row.plan_json or {}
+            criteria = plan.get("criteria", []) if isinstance(plan, dict) else []
+            if not criteria:
+                return []
+            return [c.get("label", c.get("id", f"C{i+1}")) for i, c in enumerate(criteria)]
+        except Exception:
+            return []
+        finally:
+            db.close()
 
     @staticmethod
     def _is_spot_symbol(symbol: str) -> bool:
@@ -528,6 +554,15 @@ class BotInstance:
                 indicators["_criteria_names"] = [c.get('label', c.get('id', f'C{i+1}')) for i, c in enumerate(info.criteria)]
                 indicators["_criteria_total"] = len(info.criteria)
                 indicators["_criteria_met"] = min(indicators["_criteria_met"], indicators["_criteria_total"])
+            elif not canonical_names:
+                # Se o código da estratégia não expõe criteria, usa fallback já semeado/DB.
+                seeded_names = self._last_indicators.get("_criteria_names", []) if isinstance(self._last_indicators, dict) else []
+                if not seeded_names:
+                    seeded_names = self._load_plan_criteria_names(strategy_id)
+                if seeded_names:
+                    indicators["_criteria_names"] = seeded_names
+                    indicators["_criteria_total"] = len(seeded_names)
+                    indicators["_criteria_met"] = min(indicators["_criteria_met"], indicators["_criteria_total"])
         except Exception:
             pass
         return indicators

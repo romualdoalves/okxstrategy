@@ -215,15 +215,10 @@ PLANO:
             code
         )
         # Injeta criteria no StrategyInfo se não existir
-        if 'criteria=' not in code and plan_criteria:
-            criteria_json = json.dumps(plan_criteria, ensure_ascii=False)
-            # Procura o fechamento do params={...} no StrategyInfo
-            code = _re.sub(
-                r'(params=\{[^}]+\},?\s*)',
-                r'\1\n            criteria=' + criteria_json + ',',
-                code
-            )
-            log.info("criteria injetado automaticamente no StrategyInfo")
+        if plan_criteria:
+            code, injected = _inject_criteria_in_strategy_info(code, plan_criteria)
+            if injected:
+                log.info("criteria injetado automaticamente no StrategyInfo")
         log.info("criteria_total corrigido automaticamente para %d", plan_criteria_count)
 
     log.info("Código gerado: %.0f chars", len(code))
@@ -259,6 +254,45 @@ def _normalize_plan_identity(plan: dict) -> dict:
         elif not name.upper().startswith(strategy_id):
             normalized["name"] = f"{strategy_id} - {name}"
     return normalized
+
+
+def _inject_criteria_in_strategy_info(code: str, plan_criteria: list[dict]) -> tuple[str, bool]:
+    """Garante criteria=... dentro de StrategyInfo(...), preservando o restante do código."""
+    if not plan_criteria:
+        return code, False
+
+    start = code.find("StrategyInfo(")
+    if start < 0:
+        return code, False
+
+    i = start + len("StrategyInfo(")
+    depth = 1
+    while i < len(code) and depth > 0:
+        ch = code[i]
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+        i += 1
+
+    if depth != 0:
+        return code, False
+
+    end = i - 1
+    block = code[start:end + 1]
+    if "criteria=" in block:
+        return code, False
+
+    criteria_json = json.dumps(plan_criteria, ensure_ascii=False)
+    insertion = f"\n            criteria={criteria_json},"
+
+    params_pos = block.find("params=")
+    if params_pos >= 0:
+        new_block = block[:params_pos] + insertion + "\n            " + block[params_pos:]
+    else:
+        new_block = block[:-1] + insertion + "\n        )"
+
+    return code[:start] + new_block + code[end + 1:], True
 
 
 async def fix_code(code: str, errors: list[str], plan: dict) -> str:

@@ -214,6 +214,23 @@ def validate_code(code: str, plan: dict) -> ValidationReport:
         report.error = str(e)
         return report
 
+    # ── Verificação 6.1: criteria do StrategyInfo deve refletir o plano ─────
+    plan_criteria_count = len(plan.get("criteria", []))
+    info_criteria = getattr(info, "criteria", None) or []
+    info_criteria_count = len(info_criteria)
+    if plan_criteria_count > 0 and info_criteria_count != plan_criteria_count:
+        report.add(
+            "StrategyInfo.criteria corresponde ao plano",
+            False,
+            f"criteria em info()={info_criteria_count}, plano={plan_criteria_count}",
+        )
+    else:
+        report.add(
+            "StrategyInfo.criteria corresponde ao plano",
+            True,
+            f"{info_criteria_count} critérios",
+        )
+
     # ── Verificação 7: Instanciação sem erros ────────────────────────────────
     try:
         instance = strategy_cls()
@@ -292,7 +309,6 @@ def validate_code(code: str, plan: dict) -> ValidationReport:
     ct = getattr(result, "criteria_total", 0)
     
     # Verifica se criteria_total bate com o número de critérios no plano
-    plan_criteria_count = len(plan.get("criteria", []))
     if plan_criteria_count > 1 and ct == 1:
         report.add("criteria_total corresponde ao plano", False,
                    f"criteria_total={ct} mas o plano define {plan_criteria_count} critérios. "
