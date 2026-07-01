@@ -73,9 +73,12 @@ Trabalhe somente no repositório `E:\Dell Inspiron\W\Dev\Trading\OKXTrader\OKXSt
 - O `bot_manager` implementa um fallback dinâmico: se a estratégia não enviar `sl_price`, o Stop Loss é calculado usando `ATR(14)` dinâmico (Stop a 1.5x o ATR).
 - Proteção Estatística (Hard Floor): O stop NUNCA pode ser menor que 1.5x o ATR(14) no timeframe do bot, garantindo que o stop respeite a volatilidade do ativo (substituindo o antigo limite cego de 0.8%).
 - Entrada só é considerada operacional quando a OKX confirma Stop Loss nativo (`conditional`) ou proteção equivalente. Se o SL inicial for recusado, o bot tenta novamente com pequenos ajustes de distância; se todas as tentativas falharem, encerra a posição a mercado por segurança. Se o encerramento emergencial também falhar, o bot fica em estado crítico/pausado e registra rejeição.
+- **Trava de Breakeven** (`BREAKEVEN_TRIGGER_PCT = 0.4%`): assim que o lucro flutuante atinge 0.4%, o SL fixo é substituído por um SL no preço de entrada + buffer de taxas (`BREAKEVEN_FEE_BUFFER = 0.15%`), antes mesmo do gatilho da sombra dinâmica. Só avança (nunca move o stop contra o lucro já garantido). Dispara em `_check_tp1`/`_lock_breakeven`.
+- **Sombra Dinâmica em Camadas (chandelier exit)**: ao atingir `SHADOW_TRIGGER_PCT = 1%` de lucro, ativa trailing nativo (`move_order_stop`) com callback baseado em ATR, mas com teto por faixa de lucro (`_TRAILING_CALLBACK_TIERS`): ≤1.5% abaixo de 2% de lucro, ≤1.0% entre 2–4%, ≤0.6% acima de 4% (mínimo sempre 0.5%). Evita que um ATR inflado pelo próprio rally mantenha a sombra larga demais e devolva lucro no pico.
+- **Reaperto automático**: a cada candle fechado (`force_sync_trailing`), se o callback ideal para o lucro atual for ≥15% mais apertado que o callback ativo, o trailing é cancelado e recriado mais apertado (nunca alargado). Nunca reaperta antes de confirmar a nova ordem na OKX.
 - OKX API v5: trailing stop usa `ordType="move_order_stop"` com
   `callbackRatio`/`callbackSpread`.
-- No TP1, o bot cria trailing/fallback antes de cancelar o SL fixo antigo; nunca remove a proteção antiga antes de confirmar a nova.
+- No TP1 (e no reaperto), o bot cria trailing/fallback antes de cancelar o SL/trailing antigo; nunca remove a proteção antiga antes de confirmar a nova.
 - Se trailing falhar → fallback SL fixo + registra rejeição do trailing. Se trailing e fallback falharem, `tp1_done` não é marcado.
 - `_recover_state()` recupera a posição do banco e, no próximo ciclo, sincroniza a proteção real pendente na OKX; se não houver SL/trailing ativo, tenta recriar o SL e pode encerrar a posição por segurança.
 - Buscas de algo orders pendentes na OKX são feitas por `ordType` separado (`conditional` e `move_order_stop`), sem lista separada por vírgula.

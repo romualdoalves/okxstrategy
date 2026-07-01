@@ -94,6 +94,24 @@ class BotInstance:
     Conecta ao WebSocket da exchange, processa candles e executa ordens.
     """
 
+    # ── Gestão de risco pós-entrada (breakeven + trailing em camadas) ─────────
+    # Gatilho de breakeven: lucro mínimo a partir do qual o SL trava no zero-a-zero
+    # (mais o buffer de taxas), tornando a operação matematicamente impossível de perder.
+    BREAKEVEN_TRIGGER_PCT = 0.004   # +0.4% de lucro
+    BREAKEVEN_FEE_BUFFER  = 0.0015  # cobre taxas/slippage acima da entrada
+    # Gatilho da sombra dinâmica (trailing nativo baseado em ATR).
+    SHADOW_TRIGGER_PCT    = 0.01    # +1.0% de lucro
+    # Tetos de callback por faixa de lucro (chandelier exit): quanto mais a operação
+    # avança, mais apertada a sombra fica — evita que um ATR inflado pelo próprio rally
+    # devolva boa parte do lucro antes de sair (achado da Análise do Especialista).
+    _TRAILING_CALLBACK_TIERS = (
+        (0.04, 0.006),   # >= 4% de lucro   → callback máx. 0.6%
+        (0.02, 0.010),   # >= 2% de lucro   → callback máx. 1.0%
+        (0.0,  0.015),   # abaixo disso     → callback máx. 1.5%
+    )
+    _TRAILING_MIN_CALLBACK = 0.005
+    _TRAILING_RETIGHTEN_FACTOR = 0.85  # só reaperta a sombra se a melhora for >= 15%
+
     def __init__(self, config: BotModel, ws_broadcast):
         self.config       = config
         self._broadcast   = ws_broadcast   # coroutine para enviar ao frontend
@@ -110,6 +128,7 @@ class BotInstance:
         self._tp1_price   = 0.0
         self._sl_price    = 0.0
         self._tp1_done    = False
+        self._breakeven_done = False  # Trava de breakeven já aplicada nesta posição?
         self._sl_algo_id  : Optional[str] = None
         self._ts_algo_id  : Optional[str] = None
         self._entry_ord_id: Optional[str] = None # ID da ordem de entrada
@@ -1433,9 +1452,43 @@ class BotInstance:
                     # CONDIÇÃO DE PROTEÇÃO: só recria se a exchange confirma que não há ordem ativa.
             # NÃO cancela com base em _sl_price local — evita loop de cancel/recriação.
                     is_unprotected = not order_confirmed_on_exchange
-            
-            if pnl_pct >= 0.01 and is_unprotected:
-                log.critical("[AUDITORIA Bot %d] PROTEÇÃO EXIGIDA! Lucro %.2f%% sem ordem ativa ou com stop travado.", 
+
+                    # Sombra em Camadas (chandelier exit): mesmo com a ordem confirmada e
+                    # protegida, reaperta o callback conforme o lucro avança. Sem isso, um
+                    # callback largo definido lá no gatilho inicial (ATR inflado pelo rally)
+                    # persiste durante toda a operação e devolve boa parte do lucro no pico —
+                    # exatamente o padrão identificado na Análise do Especialista.
+                    if order_confirmed_on_exchange and self._ts_callback_ratio > 0:
+                        current_price = self._candles[-1].close if self._candles else self._entry_price
+                        ideal_cb = self._trailing_callback_for_pnl(pnl_pct, current_price)
+                        if ideal_cb <= self._ts_callback_ratio * self._TRAILING_RETIGHTEN_FACTOR:
+                            old_cb = self._ts_callback_ratio
+                            old_ts_algo_id = self._ts_algo_id
+                            tightened_id = await exchange.place_trailing_stop(
+                                self.config.symbol,
+                                "sell" if self._direction == 1 else "buy",
+                                self._sz, ideal_cb, current_price,
+                            )
+                            if tightened_id:
+                                try:
+                                    await exchange.cancel_algo(self.config.symbol, old_ts_algo_id)
+                                except Exception as exc:
+                                    log.warning("[AUDITORIA Bot %d] Falha ao cancelar sombra antiga após reapertar: %s",
+                                                self.config.id, exc)
+                                self._ts_algo_id = tightened_id
+                                self._ts_callback_ratio = ideal_cb
+                                self._persist_trailing_stop_level()
+                                log.info(
+                                    "[AUDITORIA Bot %d] SOMBRA REAPERTADA: %.2f%% -> %.2f%% (lucro %.2f%%)",
+                                    self.config.id, old_cb * 100, ideal_cb * 100, pnl_pct * 100,
+                                )
+                                await self._broadcast({
+                                    "type": "trade", "bot_id": self.config.id,
+                                    "event": "trailing_tightened", "price": current_price,
+                                })
+
+            if pnl_pct >= self.SHADOW_TRIGGER_PCT and is_unprotected:
+                log.critical("[AUDITORIA Bot %d] PROTEÇÃO EXIGIDA! Lucro %.2f%% sem ordem ativa ou com stop travado.",
                              self.config.id, pnl_pct*100)
                 
                 # Cancela qualquer lixo que tenha sobrado
@@ -1938,6 +1991,7 @@ class BotInstance:
         self._tp1_price    = tp1_px
         self._sl_price     = sl_px
         self._tp1_done     = False
+        self._breakeven_done = False
         self._sl_algo_id   = sl_id
         self._entry_ord_id = ord_id # Armazenamos o ID de entrada
         self._entry_inflight = False
@@ -1991,28 +2045,93 @@ class BotInstance:
 
     # ── TP1 + Trailing ────────────────────────────────────────────────────────
 
+    def _trailing_callback_for_pnl(self, pnl_pct: float, price: float) -> float:
+        """
+        Callback do trailing stop baseado em ATR, mas com teto que se aperta conforme
+        o lucro avança (chandelier exit). Sem isso, um ATR inflado pelo próprio rally
+        (maior volatilidade = maior ATR = sombra mais larga) devolve boa parte do
+        lucro acumulado antes de sair — exatamente o achado da Análise do Especialista.
+        """
+        atr_cb = (self._current_atr * 1.5) / price if price else self._TRAILING_MIN_CALLBACK
+        cap = self._TRAILING_CALLBACK_TIERS[-1][1]
+        for threshold, tier_cap in self._TRAILING_CALLBACK_TIERS:
+            if pnl_pct >= threshold:
+                cap = tier_cap
+                break
+        return max(self._TRAILING_MIN_CALLBACK, min(atr_cb, cap))
+
+    async def _lock_breakeven(self, price: float, exchange: BaseExchange):
+        """
+        Move o Stop Loss para o breakeven (entrada + buffer de taxas) assim que a
+        operação atinge um lucro mínimo. A partir daqui o pior desfecho possível é
+        ~zero, nunca uma perda — independente de quando (ou se) a sombra dinâmica
+        de TP1 vier a ser ativada.
+        """
+        breakeven_px = (
+            self._entry_price * (1 + self.BREAKEVEN_FEE_BUFFER) if self._direction == 1
+            else self._entry_price * (1 - self.BREAKEVEN_FEE_BUFFER)
+        )
+        # Só avança o stop; nunca move contra o lucro já garantido (ex.: SL original
+        # já estava mais favorável que o breakeven).
+        already_better = (
+            (self._direction == 1 and self._sl_price >= breakeven_px)
+            or (self._direction == -1 and 0 < self._sl_price <= breakeven_px)
+        )
+        if already_better:
+            self._breakeven_done = True
+            return
+
+        close_side = "sell" if self._direction == 1 else "buy"
+        new_sl_id = await exchange.place_stop_loss(self.config.symbol, close_side, self._sz, breakeven_px)
+        if not new_sl_id:
+            log.warning("[Bot %d] Falha ao travar breakeven @ %.4f; tentará novamente no próximo tick.",
+                        self.config.id, breakeven_px)
+            return
+
+        old_sl_algo_id = self._sl_algo_id
+        self._sl_algo_id = new_sl_id
+        self._sl_price = breakeven_px
+        self._breakeven_done = True
+        if old_sl_algo_id:
+            try:
+                await exchange.cancel_algo(self.config.symbol, old_sl_algo_id)
+            except Exception as exc:
+                log.warning("[Bot %d] Falha ao cancelar SL original após travar breakeven: %s",
+                            self.config.id, exc)
+        self._persist_trailing_stop_level()
+        log.info("[Bot %d] BREAKEVEN TRAVADO @ %.4f (lucro mínimo de %.2f%% atingido).",
+                 self.config.id, breakeven_px, self.BREAKEVEN_TRIGGER_PCT * 100)
+        await self._broadcast({
+            "type": "trade", "bot_id": self.config.id,
+            "event": "breakeven_locked", "price": breakeven_px,
+        })
+
     async def _check_tp1(self, price: float, exchange: BaseExchange):
         if self._tp1_done: return
-        
+
         pnl_pct = (price - self._entry_price) / self._entry_price
         if self._direction == -1: pnl_pct = -pnl_pct
-        
+
+        # Trava de breakeven: dispara bem antes da sombra dinâmica para que a operação
+        # já não possa mais virar prejuízo enquanto aguarda o gatilho de TP1.
+        if not self._breakeven_done and pnl_pct >= self.BREAKEVEN_TRIGGER_PCT:
+            await self._lock_breakeven(price, exchange)
+
         # Gatilho de Ativação: +1.0% de PnL líquido
-        if pnl_pct >= 0.01:
+        if pnl_pct >= self.SHADOW_TRIGGER_PCT:
             close_side = "sell" if self._direction == 1 else "buy"
-            
+
             # Proteção Dupla: Garante que trailing OU fallback SL seja criado ANTES de marcar tp1_done
             protection_established = False
-            
+
             old_sl_algo_id = self._sl_algo_id
 
             # Ativa a Sombra Dinâmica (Trailing Stop 100% dinâmico) para toda a posição!
-            # A sombra manterá uma distância baseada no ATR (volatilidade real) do momento
-            min_cb = 0.005 # Nunca menor que 0.5%
-            atr_cb = (self._current_atr * 1.5) / price
-            cb = max(min_cb, atr_cb)
-            
-            log.info("[Bot %d] DYNAMIC SHADOW TRIGGER ativado! Lucro: %.2f%%. Callback dinâmico: %.2f%%", 
+            # A distância é baseada no ATR (volatilidade real) mas limitada por faixa de
+            # lucro: quanto mais a operação avança, mais apertada a sombra fica.
+            cb = self._trailing_callback_for_pnl(pnl_pct, price)
+
+            log.info("[Bot %d] DYNAMIC SHADOW TRIGGER ativado! Lucro: %.2f%%. Callback dinâmico: %.2f%%",
                      self.config.id, pnl_pct*100, cb*100)
             
             ts_id = await exchange.place_trailing_stop(
@@ -2145,6 +2264,7 @@ class BotInstance:
         self._direction = self._sz = self._sz_remaining = 0
         self._entry_price = self._tp1_price = self._sl_price = 0.0
         self._tp1_done = False
+        self._breakeven_done = False
         self._sl_algo_id = self._ts_algo_id = None
         self._ts_callback_ratio = 0.0
         self._peak_price = 0.0
