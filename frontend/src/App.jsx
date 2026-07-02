@@ -68,14 +68,14 @@ function AppShell() {
   }, [])
 
   const getDayOfYear = (date) => {
-    const start = new Date(date.getFullYear(), 0, 0)
+    const start = new Date(Date.UTC(date.getUTCFullYear(), 0, 0))
     const diff = date - start
     const oneDay = 1000 * 60 * 60 * 24
     return Math.floor(diff / oneDay)
   }
 
   const getWeekOfYear = (date) => {
-    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+    const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()))
     const dayNum = d.getUTCDay() || 7
     d.setUTCDate(d.getUTCDate() + 4 - dayNum)
     const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
@@ -142,16 +142,16 @@ function AppShell() {
           <div className="bg-black/20 rounded-xl p-3 border border-white/5 shadow-inner space-y-2">
             <div className="flex justify-between items-end">
               <p className="text-accent text-2xl font-mono font-bold leading-none tracking-tighter">
-                {now.toLocaleTimeString(undefined, { hour12: false })}
+                {now.toLocaleTimeString(undefined, { hour12: false, timeZone: 'UTC' })}
               </p>
               <p className="text-[10px] text-white font-mono font-bold mb-0.5">
-                W{getWeekOfYear(now)}
+                W{getWeekOfYear(now)} UTC
               </p>
             </div>
-            
+
             <div className="flex justify-between items-center border-t border-white/5 pt-2">
               <p className="text-[10px] text-white font-bold uppercase">
-                {now.toLocaleDateString(lang, { weekday: 'long' })}
+                {now.toLocaleDateString(lang, { weekday: 'long', timeZone: 'UTC' })}
               </p>
               <p className="text-[10px] text-white font-bold uppercase tracking-tighter">
                 DOY {getDayOfYear(now)}
@@ -159,7 +159,7 @@ function AppShell() {
             </div>
 
             <p className="text-[10px] text-white font-bold tracking-widest">
-              {now.toLocaleDateString(undefined, { day: '2-digit', month: '2-digit', year: 'numeric' })}
+              {now.toLocaleDateString(undefined, { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' })}
             </p>
           </div>
 
