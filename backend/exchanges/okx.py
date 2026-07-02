@@ -7,6 +7,7 @@ import base64
 import hashlib
 import hmac
 import json
+import logging
 import math
 import os
 from urllib.parse import urlencode
@@ -18,6 +19,8 @@ import aiohttp
 from .base import BaseExchange, CandleBar, Position
 
 OKX_BASE = "https://www.okx.com"
+
+log = logging.getLogger("okx_exchange")
 
 # ── Cache de informações de instrumento (público, sem auth) ───────────────────
 # Evita chamar /public/instruments a cada ordem. Populado em warmup_instrument().
@@ -773,8 +776,8 @@ class OKXExchange(BaseExchange):
         until: str | None = None,
         activity_type: str = "FILL",
     ) -> list[dict]:
-        """Retorna fills históricos da OKX (GET /api/v5/trade/fills)."""
-        path = "/api/v5/trade/fills?instType=ANY"
+        """Retorna fills históricos da OKX (GET /api/v5/trade/fills). App é SPOT-only."""
+        path = "/api/v5/trade/fills?instType=SPOT"
         if after:
             ms = _iso_to_ms(after)
             if ms:
@@ -788,6 +791,11 @@ class OKXExchange(BaseExchange):
             async with s.get(f"{OKX_BASE}{path}", headers=headers) as resp:
                 data = await resp.json()
         if str(data.get("code", "0")) != "0":
+            log.warning(
+                "[get_activities] OKX recusou /trade/fills (code=%s msg=%s path=%s) — "
+                "retornando lista vazia, NÃO necessariamente 'zero fills'.",
+                data.get("code"), data.get("msg"), path,
+            )
             return []
         result = []
         for f in data.get("data", []):

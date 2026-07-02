@@ -84,6 +84,17 @@ Trabalhe somente no repositório `E:\Dell Inspiron\W\Dev\Trading\OKXTrader\OKXSt
 - Buscas de algo orders pendentes na OKX são feitas por `ordType` separado (`conditional` e `move_order_stop`), sem lista separada por vírgula.
 - Orphan recovery calcula `tp1 = entry × 1.02 (LONG) / 0.98 (SHORT)`.
 
+### Taxas de corretagem e reconciliação com a OKX
+- `GET /api/v5/trade/fills` é chamado com `instType=SPOT` (app é SPOT-only). Se a OKX
+  recusar a chamada, o erro é logado (`okx_exchange` logger) em vez de virar silenciosamente
+  "0 fills" — se a aba **Registros → Atividades OKX** mostrar `Fills OKX (0)` com trades
+  reais no dia, checar `docker logs okx_strategy` por `[get_activities]`.
+- `POST /api/trades/sync-fees` busca a taxa **real** de cada fill (entrada e saída) na OKX
+  dentro da janela de tempo do trade e soma os dois valores reais — não estima mais um
+  percentual fixo (removido: estimativa antiga de 0.08% taker).
+- A reconciliação de `Fees (CFEE)` na aba Atividades OKX usa o campo `fee` já presente em
+  cada fill retornado por `/trade/fills` (não existe mais fetch/matching separado de CFEE).
+
 ### Telegram
 - Bot: `@OKX_StrategyBot` · chat_id: `6753071411`.
 - Token real só no `.env` do VPS — nunca commitar.

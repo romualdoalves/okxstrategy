@@ -1996,13 +1996,9 @@ async def get_activities(date: Optional[str] = None, db: Session = Depends(get_d
             return exchange.get_activities(after=earliest_date + "T00:00:00Z", until=_cross_end)
         return exchange.get_activities(after=_utc_start, until=_utc_end)
 
-    def _cfee_fetch():
-        return exchange.get_activities(after=_utc_start, until=_utc_end, activity_type="CFEE")
-
     try:
-        all_fills, all_cfees, account, port_history, open_orders = await asyncio.gather(
+        all_fills, account, port_history, open_orders = await asyncio.gather(
             _fills_fetch(),
-            _cfee_fetch(),
             exchange.get_account_summary(),
             exchange.get_portfolio_history("1D", "1H"),
             exchange.get_open_orders(),
@@ -2018,39 +2014,6 @@ async def get_activities(date: Optional[str] = None, db: Session = Depends(get_d
     for b in bots_all:
         key = _norm(b.symbol)
         bot_by_symbol.setdefault(key, []).append({"id": b.id, "name": b.name, "strategy_id": b.strategy_id})
-
-    # 3b. Constrói pool de taxas CFEE para matching posterior
-    _cfee_pool: list[dict] = []
-    for c in (all_cfees or []):
-        try:
-            fee_usd = abs(float(c.get("net_amount") or 0))
-        except (TypeError, ValueError):
-            fee_usd = 0.0
-        if fee_usd < 0.0001:
-            continue
-        sym_c = _norm(c.get("symbol", ""))
-        ts_str = c.get("transaction_time") or (c.get("date", "") + "T00:00:00Z")
-        try:
-            ts_c = _dt.datetime.fromisoformat(ts_str.replace("Z", "+00:00")).replace(tzinfo=None)
-        except Exception:
-            ts_c = None
-        _cfee_pool.append({"sym": sym_c, "ts": ts_c, "fee_usd": fee_usd, "used": False})
-
-    def _match_fee(sym_norm: str, fill_ts) -> float:
-        best, best_delta = None, float("inf")
-        for c in _cfee_pool:
-            if c["used"]:
-                continue
-            if c["sym"] and c["sym"] != sym_norm:
-                continue
-            if c["ts"] and fill_ts:
-                delta = abs((c["ts"] - fill_ts).total_seconds())
-                if delta < best_delta and delta <= 7200:
-                    best, best_delta = c, delta
-        if best:
-            best["used"] = True
-            return round(best["fee_usd"], 4)
-        return 0.0
 
     # 4. Trades internos do dia para reconciliação
     day_start = _dt.datetime.fromisoformat(_utc_start.replace("Z", ""))
@@ -2127,8 +2090,11 @@ async def get_activities(date: Optional[str] = None, db: Session = Depends(get_d
                         matched_db_trade = {"id": t.id, "type": t.type, "pnl": t.pnl}
                         break
 
-        # Taxa CFEE (apenas para SELLs — onde a fee fecha o round-trip)
-        fee_usd = _match_fee(sym_norm, fill_ts) if side == "sell" else 0.0
+        # Taxa real da OKX, já incluída no próprio fill (campo `fee`, tipicamente negativo).
+        try:
+            fee_usd = abs(float(f.get("fee") or 0))
+        except (TypeError, ValueError):
+            fee_usd = 0.0
         net_pnl = round(fill_pnl - fee_usd, 4) if fill_pnl is not None else None
 
         enriched_fills.append({
@@ -3136,40 +3102,102 @@ def list_trades(bot_id: Optional[int] = None,
 
 async def _sync_trade_fees_impl(db: Session, days_back: int = 30) -> dict:
     """
-    Sincroniza taxas de corretagem da OKX para trades registrados.
-    Busca trades sem fee preenchida e tenta calcular a partir dos dados disponíveis.
+    Sincroniza taxas de corretagem REAIS da OKX para trades registrados.
+    Para cada trade pendente, busca os fills de entrada e saída na OKX
+    (GET /trade/fills) na janela de tempo do trade e soma as taxas reais
+    (campo `fee` de cada fill) — não estima um percentual fixo.
     """
     from datetime import datetime, timedelta
-    
+    import aiohttp as _aio
+
     cutoff = datetime.utcnow() - timedelta(days=days_back)
     pending = db.query(TradeModel).filter(
         TradeModel.type == "exit",
         TradeModel.fee.is_(None),
         TradeModel.timestamp >= cutoff,
     ).all()
-    
+
+    if not pending:
+        return {"updated": 0, "skipped": False, "reason": "Nenhum trade pendente de sincronização."}
+
+    def _norm_sym(sym: str) -> str:
+        return (sym or "").upper().replace("/", "").replace("-", "")
+
+    def _closest_fill(candidates: list[dict], target_ts: datetime) -> Optional[dict]:
+        best, best_delta = None, None
+        for f in candidates:
+            try:
+                f_ts = datetime.fromisoformat(f["transaction_time"].replace("Z", "+00:00")).replace(tzinfo=None)
+            except Exception:
+                continue
+            delta = abs((f_ts - target_ts).total_seconds())
+            if best is None or delta < best_delta:
+                best, best_delta = f, delta
+        return best
+
     updated = 0
-    for trade in pending:
-        # Calcula taxa estimada: 0.08% (taker) do valor da ordem
-        if trade.exit_price and trade.size:
-            order_value = trade.exit_price * trade.size
-            estimated_fee = order_value * 0.0008  # 0.08% taker fee OKX
-            trade.fee = round(estimated_fee, 4)
-            
-            # Também atualiza o registro de entrada correspondente
-            # para que o summary calcule corretamente
+    skipped_no_fill = 0
+
+    async with _aio.ClientSession() as sess:
+        exchange = build_exchange(sess)
+        for trade in pending:
             entry_trade = db.query(TradeModel).filter(
                 TradeModel.bot_id == trade.bot_id,
                 TradeModel.type == "entry",
                 TradeModel.exit_price == trade.exit_price,
             ).first()
+            entry_ts = (entry_trade.timestamp if entry_trade else None) or trade.timestamp
+            exit_ts  = trade.closed_at or trade.timestamp
+            if not entry_ts or not exit_ts:
+                skipped_no_fill += 1
+                continue
+
+            window_start = (entry_ts - timedelta(minutes=10)).isoformat() + "Z"
+            window_end   = (exit_ts + timedelta(minutes=10)).isoformat() + "Z"
+            try:
+                fills = await exchange.get_activities(after=window_start, until=window_end)
+            except Exception as exc:
+                log.warning("[sync-fees] Falha ao buscar fills da OKX para trade %d: %s", trade.id, exc)
+                skipped_no_fill += 1
+                continue
+
+            sym_norm = _norm_sym(trade.symbol)
+            matching = [f for f in fills if _norm_sym(f.get("symbol", "")) == sym_norm]
+            if not matching:
+                skipped_no_fill += 1
+                continue
+
+            entry_side = "buy" if trade.direction == "long" else "sell"
+            exit_side  = "sell" if trade.direction == "long" else "buy"
+            entry_fill = _closest_fill([f for f in matching if f.get("side") == entry_side], entry_ts)
+            exit_fill  = _closest_fill([f for f in matching if f.get("side") == exit_side], exit_ts)
+
+            total_fee = 0.0
+            found_any = False
+            for fill in (entry_fill, exit_fill):
+                if fill and fill.get("fee") not in (None, ""):
+                    try:
+                        total_fee += abs(float(fill["fee"]))
+                        found_any = True
+                    except (TypeError, ValueError):
+                        pass
+
+            if not found_any:
+                skipped_no_fill += 1
+                continue
+
+            trade.fee = round(total_fee, 6)
             if entry_trade and entry_trade.fee is None:
                 entry_trade.fee = trade.fee
-            
             updated += 1
-    
+
     db.commit()
-    return {"updated": updated, "skipped": False, "reason": f"Taxas estimadas para {updated} trades"}
+    return {
+        "updated": updated,
+        "skipped_no_fill": skipped_no_fill,
+        "skipped": False,
+        "reason": f"Taxas reais sincronizadas da OKX para {updated} trade(s) ({skipped_no_fill} sem fill correspondente).",
+    }
 
 
 @app.post("/api/trades/sync-fees")
