@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import aiohttp
@@ -2433,6 +2433,21 @@ class BotInstance:
         """Tenta recuperar o estado de uma posição aberta do banco de dados."""
         db = SessionLocal()
         try:
+            # P&L acumulado/wins/losses são persistidos no banco (tabela trades), não na
+            # memória do processo: um restart do backend (deploy, crash, reboot) NÃO deve
+            # zerar o histórico do bot — só o Reset Geral (que apaga os trades) o faz.
+            closed = db.query(TradeModel).filter(
+                TradeModel.bot_id == self.config.id,
+                TradeModel.type == "exit",
+                TradeModel.pnl.isnot(None),
+            ).all()
+            if closed:
+                self._daily_pnl = sum(t.pnl for t in closed)
+                self._wins      = sum(1 for t in closed if t.pnl > 0)
+                self._losses    = sum(1 for t in closed if t.pnl <= 0)
+                log.info("[Bot %d] P&L acumulado recuperado do banco: %.2f (%dW/%dL)",
+                         self.config.id, self._daily_pnl, self._wins, self._losses)
+
             # Usa o registro de ENTRADA (type="entry") como fonte da verdade para recuperação.
             # Antes usávamos order_by(id.desc()) que retornava o registro TP1 — cujo sl_price
             # era copiado do entry no momento do trigger e nunca atualizado posteriormente.
@@ -2732,6 +2747,53 @@ class BotInstance:
         compatibilidade com chamadas antigas após fechamento.
         """
         return
+
+    async def _resolve_desync_exit_fill(self, exchange: BaseExchange) -> Optional[tuple[float, float]]:
+        """
+        Busca na OKX o fill real que fechou esta posição, para quando o WebSocket
+        privado perde/atrasa o evento e o `_reconcile_loop` detecta a posição já
+        flat na exchange antes do app processar a saída. Retorna (preço médio
+        ponderado, quantidade) do(s) fill(s) de fechamento, ou None se nenhum
+        fill correspondente for encontrado na janela de busca.
+        """
+        close_side = "sell" if self._direction == 1 else "buy"
+        sym_norm = self.config.symbol.upper().replace("/", "").replace("-", "")
+        now = datetime.now(timezone.utc)
+        lookback = now - timedelta(hours=3)
+        try:
+            fills = await exchange.get_activities(
+                after=lookback.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                until=now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            )
+        except Exception as exc:
+            log.warning("[Bot %d] Falha ao buscar fills para reconciliação de desync: %s",
+                        self.config.id, exc)
+            return None
+
+        matching = [
+            f for f in fills
+            if f.get("symbol", "").upper().replace("/", "").replace("-", "") == sym_norm
+            and f.get("side") == close_side
+        ]
+        if not matching:
+            return None
+
+        total_qty = 0.0
+        weighted_px = 0.0
+        for f in matching:
+            try:
+                px  = float(f.get("price") or 0)
+                qty = float(f.get("qty") or 0)
+            except (TypeError, ValueError):
+                continue
+            if px <= 0 or qty <= 0:
+                continue
+            weighted_px += px * qty
+            total_qty   += qty
+
+        if total_qty <= 0:
+            return None
+        return round(weighted_px / total_qty, 8), total_qty
 
     async def _on_position_closed(self, price: float, size: float, exchange: BaseExchange):
         """Finaliza o trade e limpa o estado do bot."""
@@ -3221,14 +3283,32 @@ class BotManager:
                             )
                         continue
                     if qty <= 0:
-                        log.warning(
-                            "[Bot %d] DESYNC: banco tem posição %s aberta mas OKX está FLAT. Resetando.",
-                            bot.config.id, bot.config.symbol,
-                        )
+                        # Antes de fabricar um fechamento com pnl=0, tenta recuperar o fill
+                        # real de saída na OKX — o WS pode só estar atrasado, e a posição já
+                        # ter sido fechada com um preço/P&L real que não pode ser descartado.
+                        real_exit = await bot._resolve_desync_exit_fill(exchange)
+                        if real_exit:
+                            exit_price, fill_qty = real_exit
+                            ct_size = exchange.get_contract_size(bot.config.symbol)
+                            pnl = fill_qty * ct_size * (exit_price - bot._entry_price) * bot._direction
+                            log.warning(
+                                "[Bot %d] DESYNC: banco tem posição %s aberta mas OKX está FLAT. "
+                                "Fill real recuperado @ %.6f (pnl=%.4f) — fechando com dados reais.",
+                                bot.config.id, bot.config.symbol, exit_price, pnl,
+                            )
+                        else:
+                            exit_price, pnl = bot._entry_price or 0.0, 0.0
+                            log.error(
+                                "[Bot %d] DESYNC CRÍTICO: banco tem posição %s aberta mas OKX está "
+                                "FLAT, e nenhum fill correspondente foi encontrado na OKX. Fechando "
+                                "com pnl=0 — dado pode estar incorreto, investigar manualmente.",
+                                bot.config.id, bot.config.symbol,
+                            )
+                        bot._record_pnl(pnl)
                         bot._save_trade({
                             "type": "exit", "event": "DESYNC_RECONCILE",
-                            "exit_price": bot._entry_price or 0.0,
-                            "pnl": 0.0,
+                            "exit_price": exit_price,
+                            "pnl": pnl,
                             "closed_at": datetime.now(timezone.utc).replace(tzinfo=None),
                         }, update_id=bot._current_trade_id)
                         bot._reset()

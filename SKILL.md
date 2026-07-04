@@ -128,6 +128,18 @@ reiniciar com conta limpa.
 **P&L:** `pnl = size * ct_size * (price - entry_price) * direction`
 (sinal correto para todas as combinações LONG/SHORT × ganho/perda).
 
+**DESYNC_RECONCILE (app aberto / OKX flat):** antes de fechar o trade, o
+`_reconcile_loop` tenta recuperar o fill real de saída via `_resolve_desync_exit_fill`
+(fills recentes da OKX, `get_activities`) e grava preço/P&L reais. Só cai no fallback
+`exit_price=entry_price, pnl=0` (com log `CRÍTICO`) se nenhum fill correspondente for
+encontrado — antes gravava `pnl=0` sempre, mesmo quando a posição tinha fechado com
+resultado real (WS atrasado/perdido é o gatilho mais comum dessa corrida).
+
+**P&L acumulado por bot (`daily_pnl`/wins/losses):** apesar do nome, representa o
+acumulado desde sempre — só zera no Reset Geral (que apaga os trades), nunca à meia-noite
+nem em restart do backend. `_recover_state()` reidrata esses contadores a partir dos
+trades fechados no banco a cada início/reinício do bot, para sobreviver a deploys.
+
 ---
 
 ## Arquitetura
