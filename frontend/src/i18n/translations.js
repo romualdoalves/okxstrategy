@@ -27,7 +27,7 @@ const T = {
     'c.flat':               'Flat',
     'c.all':                'Todos',
     'c.win_rate':           'Win Rate',
-    'c.pnl_today':          'P&L Hoje',
+    'c.pnl_today':          'P&L Acumulado',
     'c.total_pnl':          'P&L Total',
     'c.position':           'Posição',
     'c.stake':              'Stake',
@@ -76,7 +76,7 @@ const T = {
     'bots.create_first':    'Criar primeiro bot',
 
     // ── BotCard ────────────────────────────────────────────────────────────────
-    'card.pnl_today':       'P&L Hoje',
+    'card.pnl_today':       'P&L Acumulado',
     'card.position':        'Posição',
     'card.order_blocked':   'Ordem bloqueada pela corretora',
     'card.symbol_restricted': '{{symbol}} foi recusado por restrição da conta/região.',
@@ -590,7 +590,7 @@ const T = {
     'c.flat':               'Flat',
     'c.all':                'All',
     'c.win_rate':           'Win Rate',
-    'c.pnl_today':          'P&L Today',
+    'c.pnl_today':          'Accumulated P&L',
     'c.total_pnl':          'Total P&L',
     'c.position':           'Position',
     'c.stake':              'Stake',
@@ -639,7 +639,7 @@ const T = {
     'bots.create_first':    'Create first bot',
 
     // ── BotCard ───────────────────────────────────────────────────────────────
-    'card.pnl_today':       'P&L Today',
+    'card.pnl_today':       'Accumulated P&L',
     'card.position':        'Position',
     'card.order_blocked':   'Order blocked by broker',
     'card.symbol_restricted': '{{symbol}} was rejected by account/region restrictions.',

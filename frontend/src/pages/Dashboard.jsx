@@ -395,7 +395,9 @@ export default function Dashboard() {
   const exposureMismatch = exchExposure  != null && (
     (exchExposure === 0) !== (openExposure === 0)
   )
-  const pnlMismatch = exchUnrealPnl != null && Math.abs(exchUnrealPnl - totalPnl) > 5
+  // Não há "mismatch" entre exchUnrealPnl (não-realizado, posições abertas agora) e
+  // totalPnl (realizado acumulado, trades já fechados) — são grandezas diferentes,
+  // não duas fontes para o mesmo número. Não comparar como divergência.
   const valueColor = (n) => Number(n) > 0 ? 'bull' : Number(n) < 0 ? 'bear' : 'white'
   const textValueColor = (n, opacity = '') => {
     const suffix = opacity ? `/${opacity}` : ''
@@ -566,21 +568,19 @@ export default function Dashboard() {
               source: 'okx',
               label: 'OKX',
               value: exchUnrealPnl != null
-                ? `${exchUnrealPnl > 0 ? '+' : ''}${fmt(exchUnrealPnl)} unreal`
+                ? `${exchUnrealPnl > 0 ? '+' : ''}${fmt(exchUnrealPnl)} não-real. (aberto)`
                 : '—',
               color: exchUnrealPnl != null
                 ? textValueColor(exchUnrealPnl, '80')
                 : undefined,
-              mismatch: pnlMismatch,
             },
             {
               source: 'app',
               label: 'App',
               value: totalFees > 0
-                ? `${fmt(netPnl)} líq · -${fmt(totalFees, 4)} tx`
-                : `${totalPnl > 0 ? '+' : ''}${fmt(totalPnl)} · ${totalTrades}t`,
+                ? `${fmt(netPnl)} líq · -${fmt(totalFees, 4)} tx (realizado)`
+                : `${totalPnl > 0 ? '+' : ''}${fmt(totalPnl)} · ${totalTrades}t (realizado)`,
               color: textValueColor(netPnl, '50'),
-              mismatch: pnlMismatch,
             },
           ]}
         />

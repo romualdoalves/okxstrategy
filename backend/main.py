@@ -3481,10 +3481,12 @@ async def account_snapshot(demo: bool = False, db: Session = Depends(get_db)):
             # positions. For this spot-only app, count active bot symbols via
             # get_position(), which maps base-currency balances to LONG.
             active_symbols = []
+            active_bot_status = []
             for bot in db.query(BotModel).all():
                 status = manager.get_status(bot.id)
                 if status and int(status.get("direction", 0) or 0) != 0:
                     active_symbols.append(bot.symbol)
+                    active_bot_status.append((bot.symbol, status))
             if active_symbols:
                 spot_results = await asyncio.gather(
                     *[ex.get_position(symbol) for symbol in active_symbols],
@@ -3503,6 +3505,21 @@ async def account_snapshot(demo: bool = False, db: Session = Depends(get_db)):
                         for pos in spot_positions
                     )
                     long_mv = max(long_mv, spot_mv)
+
+            # A OKX não expõe P&L não-realizado para saldos SPOT (app SPOT-only, sem
+            # margem/derivativos) — get_account_summary() sempre retorna 0 para isso.
+            # Calcula o não-realizado real a partir do próprio estado do bot (mesma
+            # fórmula do P&L realizado, com o preço atual no lugar do preço de saída).
+            computed_unreal = 0.0
+            for symbol, status in active_bot_status:
+                entry_price = float(status.get("entry_price") or 0.0)
+                last_price  = float(status.get("last_price") or 0.0)
+                size        = float(status.get("size") or 0.0)
+                direction   = int(status.get("direction") or 0)
+                if entry_price > 0 and last_price > 0 and size > 0 and direction != 0:
+                    ct_size = ex.get_contract_size(symbol)
+                    computed_unreal += size * ct_size * (last_price - entry_price) * direction
+            unreal_pl = computed_unreal
 
             return {
                 "equity":            round(equity, 2),

@@ -135,10 +135,19 @@ reiniciar com conta limpa.
 encontrado — antes gravava `pnl=0` sempre, mesmo quando a posição tinha fechado com
 resultado real (WS atrasado/perdido é o gatilho mais comum dessa corrida).
 
-**P&L acumulado por bot (`daily_pnl`/wins/losses):** apesar do nome, representa o
+**P&L acumulado por bot (`daily_pnl`/wins/losses):** apesar do nome no backend, representa o
 acumulado desde sempre — só zera no Reset Geral (que apaga os trades), nunca à meia-noite
 nem em restart do backend. `_recover_state()` reidrata esses contadores a partir dos
 trades fechados no banco a cada início/reinício do bot, para sobreviver a deploys.
+O rótulo na UI já foi corrigido para "P&L Acumulado" (`translations.js`); o campo JSON
+continua `daily_pnl` por compatibilidade.
+
+**Card "P&L Total" do Dashboard:** o lado "OKX" mostra P&L **não-realizado** (posições
+abertas agora, calculado em `/api/account/snapshot` a partir do preço atual vs. entrada de
+cada bot — a OKX não expõe isso nativamente para saldos SPOT, `get_account_summary()`
+sempre retorna 0 nesse campo). O lado "App" mostra P&L **realizado acumulado** (trades
+fechados, todo o histórico). São grandezas diferentes e não devem ser comparadas como
+"divergência" — não existe um `mismatch` entre elas no frontend.
 
 ---
 
