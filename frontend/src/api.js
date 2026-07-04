@@ -59,6 +59,7 @@ export const testTelegram        = () => req('/system/telegram-test', { method: 
 // Conta
 export const getBalance        = (ccy = 'USDT', demo = false) => req(`/account/balance?currency=${ccy}&demo=${demo}`)
 export const getAccountSnapshot = (demo = false) => req(`/account/snapshot?demo=${demo}`)
+export const getIntegrityCheck  = () => req('/integrity/check')
 export const resetAccount      = () => req('/account/reset-data', { method: 'POST' })
 
 // OKX — Conexão via banco

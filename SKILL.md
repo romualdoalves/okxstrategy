@@ -149,6 +149,14 @@ sempre retorna 0 nesse campo). O lado "App" mostra P&L **realizado acumulado** (
 fechados, todo o histórico). São grandezas diferentes e não devem ser comparadas como
 "divergência" — não existe um `mismatch` entre elas no frontend.
 
+**Tela de Integridade (`/integridade`, menu "Integridade"):** auditoria ao vivo, sob demanda
+(`GET /api/integrity/check`) — para cada bot, compara agora mesmo posição aberta/flat,
+tamanho e existência de ordem de proteção (SL/Trailing) ativa na OKX (`find_protective_algo`)
+contra o que o app acredita. Cada bot recebe `ok`/`warn`/`fail`/`error` por checagem e um
+status geral (o pior entre elas). Não é a reconciliação de histórico (`Atividades OKX`) nem
+o `_reconcile_loop` (que já corrige sozinho a cada 15s) — é a ferramenta do usuário para
+verificar, sem depender de ninguém, que o que o app mostra bate com a OKX neste instante.
+
 ---
 
 ## Arquitetura
@@ -188,6 +196,7 @@ OKXStrategy/
 │   │   ├── BatchBacktest.jsx      # Scanner: backtest de toda uma categoria de estratégias
 │   │   ├── Strategies.jsx
 │   │   ├── Activities.jsx
+│   │   ├── Integrity.jsx          # Auditoria ao vivo app vs OKX (/integridade)
 │   │   └── StrategyFactory.jsx    # Wizard 5 etapas (IA)
 │   └── components/
 │       ├── BotCard.jsx            # Card do bot (inclui baseline_balance)

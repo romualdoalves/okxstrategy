@@ -14,6 +14,7 @@ const T = {
     'nav.factory':          'Fábrica IA',
     'nav.monitor':          'Monitor',
     'nav.scanner':          'Scanner BT',
+    'nav.integrity':        'Integridade',
 
     // ── Comuns ─────────────────────────────────────────────────────────────────
     'c.loading':            'Carregando...',
@@ -577,6 +578,7 @@ const T = {
     'nav.factory':          'AI Factory',
     'nav.monitor':          'Monitor',
     'nav.scanner':          'BT Scanner',
+    'nav.integrity':        'Integrity',
 
     // ── Common ────────────────────────────────────────────────────────────────
     'c.loading':            'Loading...',

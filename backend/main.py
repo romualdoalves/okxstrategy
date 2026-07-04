@@ -3533,6 +3533,110 @@ async def account_snapshot(demo: bool = False, db: Session = Depends(get_db)):
             raise HTTPException(502, str(exc)) from exc
 
 
+_INTEGRITY_SEVERITY_RANK = {"ok": 0, "warn": 1, "fail": 2, "error": 3}
+
+
+@app.get("/api/integrity/check")
+async def integrity_check(db: Session = Depends(get_db)):
+    """
+    Auditoria ao vivo: para cada bot, compara o estado que o app acredita ter
+    (posição, tamanho, proteção) contra o estado real na OKX, agora — não uma
+    reconciliação de histórico, mas um raio-x do momento presente.
+    """
+    import aiohttp as _aio
+
+    bots = db.query(BotModel).all()
+    results = []
+
+    async with _aio.ClientSession() as session:
+        for bot in bots:
+            checks: list[dict] = []
+            try:
+                ex = build_exchange(session, demo=bot.demo)
+                status = manager.get_status(bot.id) or {}
+                app_direction = int(status.get("direction") or 0)
+                app_size      = float(status.get("size") or 0.0)
+                app_entry     = float(status.get("entry_price") or 0.0)
+                app_open      = app_direction != 0
+
+                pos = await ex.get_position(bot.symbol)
+                okx_qty  = abs(float(pos.size or 0.0)) if pos else 0.0
+                baseline = abs(float(getattr(bot, "baseline_balance", 0.0) or 0.0))
+                net_qty  = max(0.0, okx_qty - baseline)
+                okx_open = net_qty > 1e-9
+
+                if app_open == okx_open:
+                    checks.append({
+                        "label": "Posição", "status": "ok",
+                        "detail": f"App {'aberta' if app_open else 'flat'} · "
+                                  f"OKX {'aberta' if okx_open else 'flat'} (líquido de baseline).",
+                    })
+                else:
+                    checks.append({
+                        "label": "Posição", "status": "fail",
+                        "detail": f"App diz {'ABERTA' if app_open else 'FLAT'}, mas OKX está "
+                                  f"{'ABERTA' if okx_open else 'FLAT'} (líquido de baseline: {net_qty:.8f}).",
+                    })
+
+                if app_open and okx_open:
+                    diff_pct = abs(app_size - net_qty) / net_qty if net_qty > 0 else 1.0
+                    checks.append({
+                        "label": "Tamanho",
+                        "status": "ok" if diff_pct <= 0.01 else "fail",
+                        "detail": f"App {app_size:.8f} · OKX {net_qty:.8f} (dif. {diff_pct*100:.2f}%).",
+                    })
+
+                    close_side = "sell" if app_direction == 1 else "buy"
+                    protective = await ex.find_protective_algo(bot.symbol, close_side)
+                    if protective:
+                        trigger = protective.get("moveTriggerPx") or protective.get("slTriggerPx") or "?"
+                        checks.append({
+                            "label": "Proteção (SL/Trailing)", "status": "ok",
+                            "detail": f"Ordem ativa na OKX: {protective.get('ordType')} @ {trigger}.",
+                        })
+                    else:
+                        checks.append({
+                            "label": "Proteção (SL/Trailing)", "status": "fail",
+                            "detail": "Nenhuma ordem de proteção ativa encontrada na OKX — posição desprotegida!",
+                        })
+
+                    if app_entry > 0 and pos and pos.avg_price:
+                        okx_avg = float(pos.avg_price)
+                        entry_diff_pct = abs(app_entry - okx_avg) / okx_avg if okx_avg > 0 else 0.0
+                        checks.append({
+                            "label": "Preço de entrada",
+                            "status": "ok" if entry_diff_pct <= 0.05 else "warn",
+                            "detail": f"App {app_entry:.6f} · OKX preço médio {okx_avg:.6f} "
+                                      f"(dif. {entry_diff_pct*100:.2f}% — pode incluir holdings pré-existentes).",
+                        })
+
+                if status.get("halted"):
+                    checks.append({
+                        "label": "Estado", "status": "warn",
+                        "detail": "Bot está HALTED (circuit breaker ou erro crítico registrado).",
+                    })
+            except Exception as exc:
+                checks.append({"label": "Erro na auditoria", "status": "error", "detail": str(exc)})
+
+            overall = max(
+                (c["status"] for c in checks),
+                key=lambda s: _INTEGRITY_SEVERITY_RANK.get(s, 0),
+                default="ok",
+            )
+            results.append({
+                "bot_id": bot.id,
+                "name":   bot.name,
+                "symbol": bot.symbol,
+                "overall": overall,
+                "checks": checks,
+            })
+
+    return {
+        "checked_at": datetime.utcnow().isoformat() + "Z",
+        "bots": results,
+    }
+
+
 # ── Rotas: Mercado ────────────────────────────────────────────────────────────
 
 @app.get("/api/market/symbol-tradability")
