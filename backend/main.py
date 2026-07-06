@@ -3684,6 +3684,11 @@ async def integrity_check(db: Session = Depends(get_db)):
                         until=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                     )
                     okx_pnl_window, matched_fills = _fifo_realized_pnl(okx_fills_window, sym_norm)
+                    # Cada round-trip fechado precisa de no mínimo 1 fill de compra + 1 de
+                    # venda. Se a OKX devolveu menos fills do que isso, o /trade/fills
+                    # (retenção curta, ~3 dias) provavelmente não cobre a janela inteira —
+                    # a diferença pode ser cobertura incompleta, não um erro de verdade.
+                    expected_min_fills = len(app_trades_window) * 2
                     if matched_fills == 0:
                         checks.append({
                             "label": "P&L (fills OKX)", "status": "warn",
@@ -3692,6 +3697,16 @@ async def integrity_check(db: Session = Depends(get_db)):
                                       f"retornou nenhum fill de {bot.symbol} na janela — não dá para "
                                       f"confirmar (não significa que está errado).",
                         })
+                    elif matched_fills < expected_min_fills:
+                        checks.append({
+                            "label": "P&L (fills OKX)", "status": "warn",
+                            "detail": f"App {app_pnl_window:+.2f} ({len(app_trades_window)} trade(s)) · "
+                                      f"OKX (FIFO, via fills reais) {okx_pnl_window:+.2f} usando apenas "
+                                      f"{matched_fills} fill(s) — esperava pelo menos {expected_min_fills}. "
+                                      f"A OKX provavelmente não devolveu todos os fills dos últimos 3 dias "
+                                      f"(retenção curta do /trade/fills) — cobertura incompleta, não "
+                                      f"necessariamente um erro.",
+                        })
                     else:
                         diff = abs(app_pnl_window - okx_pnl_window)
                         tolerance = max(0.05, abs(okx_pnl_window) * 0.02)
@@ -3699,7 +3714,8 @@ async def integrity_check(db: Session = Depends(get_db)):
                             "label": "P&L (fills OKX)",
                             "status": "ok" if diff <= tolerance else "fail",
                             "detail": f"App {app_pnl_window:+.2f} · OKX (FIFO, via fills reais) "
-                                      f"{okx_pnl_window:+.2f} (dif. {diff:.2f}) — últimos 3 dias.",
+                                      f"{okx_pnl_window:+.2f} (dif. {diff:.2f}) — últimos 3 dias "
+                                      f"({matched_fills} fills).",
                         })
 
                 if app_open and okx_open:

@@ -180,7 +180,11 @@ a partir dos fills reais da OKX no mesmo período (`_fifo_realized_pnl`, mesma l
 simplificada — um buy por sell — já usada em `/api/activities`, válida porque cada bot
 fecha round-trips completos). Sem trades na janela → não aparece o check (nada a auditar).
 Sem fills retornados pela OKX → `warn` (não confirmável, não é necessariamente erro).
-Diferença além da tolerância (max($0.05, 2% do valor OKX)) → `fail` com os dois números.
+Cada round-trip fechado precisa de ≥2 fills (1 compra + 1 venda); se a OKX devolveu menos
+fills do que `2 × trades_no_período`, cobertura provavelmente incompleta (retenção curta do
+`/trade/fills`) → `warn`, não `fail` (achado real: PA007 mostrou fail com poucos fills —
+refinado para não confundir cobertura parcial com erro de verdade). Só vira `fail` com
+cobertura completa e diferença além da tolerância (max($0.05, 2% do valor OKX)).
 
 **Onde ver a taxa aplicada por trade:** coluna "Taxa" própria em `TradeTable.jsx` (compartilhada
 por Registros → Histórico de Trades, Bots → detalhe → histórico, e a aba de trades), lado a
