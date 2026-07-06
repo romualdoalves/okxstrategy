@@ -149,6 +149,13 @@ sempre retorna 0 nesse campo). O lado "App" mostra P&L **realizado acumulado** (
 fechados, todo o histórico). São grandezas diferentes e não devem ser comparadas como
 "divergência" — não existe um `mismatch` entre elas no frontend.
 
+**"PnL Total" precisa ser a MESMA base em toda a app.** `/api/bots/performance` (ranking
+do Desempenho PnL) somava só o bruto (`sum(pnl)`), enquanto `/api/trades/summary`
+(Dashboard) já usava líquido (bruto − taxas) — duas telas com o rótulo "PnL Total"
+mostrando números diferentes para a mesma conta. Corrigido: `pnl` no ranking agora é
+líquido (mesma base do Dashboard); `pnl_gross`/`fees` ficam disponíveis para o detalhe
+"bruto ... · taxas ..." exibido abaixo do número principal.
+
 **Tela de Integridade (`/integridade`, menu "Integridade"):** auditoria ao vivo, sob demanda
 (`GET /api/integrity/check`) — para cada bot, compara agora mesmo posição aberta/flat,
 tamanho e existência de ordem de proteção (SL/Trailing) ativa na OKX (`find_protective_algo`)

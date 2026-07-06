@@ -177,10 +177,15 @@ export default function Performance() {
 
                 <div className="flex items-center gap-10">
                   <div className="text-right">
-                    <p className="text-[10px] text-muted uppercase font-bold mb-1 opacity-60">{t('perf.pnl')}</p>
+                    <p className="text-[10px] text-muted uppercase font-bold mb-1 opacity-60">{t('perf.pnl')} (líq.)</p>
                     <div className={`text-lg font-bold ${item.pnl >= 0 ? 'text-bull' : 'text-bear'}`}>
                       {item.pnl >= 0 ? '+' : ''}${item.pnl.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                     </div>
+                    {item.fees > 0 && (
+                      <p className="text-[10px] text-muted mt-0.5">
+                        bruto {item.pnl_gross >= 0 ? '+' : ''}${item.pnl_gross.toFixed(2)} · taxas -${item.fees.toFixed(4)}
+                      </p>
+                    )}
                   </div>
 
                   <div className="text-right">

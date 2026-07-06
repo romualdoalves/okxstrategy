@@ -1206,9 +1206,13 @@ def get_performance_ranking(db: Session = Depends(get_db)):
     # 2. Usa a mesma base do /api/trades/summary: uma linha por round-trip
     # fechado. Linhas type="exit"/"tp1" são eventos visuais e não devem
     # duplicar a contagem do ranking histórico.
+    # "pnl" aqui é o LÍQUIDO (após taxas) — mesma base do "P&L Total" do
+    # Dashboard. Antes somava só o bruto, o que fazia esta tela e o Dashboard
+    # mostrarem dois números diferentes sob o mesmo nome "PnL Total".
     stats_rows = db.query(
         TradeModel.bot_id,
         func.sum(TradeModel.pnl).label("pnl_sum"),
+        func.sum(TradeModel.fee).label("fee_sum"),
         func.count(TradeModel.id).label("total_count")
     ).filter(
         TradeModel.type == "entry",
@@ -1230,21 +1234,25 @@ def get_performance_ranking(db: Session = Depends(get_db)):
     ranking = []
     seen_ids = set()
     
-    for bid, pnl_sum, total_count in stats_rows:
+    for bid, pnl_sum, fee_sum, total_count in stats_rows:
         bot = bot_map.get(bid)
         name = bot.name if bot else f"Bot Antigo (ID {bid})"
-        
-        pnl_val  = float(pnl_sum or 0)
-        total    = int(total_count or 0)
-        wins     = int(wins_map.get(bid, 0))
-        win_rate = (wins / total * 100) if total > 0 else 0
+
+        pnl_gross = float(pnl_sum or 0)
+        fee_total = float(fee_sum or 0)
+        pnl_net   = pnl_gross - fee_total
+        total     = int(total_count or 0)
+        wins      = int(wins_map.get(bid, 0))
+        win_rate  = (wins / total * 100) if total > 0 else 0
 
         ranking.append({
             "id": bid,
             "name": name,
             "strategy_id": bot.strategy_id if bot else "N/A",
             "symbol": bot.symbol if bot else "N/A",
-            "pnl": round(pnl_val, 2),
+            "pnl": round(pnl_net, 2),
+            "pnl_gross": round(pnl_gross, 2),
+            "fees": round(fee_total, 4),
             "trades": total,
             "win_rate": round(win_rate, 1),
             "is_active": bot is not None
