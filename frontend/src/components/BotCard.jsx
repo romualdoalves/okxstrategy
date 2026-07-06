@@ -45,6 +45,7 @@ export default function BotCard({ bot, liveStatus }) {
 
   const isRunning  = rt.status === 'running'
   const pnl        = rt.daily_pnl ?? 0
+  const fees       = rt.accumulated_fees ?? 0
   const direction  = rt.direction ?? 0
   const lastPrice  = rt.last_price ?? null
   const indicators = rt.last_indicators ?? null
@@ -201,6 +202,9 @@ export default function BotCard({ bot, liveStatus }) {
           <p className={`text-sm font-medium ${pnl > 0 ? 'text-bull' : pnl < 0 ? 'text-bear' : 'text-white'}`}>
             {pnl > 0 ? '+' : ''}{pnl.toFixed(2)}
           </p>
+          {fees > 0 && (
+            <p className="text-[10px] text-bear/60 mt-0.5">-{fees.toFixed(4)} tx</p>
+          )}
         </div>
         <div>
           <p className="text-xs text-muted">{t('card.position')}</p>

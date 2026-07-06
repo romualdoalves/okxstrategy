@@ -173,6 +173,13 @@ fecha round-trips completos). Sem trades na janela → não aparece o check (nad
 Sem fills retornados pela OKX → `warn` (não confirmável, não é necessariamente erro).
 Diferença além da tolerância (max($0.05, 2% do valor OKX)) → `fail` com os dois números.
 
+**Onde ver a taxa aplicada por trade:** coluna "Taxa" própria em `TradeTable.jsx` (compartilhada
+por Registros → Histórico de Trades, Bots → detalhe → histórico, e a aba de trades), lado a
+lado com o P&L líquido — "pendente" enquanto o trade não tem `fee` sincronizada. Taxa
+acumulada por bot (`accumulated_fees`, soma de `TradeModel.fee` dos exits daquele bot) vem
+em `GET /api/bots` e `GET /api/bots/{id}` (agregada, uma query para todos os bots — não uma
+por bot) e aparece no card do bot (Dashboard/Bots) e no header de BotDetail.
+
 ---
 
 ## Arquitetura
@@ -215,7 +222,8 @@ OKXStrategy/
 │   │   ├── Integrity.jsx          # Auditoria ao vivo app vs OKX (/integridade)
 │   │   └── StrategyFactory.jsx    # Wizard 5 etapas (IA)
 │   └── components/
-│       ├── BotCard.jsx            # Card do bot (inclui baseline_balance)
+│       ├── BotCard.jsx            # Card do bot (inclui baseline_balance, taxa acumulada)
+│       ├── TradeTable.jsx         # Tabela de trades compartilhada (Registros/BotDetail/Trades) — colunas Taxa e P&L líquido
 │       ├── BacktestLikert.jsx     # Escala visual 0–10 compartilhada (BotDetail + Scanner)
 │       ├── StrategyChecklist.jsx
 │       └── Chart.jsx

@@ -23,30 +23,28 @@ function TypeBadge({ type }) {
 
 function PnlCell({ pnl, net, fee }) {
   if (pnl === null || pnl === undefined) return <span className="text-muted">—</span>
-  const hasFee = fee != null && fee > 0
+  const hasFee = fee != null
+  const headline = hasFee ? net : pnl
   return (
     <div className="flex flex-col items-end gap-0.5">
-      {/* P&L líquido em destaque */}
-      <span className={`font-semibold tabular-nums text-sm leading-none ${(net ?? pnl) >= 0 ? 'text-bull' : 'text-bear'}`}>
-        {(net ?? pnl) >= 0 ? '+' : ''}${(net ?? pnl).toFixed(2)}
+      {/* P&L líquido em destaque (bruto enquanto a taxa não sincroniza) */}
+      <span className={`font-semibold tabular-nums text-sm leading-none ${headline >= 0 ? 'text-bull' : 'text-bear'}`}>
+        {headline >= 0 ? '+' : ''}${headline.toFixed(2)}
       </span>
-      {/* Bruto e taxa apenas se houver fee registrada */}
-      {hasFee && (
-        <div className="flex items-center gap-1.5">
-          <span className="text-[9px] text-white/30 tabular-nums">
-            bruto {pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}
-          </span>
-          <span className="text-[9px] text-bear/70 tabular-nums">
-            -{fee.toFixed(4)}
-          </span>
-        </div>
-      )}
-      {/* Fee ainda não sincronizada */}
-      {fee === null && pnl !== null && (
-        <span className="text-[9px] text-muted/40 italic">fee pendente</span>
+      {/* Bruto como referência, só quando difere do líquido (taxa já sincronizada) */}
+      {hasFee && fee > 0 && (
+        <span className="text-[9px] text-white/30 tabular-nums">
+          bruto {pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}
+        </span>
       )}
     </div>
   )
+}
+
+function FeeCell({ fee }) {
+  if (fee == null) return <span className="text-[10px] text-muted/40 italic">pendente</span>
+  if (fee === 0) return <span className="text-muted/50 tabular-nums">$0</span>
+  return <span className="text-bear/80 font-mono tabular-nums">-${fee.toFixed(4)}</span>
 }
 
 export default function TradeTable({ trades = [], showBotName = true }) {
@@ -71,6 +69,7 @@ export default function TradeTable({ trades = [], showBotName = true }) {
             <th className="text-left py-2 px-3 font-medium">Qtd</th>
             <th className="text-left py-2 px-3 font-medium">Entrada</th>
             <th className="text-left py-2 px-3 font-medium">Saída</th>
+            <th className="text-right py-2 px-3 font-medium">Taxa</th>
             <th className="text-right py-2 px-3 font-medium">P&L (líquido)</th>
           </tr>
         </thead>
@@ -105,6 +104,9 @@ export default function TradeTable({ trades = [], showBotName = true }) {
               </td>
               <td className="py-2.5 px-3 font-mono text-xs tabular-nums">
                 {tr.exit_price ? `$${Number(tr.exit_price).toLocaleString(locale, { minimumFractionDigits: 2 })}` : '—'}
+              </td>
+              <td className="py-2.5 px-3 text-right text-xs">
+                <FeeCell fee={tr.fee} />
               </td>
               <td className="py-2.5 px-3 text-right">
                 <PnlCell pnl={tr.pnl} net={tr.net_pnl} fee={tr.fee} />

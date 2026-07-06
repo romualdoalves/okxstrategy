@@ -296,6 +296,7 @@ export default function BotDetail() {
   const rt      = bot.runtime ?? {}
   const candles = candleData?.data ?? []
   const pnl     = rt.daily_pnl ?? 0
+  const fees    = rt.accumulated_fees ?? 0
   const rawIndicators = liveIndicators ?? rt.last_indicators ?? null
   const indicators = rawIndicators && Object.keys(rawIndicators).length > 0 ? rawIndicators : null
   const holdReason  = liveHoldReason || rt.hold_reason || ''
@@ -585,7 +586,7 @@ export default function BotDetail() {
         <StatCard label={t('c.pnl_today')}
           value={`${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}`}
           color={pnl >= 0 ? 'bull' : 'bear'}
-          sub={`${rt.wins ?? 0}W · ${rt.losses ?? 0}L`} />
+          sub={`${rt.wins ?? 0}W · ${rt.losses ?? 0}L${fees > 0 ? ` · -$${fees.toFixed(4)} tx` : ''}`} />
         <StatCard label={t('c.position')}
           value={rt.direction === 1 ? t('c.long') : rt.direction === -1 ? t('c.short') : t('c.flat')}
           color={rt.direction === 1 ? 'bull' : rt.direction === -1 ? 'bear' : 'white'}

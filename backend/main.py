@@ -1379,10 +1379,26 @@ async def get_active_performance(db: Session = Depends(get_db)):
 
 @app.get("/api/bots")
 def list_bots(db: Session = Depends(get_db)):
+    from sqlalchemy import func
+
     bots = db.query(BotModel).all()
+
+    # Uma única query agregada para a taxa acumulada de todos os bots, em vez
+    # de uma consulta por bot — mesmo padrão do /api/bots/performance.
+    fee_rows = db.query(
+        TradeModel.bot_id,
+        func.sum(TradeModel.fee).label("fee_sum"),
+    ).filter(
+        TradeModel.type == "exit",
+        TradeModel.fee.isnot(None),
+    ).group_by(TradeModel.bot_id).all()
+    fees_by_bot = {row[0]: float(row[1] or 0) for row in fee_rows}
+
     result = []
     for b in bots:
         status = manager.get_status(b.id)
+        if status is not None:
+            status = {**status, "accumulated_fees": round(fees_by_bot.get(b.id, 0.0), 4)}
         result.append({
             "id": b.id, "name": b.name,
             "strategy_id": b.strategy_id, "symbol": b.symbol,
@@ -1437,10 +1453,22 @@ async def create_bot(payload: BotCreate, db: Session = Depends(get_db)):
 
 @app.get("/api/bots/{bot_id}")
 def get_bot(bot_id: int, db: Session = Depends(get_db)):
+    from sqlalchemy import func
+
     bot = db.get(BotModel, bot_id)
     if not bot:
         raise HTTPException(404, "Bot não encontrado")
-    return {**bot.__dict__, "runtime": manager.get_status(bot_id)}
+
+    status = manager.get_status(bot_id)
+    if status is not None:
+        fee_sum = db.query(func.sum(TradeModel.fee)).filter(
+            TradeModel.bot_id == bot_id,
+            TradeModel.type == "exit",
+            TradeModel.fee.isnot(None),
+        ).scalar()
+        status = {**status, "accumulated_fees": round(float(fee_sum or 0), 4)}
+
+    return {**bot.__dict__, "runtime": status}
 
 
 @app.patch("/api/bots/{bot_id}")
