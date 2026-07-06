@@ -158,11 +158,20 @@ líquido (mesma base do Dashboard); `pnl_gross`/`fees` ficam disponíveis para o
 
 **Tela de Integridade (`/integridade`, menu "Integridade"):** auditoria ao vivo, sob demanda
 (`GET /api/integrity/check`) — para cada bot, compara agora mesmo posição aberta/flat,
-tamanho e existência de ordem de proteção (SL/Trailing) ativa na OKX (`find_protective_algo`)
-contra o que o app acredita. Cada bot recebe `ok`/`warn`/`fail`/`error` por checagem e um
-status geral (o pior entre elas). Não é a reconciliação de histórico (`Atividades OKX`) nem
-o `_reconcile_loop` (que já corrige sozinho a cada 15s) — é a ferramenta do usuário para
-verificar, sem depender de ninguém, que o que o app mostra bate com a OKX neste instante.
+tamanho, existência de ordem de proteção (SL/Trailing) ativa na OKX (`find_protective_algo`)
+e **P&L** contra o que o app acredita. Cada bot recebe `ok`/`warn`/`fail`/`error` por
+checagem e um status geral (o pior entre elas). Não é a reconciliação de histórico
+(`Atividades OKX`) nem o `_reconcile_loop` (que já corrige sozinho a cada 15s) — é a
+ferramenta do usuário para verificar, sem depender de ninguém, que o que o app mostra bate
+com a OKX neste instante.
+
+**Check de P&L da Integridade:** soma o `pnl` dos trades fechados do bot nos últimos 3 dias
+(janela prática de retenção do `/trade/fills` da OKX) e compara contra o P&L FIFO calculado
+a partir dos fills reais da OKX no mesmo período (`_fifo_realized_pnl`, mesma lógica
+simplificada — um buy por sell — já usada em `/api/activities`, válida porque cada bot
+fecha round-trips completos). Sem trades na janela → não aparece o check (nada a auditar).
+Sem fills retornados pela OKX → `warn` (não confirmável, não é necessariamente erro).
+Diferença além da tolerância (max($0.05, 2% do valor OKX)) → `fail` com os dois números.
 
 ---
 

@@ -3543,6 +3543,48 @@ async def account_snapshot(demo: bool = False, db: Session = Depends(get_db)):
 
 _INTEGRITY_SEVERITY_RANK = {"ok": 0, "warn": 1, "fail": 2, "error": 3}
 
+# OKX /trade/fills só garante retenção recente (poucos dias) — a janela do
+# check de P&L da Integridade fica dentro desse limite prático.
+_INTEGRITY_PNL_LOOKBACK = timedelta(days=3)
+
+
+def _fifo_realized_pnl(fills: list[dict], sym_norm: str) -> tuple[float, int]:
+    """
+    P&L realizado (FIFO) de um símbolo a partir de fills brutos da OKX.
+    Mesma lógica simplificada (um buy por sell) já usada em /api/activities —
+    válida aqui porque cada bot opera round-trips completos, um de cada vez.
+    Retorna (pnl_realizado, quantidade_de_fills_do_símbolo).
+    """
+    from collections import deque
+
+    def _ts(f):
+        try:
+            return datetime.fromisoformat(f.get("transaction_time", "").replace("Z", "+00:00"))
+        except Exception:
+            return datetime.min.replace(tzinfo=timezone.utc)
+
+    buy_queue: deque = deque()
+    realized = 0.0
+    matched_count = 0
+    for f in sorted(fills, key=_ts):
+        if f.get("symbol", "").upper().replace("/", "").replace("-", "") != sym_norm:
+            continue
+        try:
+            price = float(f.get("price", 0))
+            qty   = float(f.get("qty", 0))
+        except (TypeError, ValueError):
+            continue
+        if price <= 0 or qty <= 0:
+            continue
+        matched_count += 1
+        if f.get("side") == "buy":
+            buy_queue.append({"price": price, "qty": qty})
+        elif f.get("side") == "sell" and buy_queue:
+            entry = buy_queue.popleft()
+            matched_qty = min(entry["qty"], qty)
+            realized += (price - entry["price"]) * matched_qty
+    return round(realized, 4), matched_count
+
 
 @app.get("/api/integrity/check")
 async def integrity_check(db: Session = Depends(get_db)):
@@ -3585,6 +3627,41 @@ async def integrity_check(db: Session = Depends(get_db)):
                         "detail": f"App diz {'ABERTA' if app_open else 'FLAT'}, mas OKX está "
                                   f"{'ABERTA' if okx_open else 'FLAT'} (líquido de baseline: {net_qty:.8f}).",
                     })
+
+                # P&L: soma dos trades fechados do app na janela vs. P&L FIFO
+                # calculado a partir dos fills reais da OKX na mesma janela.
+                window_start = datetime.now(timezone.utc) - _INTEGRITY_PNL_LOOKBACK
+                app_trades_window = db.query(TradeModel).filter(
+                    TradeModel.bot_id == bot.id,
+                    TradeModel.type == "exit",
+                    TradeModel.pnl.isnot(None),
+                    TradeModel.timestamp >= window_start.replace(tzinfo=None),
+                ).all()
+                if app_trades_window:
+                    app_pnl_window = sum(t.pnl for t in app_trades_window)
+                    sym_norm = bot.symbol.upper().replace("/", "").replace("-", "")
+                    okx_fills_window = await ex.get_activities(
+                        after=window_start.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        until=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    )
+                    okx_pnl_window, matched_fills = _fifo_realized_pnl(okx_fills_window, sym_norm)
+                    if matched_fills == 0:
+                        checks.append({
+                            "label": "P&L (fills OKX)", "status": "warn",
+                            "detail": f"App tem {len(app_trades_window)} trade(s) fechado(s) "
+                                      f"(P&L {app_pnl_window:+.2f}) nos últimos 3 dias, mas a OKX não "
+                                      f"retornou nenhum fill de {bot.symbol} na janela — não dá para "
+                                      f"confirmar (não significa que está errado).",
+                        })
+                    else:
+                        diff = abs(app_pnl_window - okx_pnl_window)
+                        tolerance = max(0.05, abs(okx_pnl_window) * 0.02)
+                        checks.append({
+                            "label": "P&L (fills OKX)",
+                            "status": "ok" if diff <= tolerance else "fail",
+                            "detail": f"App {app_pnl_window:+.2f} · OKX (FIFO, via fills reais) "
+                                      f"{okx_pnl_window:+.2f} (dif. {diff:.2f}) — últimos 3 dias.",
+                        })
 
                 if app_open and okx_open:
                     diff_pct = abs(app_size - net_qty) / net_qty if net_qty > 0 else 1.0
