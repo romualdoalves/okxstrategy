@@ -1499,6 +1499,17 @@ async def recapture_baseline(bot_id: int, db: Session = Depends(get_db)):
     bot = db.get(BotModel, bot_id)
     if not bot:
         raise HTTPException(404, "Bot não encontrado")
+
+    status = manager.get_status(bot_id)
+    if status and int(status.get("direction", 0) or 0) != 0:
+        raise HTTPException(
+            400,
+            "Bot tem uma posição aberta agora — recapturar o baseline absorveria essa "
+            "posição real como se fosse holding pré-existente, escondendo-a de todos os "
+            "cálculos de exposição/divergência. Feche a posição (ou espere ela fechar) "
+            "antes de recapturar o baseline.",
+        )
+
     try:
         async with aiohttp.ClientSession() as _s:
             _ex = build_exchange(_s, demo=bot.demo)

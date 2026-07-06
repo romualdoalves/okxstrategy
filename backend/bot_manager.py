@@ -13,6 +13,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import aiohttp
+from sqlalchemy.orm import Session
 
 from .database import BotModel, TradeModel, BotSnapshotModel, OrderRejectionModel, SignalLogModel, SessionLocal, StrategyModel
 from .exchanges.base import BaseExchange
@@ -44,6 +45,10 @@ from .notifications import (
 )
 
 log = logging.getLogger("bot_manager")
+
+# Duplicado de main.py (não importado de lá para evitar import circular —
+# main.py importa `manager` deste módulo). Stake fixo $100, inviolável (ver SKILL.md).
+FIXED_STAKE_USD: float = 100.0
 
 CANONICAL_ENTRY_CRITERIA: dict[str, list[str]] = {
     "TF001": ["C1 EMA", "C2 VWAP", "C3 ATR"],
@@ -2615,7 +2620,6 @@ class BotInstance:
             "maintenance":     self._maintenance,
             "started_at":      self._started_at,
             "execution_cycle":  execution_cycle,
-            "last_price":      self._candles[-1].close if self._candles else 0.0,
             "graph_state":     self._graph_state,
             "onchain_events":  self._onchain_events,
         }

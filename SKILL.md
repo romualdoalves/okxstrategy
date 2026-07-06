@@ -50,6 +50,10 @@ Trabalhe somente no repositório `E:\Dell Inspiron\W\Dev\Trading\OKXTrader\OKXSt
 - Dashboard exibe exposição pelo notional real (`size × preço`); stake é fallback
   apenas quando preço não foi carregado ainda.
 - Nunca sugerir alterar stake como ação operacional.
+- `FIXED_STAKE_USD` é definido em `main.py` e duplicado (mesmo valor, `100.0`) em
+  `bot_manager.py` — este último não importa de `main.py` porque `main.py` já importa
+  `manager` de lá (import circular). Se adicionar novo uso da constante em `bot_manager.py`,
+  usar a cópia local, não tentar importar de `main`.
 
 ### Um ativo por bot
 - Cada símbolo pode existir em apenas um bot (validado em create/edit/start).
@@ -64,6 +68,11 @@ Trabalhe somente no repositório `E:\Dell Inspiron\W\Dev\Trading\OKXTrader\OKXSt
 - Se `(saldo_okx − baseline) ≤ 0` → bot fica FLAT sem alertas de divergência.
 - Exibido no card do bot no Dashboard (componente `BotCard.jsx`).
 - Bots criados antes desta feature têm `baseline_balance = 0` — recriar para corrigir.
+- **`POST /api/bots/{id}/recapture-baseline` recusa rodar se o bot acredita ter posição
+  aberta** (`manager.get_status(id).direction != 0`) — recapturar nesse momento absorve a
+  posição real do bot como se fosse holding pré-existente, zerando o líquido-de-baseline em
+  toda a app (Integridade, Dashboard, `_reconcile_loop`) e criando uma divergência falsa
+  ("app aberta, OKX flat"). Só recapturar com o bot FLAT.
 
 ### Auditoria de rejeições
 - Toda rejeição crítica de ordem persistida em `order_rejections`.
