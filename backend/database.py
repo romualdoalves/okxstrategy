@@ -75,6 +75,7 @@ class TradeModel(Base):
     exit_price  = Column(Float,  nullable=True)
     sl_price    = Column(Float,  nullable=True)
     tp1_price   = Column(Float,  nullable=True)
+    peak_price  = Column(Float,  nullable=True)   # maior excursão favorável (Long) / menor (Short) desde a entrada
     tp1_done    = Column(Boolean, default=False)
     atr         = Column(Float,  nullable=True)
     pnl         = Column(Float,  nullable=True)   # P&L bruto (sem taxas)
@@ -261,6 +262,7 @@ def _run_migrations():
     """Aplica colunas novas que create_all não adiciona automaticamente em tabelas existentes."""
     migrations = [
         "ALTER TABLE trades ADD COLUMN IF NOT EXISTS fee FLOAT",
+        "ALTER TABLE trades ADD COLUMN IF NOT EXISTS peak_price FLOAT",
         """
         CREATE TABLE IF NOT EXISTS factory_strategies (
             id SERIAL PRIMARY KEY,

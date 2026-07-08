@@ -47,6 +47,16 @@ function FeeCell({ fee }) {
   return <span className="text-bear/80 font-mono tabular-nums">-${fee.toFixed(4)}</span>
 }
 
+function CaptureCell({ pct }) {
+  if (pct == null) return <span className="text-muted/30 text-xs">—</span>
+  const color = pct >= 70 ? 'text-bull' : pct >= 40 ? 'text-yellow-400' : 'text-bear'
+  return (
+    <span className={`text-xs font-semibold tabular-nums ${color}`} title="% do movimento favorável máximo (entrada → pico) capturado na saída">
+      {pct.toFixed(0)}%
+    </span>
+  )
+}
+
 export default function TradeTable({ trades = [], showBotName = true }) {
   const { lang } = useLanguage()
   const locale = lang === 'en-US' ? 'en-US' : 'pt-BR'
@@ -69,6 +79,7 @@ export default function TradeTable({ trades = [], showBotName = true }) {
             <th className="text-left py-2 px-3 font-medium">Qtd</th>
             <th className="text-left py-2 px-3 font-medium">Entrada</th>
             <th className="text-left py-2 px-3 font-medium">Saída</th>
+            <th className="text-right py-2 px-3 font-medium" title="% do movimento favorável máximo capturado na saída">Captura</th>
             <th className="text-right py-2 px-3 font-medium">Taxa</th>
             <th className="text-right py-2 px-3 font-medium">P&L (líquido)</th>
           </tr>
@@ -104,6 +115,9 @@ export default function TradeTable({ trades = [], showBotName = true }) {
               </td>
               <td className="py-2.5 px-3 font-mono text-xs tabular-nums">
                 {tr.exit_price ? `$${Number(tr.exit_price).toLocaleString(locale, { minimumFractionDigits: 2 })}` : '—'}
+              </td>
+              <td className="py-2.5 px-3 text-right">
+                <CaptureCell pct={tr.capture_pct} />
               </td>
               <td className="py-2.5 px-3 text-right text-xs">
                 <FeeCell fee={tr.fee} />

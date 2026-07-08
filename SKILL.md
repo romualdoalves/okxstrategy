@@ -193,6 +193,28 @@ acumulada por bot (`accumulated_fees`, soma de `TradeModel.fee` dos exits daquel
 em `GET /api/bots` e `GET /api/bots/{id}` (agregada, uma query para todos os bots — não uma
 por bot) e aparece no card do bot (Dashboard/Bots) e no header de BotDetail.
 
+### Efetividade do trailing stop (achados e plano)
+- **Bug confirmado e corrigido:** `force_sync_trailing` procurava uma ordem `move_order_stop`
+  (trailing) e logava "Nenhuma ordem encontrada" toda vez que `_ts_algo_id` estava vazio —
+  mas antes do TP1 isso é o estado CORRETO (a proteção é o SL fixo em `_sl_algo_id`, não um
+  trailing). Isso gerava alarme falso a cada ciclo (15 min) para todo bot ainda no SL fixo —
+  ruído que mascarava alarmes reais. Corrigido: só procura/alerta se `self._tp1_done`.
+- **Métrica de efetividade (`peak_price`/`capture_pct`):** `_peak_price` agora rastreia a
+  maior excursão favorável desde a ENTRADA (antes só rastreava pós-TP1, ficando em 0 para
+  qualquer trade que nunca lucrou). Persistido em `trades.peak_price` no fechamento. A API
+  `/api/trades` calcula `capture_pct` = % do movimento favorável máximo (entrada→pico) que
+  foi realmente capturado na saída — exibido como coluna "Captura" em `TradeTable.jsx`
+  (verde ≥70%, amarelo ≥40%, vermelho abaixo, "—" quando não aplicável). É a forma objetiva
+  de medir se o trailing está funcionando, em vez de reconstruir isso manualmente via PDF.
+- **Terceiro caminho de DESYNC corrigido** (achado ao mexer nisso): a sincronização de
+  startup em `_run()` (banco tem posição aberta, OKX flat) também fabricava `pnl=0` sem
+  tentar recuperar o fill real — mesmo bug já corrigido no `_reconcile_loop`. Agora usa o
+  mesmo `_resolve_desync_exit_fill` antes do fallback zerado.
+- **Pendente (não implementado ainda, por decisão do usuário):** revisar SL inicial largo
+  (ex.: TF004/DOGE abriu com stop a ~7% da entrada — nenhum ajuste de trailing resolve se o
+  stop inicial já nasce largo) e corrigir a contaminação de símbolo no check de P&L da
+  Integridade (fills de um bot antigo no mesmo símbolo entrando no FIFO do bot atual).
+
 ---
 
 ## Arquitetura

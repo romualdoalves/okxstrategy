@@ -684,11 +684,31 @@ class BotInstance:
                                 "mas a exchange está FLAT. Resetando estado para FLAT.",
                                 self.config.id, self._direction
                             )
+                            # Mesmo tratamento do _reconcile_loop: busca o fill real de saída
+                            # antes de fabricar pnl=0 — o WS pode só ter perdido o evento
+                            # enquanto o bot estava reiniciando (deploy, crash, etc.).
+                            real_exit = await self._resolve_desync_exit_fill(exchange)
+                            if real_exit:
+                                exit_price, fill_qty = real_exit
+                                ct_size = exchange.get_contract_size(self.config.symbol)
+                                pnl = fill_qty * ct_size * (exit_price - self._entry_price) * self._direction
+                                log.warning(
+                                    "[Bot %d] Fill real recuperado @ %.6f (pnl=%.4f) — fechando com dados reais.",
+                                    self.config.id, exit_price, pnl,
+                                )
+                            else:
+                                exit_price, pnl = self._entry_price or 0.0, 0.0
+                                log.error(
+                                    "[Bot %d] Nenhum fill correspondente encontrado na OKX — "
+                                    "fechando com pnl=0 (dado pode estar incorreto).",
+                                    self.config.id,
+                                )
+                            self._record_pnl(pnl)
                             self._save_trade({
                                 "type": "exit",
                                 "event": "DESYNC_RESET",
-                                "exit_price": self._entry_price or 0.0,
-                                "pnl": 0.0,
+                                "exit_price": exit_price,
+                                "pnl": pnl, "peak_price": self._peak_price or None,
                                 "closed_at": datetime.now(timezone.utc).replace(tzinfo=None)
                             }, update_id=self._current_trade_id)
                             self._reset()
@@ -1292,16 +1312,16 @@ class BotInstance:
             await self._check_tp1(bar.close, exchange)
 
         if not closed:
-            # Atualiza peak intracandle para guaranteed_pnl ser preciso em tempo real
-            if self._ts_algo_id and self._direction != 0:
+            # Atualiza peak intracandle desde a entrada (não só pós-TP1) — é a base da
+            # métrica de efetividade do trailing: quanto do movimento favorável máximo
+            # a operação realmente capturou na saída.
+            if self._direction != 0:
                 if self._direction == 1:
                     if self._peak_price == 0 or bar.close > self._peak_price:
                         self._peak_price = bar.close
                 else:
                     if self._peak_price == 0 or bar.close < self._peak_price:
                         self._peak_price = bar.close
-                # Remover bloco de TS em software (usamos apenas OKX nativo)
-                pass
 
             await self._broadcast({
                 "type":   "price",
@@ -1417,8 +1437,12 @@ class BotInstance:
                         log.critical("[AUDITORIA Bot %d] ✅ Fallback SL de emergência criado: %s @ %.4f", 
                                     self.config.id, fallback_id, fallback_stop)
 
-            # 1. Recupera o ID se não tivermos um, ou se for o marcador de restart
-            if not self._ts_algo_id or self._ts_algo_id == "recovered_after_restart":
+            # 1. Recupera o ID do trailing se não tivermos um — só faz sentido procurar
+            # depois do TP1: antes disso, _ts_algo_id vazio é o estado CORRETO (a proteção
+            # é o SL fixo em _sl_algo_id, não um move_order_stop). Sem esse guard, todo bot
+            # ainda no SL fixo (a maior parte da vida de qualquer trade) loga "nenhuma ordem
+            # encontrada" a cada ciclo — ruído falso que mascara alarmes reais.
+            if self._tp1_done and (not self._ts_algo_id or self._ts_algo_id == "recovered_after_restart"):
                 params = {"ordType": "move_order_stop", "instId": self.config.symbol}
                 data = await exchange._get("/api/v5/trade/orders-algo-pending", params)
                 orders = data.get("data", [])
@@ -1426,7 +1450,7 @@ class BotInstance:
                     self._ts_algo_id = orders[0]["algoId"]
                     log.info("[AUDITORIA Bot %d] ID recuperado: %s", self.config.id, self._ts_algo_id)
                 else:
-                    log.warning("[AUDITORIA Bot %d] Nenhuma ordem encontrada na exchange. Verificando necessidade de criar nova...", self.config.id)
+                    log.warning("[AUDITORIA Bot %d] TP1 já ocorreu mas nenhuma ordem de trailing encontrada na exchange. Verificando necessidade de criar nova...", self.config.id)
                     # Não damos return aqui. Seguimos para a lógica de reset/criação abaixo.
 
             # 2. Sincronização: busca o stop real na exchange e rastreia se a ordem existe
@@ -1619,17 +1643,20 @@ class BotInstance:
             check_exchange_position=signal_direction is not None,
         )
 
-        # Cálculo de Lucro Garantido (Sombra)
-        guaranteed_pnl = 0.0
-        if self._direction != 0 and self._ts_algo_id:
-            # Atualiza o pico
+        # Atualiza o pico de preço favorável desde a entrada — independe de já estar em
+        # modo sombra/trailing, é a base da métrica de efetividade (% do movimento
+        # favorável capturado na saída).
+        if self._direction != 0:
             if self._direction == 1:
                 if self._peak_price == 0 or bar.close > self._peak_price:
                     self._peak_price = bar.close
             else:
                 if self._peak_price == 0 or bar.close < self._peak_price:
                     self._peak_price = bar.close
-            
+
+        # Cálculo de Lucro Garantido (Sombra) — só existe depois que o trailing ativa
+        guaranteed_pnl = 0.0
+        if self._direction != 0 and self._ts_algo_id:
             # Cálculo do lucro garantido baseado no stop real confirmado pela exchange
             if self._sl_price > 0:
                 diff = (self._sl_price - self._entry_price) / self._entry_price * self._direction
@@ -2214,8 +2241,12 @@ class BotInstance:
             
             self._tp1_done = True
             # Mantém get_status() coerente no mesmo ciclo em que a proteção nasce.
+            # Nunca regride: o pico desde a entrada já pode ser maior que `price` agora.
             if self._ts_algo_id:
-                self._peak_price = price
+                if self._direction == 1:
+                    self._peak_price = max(self._peak_price, price)
+                else:
+                    self._peak_price = min(self._peak_price, price) if self._peak_price else price
             
             self._save_trade({
                 "type": "tp1", "event": "DYNAMIC_SHADOW_TRIGGER",
@@ -2811,7 +2842,7 @@ class BotInstance:
         self._record_pnl(pnl)
         self._save_trade({
             "type": "exit", "event": "WS_EXECUTION",
-            "exit_price": price, "pnl": pnl,
+            "exit_price": price, "pnl": pnl, "peak_price": self._peak_price or None,
             "closed_at": datetime.now(timezone.utc).replace(tzinfo=None),
         }, update_id=self._current_trade_id)
 
@@ -3036,7 +3067,7 @@ class BotInstance:
             self._save_trade({
                 "type": "exit", "event": "MANUAL_FAILED",
                 "exit_price": self._entry_price,
-                "pnl": 0.0
+                "pnl": 0.0, "peak_price": self._peak_price or None,
             }, update_id=self._current_trade_id)
             self._reset()
             return
@@ -3312,7 +3343,7 @@ class BotManager:
                         bot._save_trade({
                             "type": "exit", "event": "DESYNC_RECONCILE",
                             "exit_price": exit_price,
-                            "pnl": pnl,
+                            "pnl": pnl, "peak_price": bot._peak_price or None,
                             "closed_at": datetime.now(timezone.utc).replace(tzinfo=None),
                         }, update_id=bot._current_trade_id)
                         bot._reset()

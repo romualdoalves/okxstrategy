@@ -3131,6 +3131,21 @@ def list_trades(bot_id: Optional[int] = None,
     # Build a bot-id → name map in one query to avoid N+1
     bot_ids = {t.bot_id for t in trades}
     bot_names = {b.id: b.name for b in db.query(BotModel).filter(BotModel.id.in_(bot_ids)).all()}
+    def _capture_pct(t):
+        """% do movimento favorável máximo (entrada → pico) que foi realmente capturado
+        na saída — a métrica de efetividade do trailing/SL. None quando não aplicável
+        (peak desconhecido, ou o preço nunca chegou a ficar favorável antes de sair)."""
+        if t.type != "exit" or not (t.entry_price and t.exit_price and t.peak_price):
+            return None
+        mult = 1 if (t.direction or "").upper() == "LONG" else -1 if (t.direction or "").upper() == "SHORT" else None
+        if mult is None:
+            return None
+        max_favorable = (t.peak_price - t.entry_price) * mult
+        if max_favorable <= 1e-9:
+            return None
+        captured = (t.exit_price - t.entry_price) * mult
+        return round(max(0.0, min(1.0, captured / max_favorable)) * 100, 1)
+
     def _serialize(t):
         fee = t.fee  # None = ainda não sincronizado
         net = round(t.pnl - fee, 2) if (t.pnl is not None and fee is not None) else None
@@ -3139,6 +3154,7 @@ def list_trades(bot_id: Optional[int] = None,
             "type": t.type, "event": t.event, "direction": t.direction, "symbol": t.symbol,
             "size": t.size, "entry_price": t.entry_price, "exit_price": t.exit_price,
             "sl_price": t.sl_price, "tp1_price": t.tp1_price, "atr": t.atr,
+            "peak_price": t.peak_price, "capture_pct": _capture_pct(t),
             "pnl": t.pnl, "fee": fee, "net_pnl": net,
             "daily_pnl": t.daily_pnl, "source": t.source,
             "timestamp": t.timestamp.isoformat() + "Z" if t.timestamp else None,
