@@ -3183,21 +3183,8 @@ async def _sync_trade_fees_impl(db: Session, days_back: int = 30) -> dict:
     if not pending:
         return {"updated": 0, "skipped": False, "reason": "Nenhum trade pendente de sincronização."}
 
-    def _norm_sym(sym: str) -> str:
-        return (sym or "").upper().replace("/", "").replace("-", "")
-
-    def _closest_fill(candidates: list[dict], target_ts: datetime) -> Optional[dict]:
-        best, best_delta = None, None
-        for f in candidates:
-            try:
-                f_ts = datetime.fromisoformat(f["transaction_time"].replace("Z", "+00:00")).replace(tzinfo=None)
-            except Exception:
-                continue
-            delta = abs((f_ts - target_ts).total_seconds())
-            if best is None or delta < best_delta:
-                best, best_delta = f, delta
-        return best
-
+    # _norm_sym / _closest_fill definidos mais abaixo neste módulo (compartilhados com
+    # /api/integrity/check) — resolvidos em tempo de execução, não de definição.
     updated = 0
     skipped_no_fill = 0
 
@@ -3230,8 +3217,11 @@ async def _sync_trade_fees_impl(db: Session, days_back: int = 30) -> dict:
                 skipped_no_fill += 1
                 continue
 
-            entry_side = "buy" if trade.direction == "long" else "sell"
-            exit_side  = "sell" if trade.direction == "long" else "buy"
+            # trade.direction é gravado como "LONG"/"SHORT" (maiúsculo) por _save_trade —
+            # comparar em minúsculo aqui sempre falhava e invertia compra/venda.
+            is_long = (trade.direction or "").upper() == "LONG"
+            entry_side = "buy" if is_long else "sell"
+            exit_side  = "sell" if is_long else "buy"
             entry_fill = _closest_fill([f for f in matching if f.get("side") == entry_side], entry_ts)
             exit_fill  = _closest_fill([f for f in matching if f.get("side") == exit_side], exit_ts)
 
@@ -3603,42 +3593,21 @@ _INTEGRITY_SEVERITY_RANK = {"ok": 0, "warn": 1, "fail": 2, "error": 3}
 _INTEGRITY_PNL_LOOKBACK = timedelta(days=3)
 
 
-def _fifo_realized_pnl(fills: list[dict], sym_norm: str) -> tuple[float, int]:
-    """
-    P&L realizado (FIFO) de um símbolo a partir de fills brutos da OKX.
-    Mesma lógica simplificada (um buy por sell) já usada em /api/activities —
-    válida aqui porque cada bot opera round-trips completos, um de cada vez.
-    Retorna (pnl_realizado, quantidade_de_fills_do_símbolo).
-    """
-    from collections import deque
+def _norm_sym(sym: str) -> str:
+    return (sym or "").upper().replace("/", "").replace("-", "")
 
-    def _ts(f):
+
+def _closest_fill(candidates: list[dict], target_ts: datetime) -> Optional[dict]:
+    best, best_delta = None, None
+    for f in candidates:
         try:
-            return datetime.fromisoformat(f.get("transaction_time", "").replace("Z", "+00:00"))
+            f_ts = datetime.fromisoformat(f["transaction_time"].replace("Z", "+00:00")).replace(tzinfo=None)
         except Exception:
-            return datetime.min.replace(tzinfo=timezone.utc)
-
-    buy_queue: deque = deque()
-    realized = 0.0
-    matched_count = 0
-    for f in sorted(fills, key=_ts):
-        if f.get("symbol", "").upper().replace("/", "").replace("-", "") != sym_norm:
             continue
-        try:
-            price = float(f.get("price", 0))
-            qty   = float(f.get("qty", 0))
-        except (TypeError, ValueError):
-            continue
-        if price <= 0 or qty <= 0:
-            continue
-        matched_count += 1
-        if f.get("side") == "buy":
-            buy_queue.append({"price": price, "qty": qty})
-        elif f.get("side") == "sell" and buy_queue:
-            entry = buy_queue.popleft()
-            matched_qty = min(entry["qty"], qty)
-            realized += (price - entry["price"]) * matched_qty
-    return round(realized, 4), matched_count
+        delta = abs((f_ts - target_ts).total_seconds())
+        if best is None or delta < best_delta:
+            best, best_delta = f, delta
+    return best
 
 
 @app.get("/api/integrity/check")
@@ -3683,8 +3652,13 @@ async def integrity_check(db: Session = Depends(get_db)):
                                   f"{'ABERTA' if okx_open else 'FLAT'} (líquido de baseline: {net_qty:.8f}).",
                     })
 
-                # P&L: soma dos trades fechados do app na janela vs. P&L FIFO
-                # calculado a partir dos fills reais da OKX na mesma janela.
+                # P&L: para cada trade fechado do app na janela, casa o fill de entrada e
+                # de saída correspondentes NA OKX (mais próximos no tempo, mesmo símbolo e
+                # lado) — não um FIFO agregado sobre todos os fills do símbolo. Isso importa
+                # porque o mesmo símbolo pode ter sido usado por um bot antigo (deletado/
+                # recriado) dentro da janela de 3 dias; um FIFO cego misturaria os fills
+                # daquele bot com os deste, produzindo um P&L "da OKX" sem relação real com
+                # este bot (achado real: PA001 puxou 32 fills para 1 round-trip).
                 window_start = datetime.now(timezone.utc) - _INTEGRITY_PNL_LOOKBACK
                 app_trades_window = db.query(TradeModel).filter(
                     TradeModel.bot_id == bot.id,
@@ -3694,34 +3668,53 @@ async def integrity_check(db: Session = Depends(get_db)):
                 ).all()
                 if app_trades_window:
                     app_pnl_window = sum(t.pnl for t in app_trades_window)
-                    sym_norm = bot.symbol.upper().replace("/", "").replace("-", "")
+                    sym_norm = _norm_sym(bot.symbol)
                     okx_fills_window = await ex.get_activities(
                         after=window_start.strftime("%Y-%m-%dT%H:%M:%SZ"),
                         until=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                     )
-                    okx_pnl_window, matched_fills = _fifo_realized_pnl(okx_fills_window, sym_norm)
-                    # Cada round-trip fechado precisa de no mínimo 1 fill de compra + 1 de
-                    # venda. Se a OKX devolveu menos fills do que isso, o /trade/fills
-                    # (retenção curta, ~3 dias) provavelmente não cobre a janela inteira —
-                    # a diferença pode ser cobertura incompleta, não um erro de verdade.
-                    expected_min_fills = len(app_trades_window) * 2
-                    if matched_fills == 0:
+                    matching_fills = [f for f in okx_fills_window if _norm_sym(f.get("symbol", "")) == sym_norm]
+
+                    okx_pnl_window = 0.0
+                    confirmed = 0
+                    for t in app_trades_window:
+                        entry_trade = db.query(TradeModel).filter(
+                            TradeModel.bot_id == bot.id,
+                            TradeModel.type == "entry",
+                            TradeModel.exit_price == t.exit_price,
+                        ).first()
+                        entry_ts = (entry_trade.timestamp if entry_trade else None) or t.timestamp
+                        exit_ts = t.closed_at or t.timestamp
+                        is_long = (t.direction or "").upper() == "LONG"
+                        entry_side = "buy" if is_long else "sell"
+                        exit_side = "sell" if is_long else "buy"
+                        entry_fill = _closest_fill([f for f in matching_fills if f.get("side") == entry_side], entry_ts)
+                        exit_fill = _closest_fill([f for f in matching_fills if f.get("side") == exit_side], exit_ts)
+                        if entry_fill and exit_fill:
+                            try:
+                                e_px, x_px = float(entry_fill["price"]), float(exit_fill["price"])
+                                qty = min(float(entry_fill["qty"]), float(exit_fill["qty"]))
+                                okx_pnl_window += (x_px - e_px) * qty * (1 if is_long else -1)
+                                confirmed += 1
+                            except (TypeError, ValueError, KeyError):
+                                pass
+
+                    if confirmed == 0:
                         checks.append({
                             "label": "P&L (fills OKX)", "status": "warn",
                             "detail": f"App tem {len(app_trades_window)} trade(s) fechado(s) "
-                                      f"(P&L {app_pnl_window:+.2f}) nos últimos 3 dias, mas a OKX não "
-                                      f"retornou nenhum fill de {bot.symbol} na janela — não dá para "
-                                      f"confirmar (não significa que está errado).",
+                                      f"(P&L {app_pnl_window:+.2f}) nos últimos 3 dias, mas não achei "
+                                      f"fills de entrada+saída correspondentes na OKX para nenhum — não "
+                                      f"dá para confirmar (não significa que está errado).",
                         })
-                    elif matched_fills < expected_min_fills:
+                    elif confirmed < len(app_trades_window):
                         checks.append({
                             "label": "P&L (fills OKX)", "status": "warn",
                             "detail": f"App {app_pnl_window:+.2f} ({len(app_trades_window)} trade(s)) · "
-                                      f"OKX (FIFO, via fills reais) {okx_pnl_window:+.2f} usando apenas "
-                                      f"{matched_fills} fill(s) — esperava pelo menos {expected_min_fills}. "
-                                      f"A OKX provavelmente não devolveu todos os fills dos últimos 3 dias "
-                                      f"(retenção curta do /trade/fills) — cobertura incompleta, não "
-                                      f"necessariamente um erro.",
+                                      f"OKX (fills reais) {okx_pnl_window:+.2f} confirmando apenas "
+                                      f"{confirmed}/{len(app_trades_window)} trade(s) — os demais podem "
+                                      f"estar fora da retenção curta do /trade/fills, cobertura "
+                                      f"incompleta, não necessariamente um erro.",
                         })
                     else:
                         diff = abs(app_pnl_window - okx_pnl_window)
@@ -3729,9 +3722,9 @@ async def integrity_check(db: Session = Depends(get_db)):
                         checks.append({
                             "label": "P&L (fills OKX)",
                             "status": "ok" if diff <= tolerance else "fail",
-                            "detail": f"App {app_pnl_window:+.2f} · OKX (FIFO, via fills reais) "
+                            "detail": f"App {app_pnl_window:+.2f} · OKX (fills reais) "
                                       f"{okx_pnl_window:+.2f} (dif. {diff:.2f}) — últimos 3 dias "
-                                      f"({matched_fills} fills).",
+                                      f"({confirmed}/{len(app_trades_window)} trade(s) confirmados).",
                         })
 
                 if app_open and okx_open:

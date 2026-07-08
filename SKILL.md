@@ -210,10 +210,20 @@ por bot) e aparece no card do bot (Dashboard/Bots) e no header de BotDetail.
   startup em `_run()` (banco tem posição aberta, OKX flat) também fabricava `pnl=0` sem
   tentar recuperar o fill real — mesmo bug já corrigido no `_reconcile_loop`. Agora usa o
   mesmo `_resolve_desync_exit_fill` antes do fallback zerado.
-- **Pendente (não implementado ainda, por decisão do usuário):** revisar SL inicial largo
-  (ex.: TF004/DOGE abriu com stop a ~7% da entrada — nenhum ajuste de trailing resolve se o
-  stop inicial já nasce largo) e corrigir a contaminação de símbolo no check de P&L da
-  Integridade (fills de um bot antigo no mesmo símbolo entrando no FIFO do bot atual).
+- **Teto do SL inicial:** só existia piso (nunca menor que 1.5×ATR). Achado real: TF004/DOGE
+  abriu com stop a ~7% da entrada — nenhum ajuste de trailing resolve um risco que já nasce
+  grande. Adicionado teto adaptativo em `_process_strategy`: `min(4×ATR, 5% do preço)`,
+  o que for mais apertado — preserva a RR original recalculando o tp1, mesmo padrão do piso.
+- **Contaminação de símbolo no check de P&L da Integridade corrigida:** antes fazia FIFO
+  sobre TODOS os fills do símbolo na janela de 3 dias — se um bot antigo (deletado/recriado)
+  usou o mesmo símbolo, os fills dele entravam no cálculo (achado real: PA001 puxou 32 fills
+  para 1 round-trip). Agora casa fill de entrada+saída **por trade** (mais próximo no tempo,
+  mesmo padrão de `_sync_trade_fees_impl`) em vez de FIFO cego — `_norm_sym`/`_closest_fill`
+  compartilhados entre as duas funções.
+- **Bug de casing corrigido em `_sync_trade_fees_impl`:** comparava `trade.direction ==
+  "long"` (minúsculo), mas o banco grava `"LONG"` (maiúsculo) — a comparação nunca batia,
+  invertendo entry_side/exit_side na hora de casar os fills de taxa. Sempre usar
+  `.upper() == "LONG"` ao comparar `TradeModel.direction`.
 
 ---
 
