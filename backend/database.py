@@ -242,6 +242,31 @@ class MarketDataSyncJobModel(Base):
     finished_at    = Column(DateTime, nullable=True)
 
 
+class AutoScanStateModel(Base):
+    """Estado (singleton, id=1) da rotina de auto-scan horária: liga/desliga e cursor
+    de rotação de ativos. Separado de `settings` (reservada a credenciais criptografadas)."""
+    __tablename__ = "auto_scan_state"
+
+    id            = Column(Integer, primary_key=True, default=1)
+    enabled       = Column(Boolean, default=False)
+    cursor_symbol = Column(String,  nullable=True)   # último símbolo processado (retoma dali)
+    updated_at    = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+
+class AutoScanRunLogModel(Base):
+    """Histórico de decisões da rotina de auto-scan horária — um registro por ciclo."""
+    __tablename__ = "auto_scan_runs"
+
+    id               = Column(Integer, primary_key=True, autoincrement=True)
+    created_at       = Column(DateTime, default=datetime.datetime.utcnow, index=True)
+    symbol           = Column(String,  nullable=True)
+    best_score       = Column(Float,   nullable=True)
+    best_strategy_id = Column(String,  nullable=True)
+    bot_created      = Column(Boolean, default=False)
+    bot_id           = Column(Integer, nullable=True)
+    note             = Column(Text,    nullable=True)
+
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def get_db() -> Session:

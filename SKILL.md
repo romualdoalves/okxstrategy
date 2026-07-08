@@ -316,9 +316,26 @@ Migrations adicionais são executadas via lista `migrations` em `database.py` us
 
 ### Scanner de Backtest (`/batch-backtest`)
 - Usuário escolhe categoria (TF/MR/PA/SC/RG/IF/NW) ou **Todas** + ativo e clica "Executar".
-- Não há modo Auto-Scan separado; o fluxo **Todas** cobre a varredura ampla sem histórico redundante.
 - `POST /api/backtest/category`: filtra REGISTRY por prefixo, agrupa por `recommended_timeframe`,
   busca candles uma vez por TF e timeframes extras, roda backtests estritos em paralelo (`asyncio.gather`).
+  Núcleo extraído em `_run_category_backtest_core(category, symbol, exclude_strategies, strict)` —
+  reaproveitado tanto pelo endpoint HTTP quanto pelo Auto-Scan horário (sem round-trip HTTP entre eles).
+
+### Auto-Scan horário (`_auto_scan_loop`, botão "Auto-Scan Horário" no Scanner BT)
+- Dorme até a próxima hora cheia (UTC) e roda um ciclo: pega o próximo ativo **habilitado**
+  (`TrackedSymbolModel.is_active`) que ainda **não tem bot** (rotação com cursor persistido em
+  `auto_scan_state`, um único ativo por ciclo — não todos de uma vez), roda o Scanner em
+  **todas as categorias** para ele via `_run_category_backtest_core`, e se o melhor `score`
+  encontrado for **≥ 9.0** (`_AUTO_SCAN_MIN_SCORE`), cria **e inicia** o bot automaticamente
+  (chama `create_bot`/`start_bot` diretamente, sem HTTP).
+- **Sempre demo, por decisão do usuário** — a rotina nunca cria bot LIVE; promover para live
+  é manual. `demo=True` é forçado no payload, independente de qualquer config global.
+- Liga/desliga via `POST /api/auto-scan/toggle` (estado em `auto_scan_state`, tabela singleton
+  id=1 — separada de `settings`, que é reservada a credenciais criptografadas).
+- Histórico de decisões (ativo escolhido, melhor score/estratégia, se criou bot) em
+  `auto_scan_runs` — exibido no painel do Scanner BT e via `GET /api/auto-scan/runs`.
+- Se não houver nenhum ativo elegível (todos habilitados já têm bot, ou nenhum rastreado),
+  o ciclo é pulado e logado — a automação não força criar nada.
 - Recomendações do Scanner usam score composto `composite_v1`:
   60% backtest histórico, 25% score preditivo recente, 10% robustez da amostra e
   5% cobertura operacional. O score histórico original fica em `historical_score`.

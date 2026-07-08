@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ScanSearch, Play, HelpCircle, ChevronDown, ChevronUp, PlusCircle, CheckSquare, Square, ShieldCheck, AlertTriangle } from 'lucide-react'
+import { ScanSearch, Play, HelpCircle, ChevronDown, ChevronUp, PlusCircle, CheckSquare, Square, ShieldCheck, AlertTriangle, Clock, Zap } from 'lucide-react'
 import BacktestLikert from '../components/BacktestLikert'
-import { getStrategies, getBots, createBot } from '../api'
+import { getStrategies, getBots, createBot, getAutoScanStatus, toggleAutoScan, getAutoScanRuns } from '../api'
 
 const CATEGORIES = [
   { id: 'TF', label: 'Trend Following',  description: 'Estratégias que seguem a tendência (EMA, MACD, SuperTrend…)' },
@@ -285,6 +285,31 @@ export default function BatchBacktest() {
   const { data: strategies = [] } = useQuery({ queryKey: ['strategies'], queryFn: getStrategies })
   const { data: bots = [] }       = useQuery({ queryKey: ['bots'],       queryFn: getBots       })
 
+  const { data: autoScan, isLoading: autoScanLoading } = useQuery({
+    queryKey: ['auto-scan-status'],
+    queryFn: getAutoScanStatus,
+    refetchInterval: 30_000,
+  })
+  const { data: autoScanRuns = [] } = useQuery({
+    queryKey: ['auto-scan-runs'],
+    queryFn: () => getAutoScanRuns(5),
+    refetchInterval: 30_000,
+  })
+  const [autoScanToggling, setAutoScanToggling] = useState(false)
+
+  async function handleAutoScanToggle() {
+    if (!autoScan) return
+    setAutoScanToggling(true)
+    try {
+      await toggleAutoScan(!autoScan.enabled)
+      await qc.invalidateQueries({ queryKey: ['auto-scan-status'] })
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setAutoScanToggling(false)
+    }
+  }
+
   const usedSymbols = new Set(bots.map(b => b.symbol))
   const usedStrategies = Array.from(new Set(bots.map(b => b.strategy_id)))
   const selectedList = Object.values(selectedRows)
@@ -471,6 +496,58 @@ export default function BatchBacktest() {
           <h1 className="text-2xl font-bold">Scanner de Backtest</h1>
           <p className="text-sm text-muted">Backtest Estrito + score preditivo: histórico OKX, regime recente, volatilidade, liquidez e momentum</p>
         </div>
+      </div>
+
+      {/* Auto-Scan horário */}
+      <div className="card p-5 mb-6">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-3">
+            <Zap size={20} className={autoScan?.enabled ? 'text-accent' : 'text-muted'} />
+            <div>
+              <p className="font-bold text-sm">Auto-Scan Horário</p>
+              <p className="text-xs text-muted">
+                Todas as categorias, um ativo habilitado por vez a cada hora cheia — cria e
+                inicia o bot automaticamente se o score for ≥ {autoScan?.min_score ?? 9}.
+                Sempre em modo demo.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={handleAutoScanToggle}
+            disabled={autoScanLoading || autoScanToggling}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 ${
+              autoScan?.enabled
+                ? 'bg-bear/15 text-bear hover:bg-bear/25'
+                : 'bg-accent/15 text-accent hover:bg-accent/25'
+            }`}
+          >
+            {autoScanToggling ? '...' : autoScan?.enabled ? 'Desativar' : 'Ativar'}
+          </button>
+        </div>
+
+        {autoScan && (
+          <div className="mt-3 pt-3 border-t border-white/5 flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted">
+            <span className="flex items-center gap-1.5">
+              <Clock size={12} />
+              Próximo ciclo: {new Date(autoScan.next_run_at).toLocaleString()}
+            </span>
+            {autoScan.cursor_symbol && <span>Último ativo: {autoScan.cursor_symbol}</span>}
+          </div>
+        )}
+
+        {autoScanRuns.length > 0 && (
+          <div className="mt-3 pt-3 border-t border-white/5 space-y-1.5">
+            {autoScanRuns.map(run => (
+              <div key={run.id} className="text-xs flex items-start gap-2">
+                <span className={`mt-1 w-1.5 h-1.5 rounded-full shrink-0 ${run.bot_created ? 'bg-bull' : 'bg-white/20'}`} />
+                <div>
+                  <span className="text-muted">{new Date(run.created_at).toLocaleString()} — </span>
+                  <span className="text-white/80">{run.note || '—'}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {bulkMessage && (

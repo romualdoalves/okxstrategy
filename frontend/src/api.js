@@ -60,6 +60,13 @@ export const testTelegram        = () => req('/system/telegram-test', { method: 
 export const getBalance        = (ccy = 'USDT', demo = false) => req(`/account/balance?currency=${ccy}&demo=${demo}`)
 export const getAccountSnapshot = (demo = false) => req(`/account/snapshot?demo=${demo}`)
 export const getIntegrityCheck  = () => req('/integrity/check')
+
+// Auto-Scan horário
+export const getAutoScanStatus = () => req('/auto-scan/status')
+export const toggleAutoScan    = (enabled) => req('/auto-scan/toggle', {
+  method: 'POST', body: JSON.stringify({ enabled }),
+})
+export const getAutoScanRuns   = (limit = 20) => req(`/auto-scan/runs?limit=${limit}`)
 export const resetAccount      = () => req('/account/reset-data', { method: 'POST' })
 
 // OKX — Conexão via banco
