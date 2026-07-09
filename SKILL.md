@@ -332,8 +332,11 @@ Migrations adicionais são executadas via lista `migrations` em `database.py` us
   é manual. `demo=True` é forçado no payload, independente de qualquer config global.
 - Liga/desliga via `POST /api/auto-scan/toggle` (estado em `auto_scan_state`, tabela singleton
   id=1 — separada de `settings`, que é reservada a credenciais criptografadas).
-- Histórico de decisões (ativo escolhido, melhor score/estratégia, se criou bot) em
-  `auto_scan_runs` — exibido no painel do Scanner BT e via `GET /api/auto-scan/runs`.
+- Histórico de decisões (ativo, categoria, melhor score/estratégia, se criou bot) persistido em
+  `auto_scan_runs`, com índice em `symbol`/`category`/`best_strategy_id`. `GET /api/auto-scan/runs`
+  filtra por `symbol`, `strategy_id`, `category` e período (`date_from`/`date_to`, `YYYY-MM-DD`,
+  UTC) — painel do Scanner BT tem os mesmos filtros na UI (mostra últimos 5 sem filtro, até 100
+  com filtro aplicado). `category` é derivado de `best_strategy_id[:2]` no momento do registro.
 - Se não houver nenhum ativo elegível (todos habilitados já têm bot, ou nenhum rastreado),
   o ciclo é pulado e logado — a automação não força criar nada.
 - Recomendações do Scanner usam score composto `composite_v1`:

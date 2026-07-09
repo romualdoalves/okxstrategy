@@ -290,9 +290,12 @@ export default function BatchBacktest() {
     queryFn: getAutoScanStatus,
     refetchInterval: 30_000,
   })
+  const [autoScanFilters, setAutoScanFilters] = useState({ symbol: '', category: '', strategyId: '', dateFrom: '', dateTo: '' })
+  const [autoScanFiltersApplied, setAutoScanFiltersApplied] = useState({})
+  const hasAutoScanFilters = Object.values(autoScanFiltersApplied).some(Boolean)
   const { data: autoScanRuns = [] } = useQuery({
-    queryKey: ['auto-scan-runs'],
-    queryFn: () => getAutoScanRuns(5),
+    queryKey: ['auto-scan-runs', autoScanFiltersApplied],
+    queryFn: () => getAutoScanRuns({ limit: hasAutoScanFilters ? 100 : 5, ...autoScanFiltersApplied }),
     refetchInterval: 30_000,
   })
   const [autoScanToggling, setAutoScanToggling] = useState(false)
@@ -535,18 +538,90 @@ export default function BatchBacktest() {
           </div>
         )}
 
-        {autoScanRuns.length > 0 && (
-          <div className="mt-3 pt-3 border-t border-white/5 space-y-1.5">
+        <div className="mt-3 pt-3 border-t border-white/5">
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] text-muted uppercase">Ativo</label>
+              <input
+                type="text" placeholder="ex: BTC-USDT" value={autoScanFilters.symbol}
+                onChange={e => setAutoScanFilters(f => ({ ...f, symbol: e.target.value }))}
+                className="bg-black/20 border border-white/10 rounded px-2 py-1 text-xs w-28"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] text-muted uppercase">Categoria</label>
+              <select
+                value={autoScanFilters.category}
+                onChange={e => setAutoScanFilters(f => ({ ...f, category: e.target.value }))}
+                className="bg-black/20 border border-white/10 rounded px-2 py-1 text-xs"
+              >
+                <option value="">Todas</option>
+                {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.id}</option>)}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] text-muted uppercase">Estratégia</label>
+              <input
+                type="text" placeholder="ex: TF010" value={autoScanFilters.strategyId}
+                onChange={e => setAutoScanFilters(f => ({ ...f, strategyId: e.target.value }))}
+                className="bg-black/20 border border-white/10 rounded px-2 py-1 text-xs w-24"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] text-muted uppercase">De</label>
+              <input
+                type="date" value={autoScanFilters.dateFrom}
+                onChange={e => setAutoScanFilters(f => ({ ...f, dateFrom: e.target.value }))}
+                className="bg-black/20 border border-white/10 rounded px-2 py-1 text-xs"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] text-muted uppercase">Até</label>
+              <input
+                type="date" value={autoScanFilters.dateTo}
+                onChange={e => setAutoScanFilters(f => ({ ...f, dateTo: e.target.value }))}
+                className="bg-black/20 border border-white/10 rounded px-2 py-1 text-xs"
+              />
+            </div>
+            <button
+              onClick={() => setAutoScanFiltersApplied({ ...autoScanFilters })}
+              className="px-3 py-1.5 rounded bg-accent/15 text-accent text-xs font-medium hover:bg-accent/25"
+            >
+              Buscar
+            </button>
+            {hasAutoScanFilters && (
+              <button
+                onClick={() => {
+                  setAutoScanFilters({ symbol: '', category: '', strategyId: '', dateFrom: '', dateTo: '' })
+                  setAutoScanFiltersApplied({})
+                }}
+                className="px-3 py-1.5 rounded bg-white/5 text-muted text-xs font-medium hover:bg-white/10"
+              >
+                Limpar
+              </button>
+            )}
+          </div>
+        </div>
+
+        {autoScanRuns.length > 0 ? (
+          <div className="mt-3 pt-3 border-t border-white/5 space-y-1.5 max-h-96 overflow-y-auto">
             {autoScanRuns.map(run => (
               <div key={run.id} className="text-xs flex items-start gap-2">
                 <span className={`mt-1 w-1.5 h-1.5 rounded-full shrink-0 ${run.bot_created ? 'bg-bull' : 'bg-white/20'}`} />
                 <div>
-                  <span className="text-muted">{new Date(run.created_at).toLocaleString()} — </span>
-                  <span className="text-white/80">{run.note || '—'}</span>
+                  <span className="text-muted">{new Date(run.created_at).toLocaleString()}</span>
+                  {run.symbol && <span className="text-muted"> · {run.symbol}</span>}
+                  {run.category && <span className="text-muted"> · {run.category}</span>}
+                  {run.best_score != null && <span className="text-muted"> · score {run.best_score.toFixed(2)}</span>}
+                  <span className="text-white/80"> — {run.note || '—'}</span>
                 </div>
               </div>
             ))}
           </div>
+        ) : (
+          <p className="mt-3 pt-3 border-t border-white/5 text-xs text-muted">
+            {hasAutoScanFilters ? 'Nenhum ciclo encontrado para esses filtros.' : 'Nenhum ciclo registrado ainda.'}
+          </p>
         )}
       </div>
 

@@ -2717,6 +2717,7 @@ async def _auto_scan_cycle():
 
         db.add(AutoScanRunLogModel(
             symbol=symbol,
+            category=best_row["strategy_id"][:2].upper() if best_row else None,
             best_score=best_score if best_row else None,
             best_strategy_id=best_row["strategy_id"] if best_row else None,
             bot_created=bot_created,
@@ -2758,6 +2759,7 @@ def get_auto_scan_status(db: Session = Depends(get_db)):
         "last_run": {
             "created_at": last_run.created_at.isoformat() + "Z",
             "symbol": last_run.symbol,
+            "category": last_run.category,
             "best_score": last_run.best_score,
             "best_strategy_id": last_run.best_strategy_id,
             "bot_created": last_run.bot_created,
@@ -2781,12 +2783,40 @@ def toggle_auto_scan(payload: AutoScanToggleRequest, db: Session = Depends(get_d
 
 
 @app.get("/api/auto-scan/runs")
-def list_auto_scan_runs(limit: int = 20, db: Session = Depends(get_db)):
-    runs = db.query(AutoScanRunLogModel).order_by(AutoScanRunLogModel.created_at.desc()).limit(limit).all()
+def list_auto_scan_runs(
+    limit: int = 20,
+    symbol: Optional[str] = None,
+    strategy_id: Optional[str] = None,
+    category: Optional[str] = None,
+    date_from: Optional[str] = None,   # "YYYY-MM-DD", início do dia (UTC)
+    date_to: Optional[str] = None,     # "YYYY-MM-DD", fim do dia (UTC, inclusive)
+    db: Session = Depends(get_db),
+):
+    """Histórico de ciclos do Auto-Scan, filtrável por ativo, estratégia, categoria e período."""
+    q = db.query(AutoScanRunLogModel)
+    if symbol:
+        q = q.filter(AutoScanRunLogModel.symbol == _norm_symbol(symbol))
+    if strategy_id:
+        q = q.filter(AutoScanRunLogModel.best_strategy_id == strategy_id.upper())
+    if category:
+        q = q.filter(AutoScanRunLogModel.category == category.upper())
+    if date_from:
+        try:
+            q = q.filter(AutoScanRunLogModel.created_at >= datetime.fromisoformat(date_from))
+        except ValueError:
+            raise HTTPException(400, f"date_from inválido: {date_from!r} (use YYYY-MM-DD)")
+    if date_to:
+        try:
+            end = datetime.fromisoformat(date_to) + timedelta(days=1)
+            q = q.filter(AutoScanRunLogModel.created_at < end)
+        except ValueError:
+            raise HTTPException(400, f"date_to inválido: {date_to!r} (use YYYY-MM-DD)")
+
+    runs = q.order_by(AutoScanRunLogModel.created_at.desc()).limit(min(limit, 500)).all()
     return [
         {
             "id": r.id, "created_at": r.created_at.isoformat() + "Z", "symbol": r.symbol,
-            "best_score": r.best_score, "best_strategy_id": r.best_strategy_id,
+            "category": r.category, "best_score": r.best_score, "best_strategy_id": r.best_strategy_id,
             "bot_created": r.bot_created, "bot_id": r.bot_id, "note": r.note,
         }
         for r in runs

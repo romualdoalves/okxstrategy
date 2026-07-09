@@ -259,9 +259,10 @@ class AutoScanRunLogModel(Base):
 
     id               = Column(Integer, primary_key=True, autoincrement=True)
     created_at       = Column(DateTime, default=datetime.datetime.utcnow, index=True)
-    symbol           = Column(String,  nullable=True)
+    symbol           = Column(String,  nullable=True, index=True)
+    category         = Column(String,  nullable=True, index=True)   # prefixo da estratégia vencedora (TF/MR/PA/...)
     best_score       = Column(Float,   nullable=True)
-    best_strategy_id = Column(String,  nullable=True)
+    best_strategy_id = Column(String,  nullable=True, index=True)
     bot_created      = Column(Boolean, default=False)
     bot_id           = Column(Integer, nullable=True)
     note             = Column(Text,    nullable=True)
@@ -288,6 +289,10 @@ def _run_migrations():
     migrations = [
         "ALTER TABLE trades ADD COLUMN IF NOT EXISTS fee FLOAT",
         "ALTER TABLE trades ADD COLUMN IF NOT EXISTS peak_price FLOAT",
+        "ALTER TABLE auto_scan_runs ADD COLUMN IF NOT EXISTS category VARCHAR",
+        "CREATE INDEX IF NOT EXISTS idx_auto_scan_runs_symbol ON auto_scan_runs(symbol)",
+        "CREATE INDEX IF NOT EXISTS idx_auto_scan_runs_category ON auto_scan_runs(category)",
+        "CREATE INDEX IF NOT EXISTS idx_auto_scan_runs_strategy ON auto_scan_runs(best_strategy_id)",
         """
         CREATE TABLE IF NOT EXISTS factory_strategies (
             id SERIAL PRIMARY KEY,
