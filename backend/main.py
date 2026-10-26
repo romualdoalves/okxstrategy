@@ -58,8 +58,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.add_event_handler("startup", lifecycle.startup)
-app.add_event_handler("shutdown", lifecycle.shutdown)
+# on_event é o mesmo mecanismo que o main.py usava antes (add_event_handler não existe nas
+# versões mais novas do Starlette que o build da VPS instala).
+app.on_event("startup")(lifecycle.startup)
+app.on_event("shutdown")(lifecycle.shutdown)
 
 if spa.STATIC_ASSETS_DIR.exists():
     app.mount("/assets", StaticFiles(directory=spa.STATIC_ASSETS_DIR), name="assets")

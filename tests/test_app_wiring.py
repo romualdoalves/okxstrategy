@@ -4,6 +4,7 @@ import glob
 import importlib
 import json
 import os
+import re
 import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -11,18 +12,17 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 class TestAppWiring(unittest.TestCase):
     def test_routes_match_fixture(self):
-        from fastapi.routing import APIRoute
-        from starlette.routing import WebSocketRoute
+        """Usa o schema OpenAPI (e não app.routes): versões novas do FastAPI guardam routers incluídos
+        como objetos opacos, e `app.routes` deixa de listar as rotas individuais."""
         from backend.main import app
 
-        actual = set()
-        for r in app.routes:
-            if isinstance(r, APIRoute):
-                actual |= {f"{m} {r.path}" for m in r.methods}
-            elif isinstance(r, WebSocketRoute):
-                actual.add(f"WS {r.path}")
+        def norm(path):
+            return re.sub(r":\w+}", "}", path)      # {symbol:path} -> {symbol}
+
+        actual = {f"{m.upper()} {norm(p)}" for p, methods in app.openapi()["paths"].items() for m in methods}
+        actual |= {"WS /ws", "GET /{full_path}"}      # fora do schema (websocket e catch-all da SPA)
         with open(os.path.join(ROOT, "tests", "fixtures", "routes.json"), encoding="utf-8") as f:
-            expected = set(json.load(f))
+            expected = {re.sub(r":\w+}", "}", x) for x in json.load(f)}
         self.assertEqual(sorted(expected - actual), [], "rotas removidas")
         self.assertEqual(sorted(actual - expected), [], "rotas novas: atualize tests/fixtures/routes.json")
 
