@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { wsUrl } from '../auth'
 
 let _addToast = null
 
@@ -41,13 +42,11 @@ export function useToastEngine() {
 
   // Escuta WebSocket globalmente
   useEffect(() => {
-    const protocol = location.protocol === 'https:' ? 'wss' : 'ws'
-    const url = `${protocol}://${location.host}/ws`
     let ws
     let retryTimeout
 
     function connect() {
-      ws = new WebSocket(url)
+      ws = new WebSocket(wsUrl())
 
       ws.onmessage = (e) => {
         try {

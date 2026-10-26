@@ -52,6 +52,7 @@ from .database import (
     get_db,
 )
 from .bot_manager import manager
+from .security import ApiAuthMiddleware, get_cors_origins
 from .backtest_engine import BacktestEngine, backtest_recommendation, backtest_score
 from .predictive_scoring import PredictiveScoringService
 from .optimizer import StrategyOptimizer
@@ -87,9 +88,12 @@ app.include_router(market_data.router, prefix="/api")
 
 market_data_svc = MarketDataService()
 
+# Ordem importa: o último middleware adicionado é o mais externo. CORS fica por fora
+# para responder preflight (OPTIONS) e anexar headers também nas respostas 401.
+app.add_middleware(ApiAuthMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=get_cors_origins(),
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -708,6 +712,10 @@ async def startup():
     create_tables()
     log.info("Banco de dados inicializado.")
 
+    from .crypto_utils import rotate_secrets
+    with SessionLocal() as _db:
+        rotate_secrets(_db)
+
     # Inicia o feed do calendário económico do provider atual, se configurado
     await calendar_feed.start()
     await market_data_svc.start()
@@ -881,6 +889,7 @@ class FactoryDeployRequest(BaseModel):
     code: str
     plan: dict
     source_text: str = ""
+    approved: bool = False   # confirmação explícita de que o código foi revisado
 
 
 @app.get("/api/strategy-factory/status")
@@ -984,6 +993,8 @@ def factory_validate(req: FactoryValidateRequest):
 @app.post("/api/strategy-factory/deploy")
 def factory_deploy(req: FactoryDeployRequest, db: Session = Depends(get_db)):
     """Etapa 4 — Implanta a estratégia: escreve arquivo + hot-load + persiste no banco."""
+    if not req.approved:
+        raise HTTPException(400, "Implantação exige aprovação explícita do código (approved=true).")
     from .strategy_factory.deployer import deploy
     from .strategy_factory.validator import validate_code
 

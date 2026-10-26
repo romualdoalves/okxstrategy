@@ -771,6 +771,7 @@ export default function StrategyFactory() {
   }
 
   async function handleDeploy() {
+    if (!window.confirm('Este código será executado no servidor, junto dos bots com ordens reais. Você revisou o código e quer implantar?')) return
     setDeploying(true)
     try {
       const result = await factoryDeploy(code, plan, sourceText)

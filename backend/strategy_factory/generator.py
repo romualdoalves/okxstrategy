@@ -367,11 +367,10 @@ def _strip_markdown(code: str) -> str:
 
 def _basic_code_check(code: str, class_name: str) -> None:
     """Verificações básicas antes de prosseguir para o validador completo."""
-    forbidden = ["subprocess", "os.system", "os.popen", "eval(", "exec(",
-                 "__import__", "socket.", "requests.", "aiohttp."]
-    for f in forbidden:
-        if f in code:
-            raise RuntimeError(f"Código gerado contém padrão proibido: '{f}'")
+    from .code_policy import check_code
+    issues = check_code(code)
+    if issues:
+        raise RuntimeError(f"Código gerado viola a política de segurança: {issues[0]}")
 
     expected_class = f"{class_name}Strategy"
     class_defs = re.findall(r"^\s*class\s+([^\s(:]+)", code, flags=re.MULTILINE)

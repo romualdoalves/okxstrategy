@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ScanSearch, Play, HelpCircle, ChevronDown, ChevronUp, PlusCircle, CheckSquare, Square, ShieldCheck, AlertTriangle, Clock, Zap } from 'lucide-react'
 import BacktestLikert from '../components/BacktestLikert'
 import { getStrategies, getBots, createBot, getAutoScanStatus, toggleAutoScan, getAutoScanRuns } from '../api'
+import { authFetch } from '../auth'
 
 const CATEGORIES = [
   { id: 'TF', label: 'Trend Following',  description: 'Estratégias que seguem a tendência (EMA, MACD, SuperTrend…)' },
@@ -93,7 +94,7 @@ async function requestCategoryScan(payload, maxAttempts = 3) {
   let lastError = null
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      const res = await fetch('/api/backtest/category', {
+      const res = await authFetch('/api/backtest/category', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

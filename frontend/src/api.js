@@ -1,7 +1,9 @@
+import { authFetch } from './auth'
+
 const BASE = '/api'
 
 async function req(path, options = {}) {
-  const res = await fetch(BASE + path, {
+  const res = await authFetch(BASE + path, {
     headers: { 'Content-Type': 'application/json' },
     ...options,
   })
@@ -121,7 +123,7 @@ export const factoryValidate = (code, plan) =>
 export const factoryFix     = (code, plan, errors) =>
   req('/strategy-factory/fix',      { method: 'POST', body: JSON.stringify({ code, plan, errors }) })
 export const factoryDeploy   = (code, plan, source_text = '') =>
-  req('/strategy-factory/deploy', { method: 'POST', body: JSON.stringify({ code, plan, source_text }) })
+  req('/strategy-factory/deploy', { method: 'POST', body: JSON.stringify({ code, plan, source_text, approved: true }) })
 export const factoryList     = () => req('/strategy-factory/strategies')
 export const factoryGetCode  = (id) => req(`/strategy-factory/strategies/${id}/code`)
 export const factoryDisable  = (id) => req(`/strategy-factory/strategies/${id}`, { method: 'DELETE' })

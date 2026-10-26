@@ -15,21 +15,6 @@ from typing import Any
 
 log = logging.getLogger("strategy_factory.validator")
 
-FORBIDDEN_PATTERNS = [
-    "subprocess", "os.system", "os.popen", "os.exec",
-    "eval(", "exec(", "__import__", "socket.",
-    "requests.", "aiohttp.", "urllib.", "http.",
-    "open(", "pathlib.", "shutil.", "tempfile.",
-]
-
-ALLOWED_IMPORTS = {
-    "__future__", "typing", "math", "re", "dataclasses",
-    "pandas", "pandas_ta", "numpy",
-    "..base",  # import relativo da base
-    "backend",  # import absoluto do backend (strategy_factory)
-}
-
-
 @dataclass
 class ValidationReport:
     passed: bool = False
@@ -98,13 +83,15 @@ def _make_candles(n: int = 250, seed: int = 42) -> list[_CandleBar]:
 
 def validate_code(code: str, plan: dict) -> ValidationReport:
     """
-    Valida o código gerado sincronamente.
-    Executa dentro do processo principal em namespace isolado.
-    Retorna ValidationReport com resultado de cada verificação.
+    Valida o código gerado.
+      1. Sintaxe e política estática (AST) no processo principal — sem executar nada.
+      2. Verificações dinâmicas (exec + candles sintéticos) em subprocesso isolado.
     """
+    from .code_policy import check_code
+    from .sandbox import run_in_sandbox
+
     report = ValidationReport()
 
-    # ── Verificação 1: Sintaxe ────────────────────────────────────────────────
     try:
         compile(code, "<strategy>", "exec")
         report.add("Sintaxe Python válida", True)
@@ -113,34 +100,26 @@ def validate_code(code: str, plan: dict) -> ValidationReport:
         report.error = f"Erro de sintaxe: {e}"
         return report
 
-    # ── Verificação 2: Imports proibidos ─────────────────────────────────────
-    forbidden_found = [p for p in FORBIDDEN_PATTERNS if p in code]
-    if forbidden_found:
-        detail = ", ".join(forbidden_found)
-        report.add("Sem imports proibidos", False, f"Encontrado: {detail}")
-        report.error = f"Imports proibidos: {detail}"
+    issues = check_code(code)
+    if issues:
+        report.add("Política de segurança (AST)", False, "; ".join(issues[:8]))
+        report.error = f"Código viola a política de segurança: {issues[0]}"
         return report
-    report.add("Sem imports proibidos", True)
+    report.add("Política de segurança (AST)", True)
 
-    # ── Verificação 3: Imports do AST ─────────────────────────────────────────
-    try:
-        tree = ast.parse(code)
-        bad_imports = []
-        for node in ast.walk(tree):
-            if isinstance(node, (ast.Import, ast.ImportFrom)):
-                mod = getattr(node, "module", "") or ""
-                for alias in getattr(node, "names", []):
-                    full = f"{mod}.{alias.name}" if mod else alias.name
-                    top  = full.split(".")[0] if not full.startswith(".") else full
-                    ok   = any(top.startswith(a) or top == a for a in ALLOWED_IMPORTS)
-                    if not ok:
-                        bad_imports.append(full)
-        if bad_imports:
-            report.add("Imports do AST seguros", False, f"Não permitidos: {bad_imports}")
-        else:
-            report.add("Imports do AST seguros", True)
-    except Exception as e:
-        report.add("Imports do AST seguros", False, str(e))
+    result = run_in_sandbox(code, plan)
+    report.checks.extend(result["checks"])
+    report.error = result.get("error", "")
+    report.passed = bool(result.get("passed"))
+    return report
+
+
+def run_dynamic_checks(code: str, plan: dict) -> ValidationReport:
+    """
+    Verificações dinâmicas. EXECUTA o código — chamar somente dentro do sandbox
+    (sandbox_runner.py), nunca no processo principal.
+    """
+    report = ValidationReport()
 
     # ── Verificação 4: Execução em namespace isolado ──────────────────────────
     from ..strategies.base import BaseStrategy, ParamDef, Signal, StrategyInfo, StrategyResult

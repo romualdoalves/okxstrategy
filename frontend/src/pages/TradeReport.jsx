@@ -3,12 +3,13 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, TrendingUp, TrendingDown, Clock, Target, ShieldAlert, Bot, ChevronDown } from 'lucide-react'
 import Chart from '../components/Chart'
+import { authFetch } from '../auth'
 
 async function fetchReport(botId, tradeId) {
   const url = tradeId
     ? `/api/bots/${botId}/trade-report?trade_id=${tradeId}`
     : `/api/bots/${botId}/trade-report`
-  const r = await fetch(url)
+  const r = await authFetch(url)
   if (!r.ok) throw new Error(await r.text())
   return r.json()
 }

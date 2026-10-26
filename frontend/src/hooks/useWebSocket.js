@@ -1,15 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
+import { wsUrl } from '../auth'
 
 export function useWebSocket() {
   const [lastMsg, setLastMsg] = useState(null)
   const wsRef = useRef(null)
 
   useEffect(() => {
-    const protocol = location.protocol === 'https:' ? 'wss' : 'ws'
-    const url      = `${protocol}://${location.host}/ws`
-
     function connect() {
-      const ws = new WebSocket(url)
+      const ws = new WebSocket(wsUrl())
       wsRef.current = ws
 
       ws.onmessage = (e) => {

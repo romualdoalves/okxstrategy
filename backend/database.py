@@ -23,7 +23,18 @@ def _resolve_database_url() -> str:
 
 
 DATABASE_URL = _resolve_database_url()
-log.info("Database URL: %s", DATABASE_URL)
+
+
+def _redact_url(url: str) -> str:
+    """Oculta a senha da URL para uso em logs."""
+    try:
+        from sqlalchemy.engine import make_url
+        return make_url(url).render_as_string(hide_password=True)
+    except Exception:
+        return "<url inválida>"
+
+
+log.info("Database URL: %s", _redact_url(DATABASE_URL))
 
 engine = create_engine(
     DATABASE_URL.replace("postgresql://", "postgresql+psycopg://", 1)
