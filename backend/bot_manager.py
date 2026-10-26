@@ -8,12 +8,24 @@ O BotManager expõe start/stop/status para a API REST.
 from __future__ import annotations
 import asyncio
 import logging
+import os
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import aiohttp
 from sqlalchemy.orm import Session
+
+# Fuso local em horas (ex.: -3 para BRT), o mesmo TZ_OFFSET usado pela API. Define a virada do "dia".
+_TZ_OFFSET_HOURS = int(os.getenv("TZ_OFFSET", "0"))
+
+
+def _current_day_start_utc() -> datetime:
+    """Início do dia local atual, como datetime UTC naive (formato gravado no banco)."""
+    offset = timedelta(hours=_TZ_OFFSET_HOURS)
+    local_now = datetime.now(timezone.utc).replace(tzinfo=None) + offset
+    return local_now.replace(hour=0, minute=0, second=0, microsecond=0) - offset
+
 
 from .database import BotModel, TradeModel, BotSnapshotModel, OrderRejectionModel, SignalLogModel, SessionLocal, StrategyModel
 from .exchanges.base import BaseExchange
@@ -148,6 +160,10 @@ class BotInstance:
         self._wins        = 0
         self._losses      = 0
         self._halted      = False
+        # Por que _halted está ativo: "daily_loss" (some na virada do dia) ou "critical"
+        # (posição sem SL etc. — só sai com intervenção manual).
+        self._halt_kind   : Optional[str] = None
+        self._pnl_day     : datetime = _current_day_start_utc()
         self._hold_reason     : str = ""
         self._last_indicators : dict = self._seed_initial_indicators()
         self._last_order_criteria: dict = self._empty_order_criteria()
@@ -1349,6 +1365,7 @@ class BotInstance:
                 self._last_counted_closed_epoch = bar_epoch
             if len(self._candles) > 300:
                 self._candles.pop(0)
+            self._roll_day()
             await self._process_strategy(bar, exchange, session)
 
     async def force_sync_trailing(self, exchange: BaseExchange):
@@ -1397,6 +1414,7 @@ class BotInstance:
                 ):
                     return
                 self._halted = True
+                self._halt_kind = "critical"
                 self._hold_reason = "CRÍTICO: posição aberta sem Stop Loss confirmado na OKX."
                 return
 
@@ -2054,6 +2072,7 @@ class BotInstance:
         self._entry_inflight = False
         if not sl_id:
             self._halted = True
+            self._halt_kind = "critical"
             self._hold_reason = "CRÍTICO: posição aberta sem Stop Loss confirmado na OKX."
 
         # Persiste no banco e linka o signal_log que originou esta entrada
@@ -2301,13 +2320,31 @@ class BotInstance:
 
     # ── P&L ──────────────────────────────────────────────────────────────────
 
+    def _roll_day(self) -> None:
+        """Na virada do dia local zera o P&L diário e libera o circuit breaker de perda diária.
+        Halts críticos (ex.: posição sem Stop Loss) NÃO são liberados automaticamente."""
+        today = _current_day_start_utc()
+        if today == self._pnl_day:
+            return
+        log.info("[Bot %d] Novo dia: P&L diário %.2f zerado.", self.config.id, self._daily_pnl)
+        self._pnl_day = today
+        self._daily_pnl = 0.0
+        if self._halted and self._halt_kind == "daily_loss":
+            self._halted = False
+            self._halt_kind = None
+            self._hold_reason = ""
+            log.warning("[Bot %d] Circuit breaker diário liberado: bot retomado.", self.config.id)
+
     def _record_pnl(self, pnl: float):
+        self._roll_day()
         self._daily_pnl += pnl
         if pnl > 0:
             self._wins += 1
         else:
             self._losses += 1
         if self._daily_pnl <= self.config.stop_loss_usd:
+            if not self._halted:
+                self._halt_kind = "daily_loss"
             self._halted = True
             log.warning("[Bot %d] CIRCUIT BREAKER: P&L diário %.2f",
                         self.config.id, self._daily_pnl)
@@ -2494,20 +2531,26 @@ class BotInstance:
         """Tenta recuperar o estado de uma posição aberta do banco de dados."""
         db = SessionLocal()
         try:
-            # P&L acumulado/wins/losses são persistidos no banco (tabela trades), não na
-            # memória do processo: um restart do backend (deploy, crash, reboot) NÃO deve
-            # zerar o histórico do bot — só o Reset Geral (que apaga os trades) o faz.
+            # wins/losses (histórico) e o P&L do dia vêm do banco (tabela trades), não da
+            # memória: um restart do backend NÃO deve zerar o histórico do bot nem rearmar
+            # o circuit breaker — só o Reset Geral (que apaga os trades) zera o histórico.
             closed = db.query(TradeModel).filter(
                 TradeModel.bot_id == self.config.id,
                 TradeModel.type == "exit",
                 TradeModel.pnl.isnot(None),
             ).all()
             if closed:
-                self._daily_pnl = sum(t.pnl for t in closed)
+                self._pnl_day   = _current_day_start_utc()
+                self._daily_pnl = sum(t.pnl for t in closed
+                                      if t.timestamp and t.timestamp >= self._pnl_day)
                 self._wins      = sum(1 for t in closed if t.pnl > 0)
                 self._losses    = sum(1 for t in closed if t.pnl <= 0)
-                log.info("[Bot %d] P&L acumulado recuperado do banco: %.2f (%dW/%dL)",
+                log.info("[Bot %d] Recuperado do banco: P&L do dia %.2f (histórico %dW/%dL)",
                          self.config.id, self._daily_pnl, self._wins, self._losses)
+                if self._daily_pnl <= self.config.stop_loss_usd and not self._halted:
+                    self._halted = True
+                    self._halt_kind = "daily_loss"
+                    log.warning("[Bot %d] Circuit breaker diário ainda ativo após restart.", self.config.id)
 
             # Usa o registro de ENTRADA (type="entry") como fonte da verdade para recuperação.
             # Antes usávamos order_by(id.desc()) que retornava o registro TP1 — cujo sl_price
