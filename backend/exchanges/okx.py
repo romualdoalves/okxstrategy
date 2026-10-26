@@ -898,7 +898,9 @@ class OKXPrivateStream:
 
     def __init__(self, exchange: OKXExchange):
         _, _, _, demo = _get_credentials()
-        self._ws_url = (
+        # A OKX avisou (event "notice", code 64010) que a porta 8443 será desativada; a 443 é a
+        # sucessora. OKX_WS_PRIVATE_URL permite migrar (ou voltar atrás) sem novo deploy.
+        self._ws_url = os.getenv("OKX_WS_PRIVATE_URL", "").strip() or (
             "wss://wspap.okx.com:8443/ws/v5/private"
             if demo
             else "wss://ws.okx.com:8443/ws/v5/private"
@@ -925,22 +927,32 @@ class OKXPrivateStream:
                 "open_timeout": 15,
             }
             params = _inspect.signature(_ws.connect).parameters
-            if "additional_headers" in params:
-                connect_kwargs["additional_headers"] = headers
-            elif "extra_headers" in params:
-                connect_kwargs["extra_headers"] = headers
+            # User-Agent e Origin têm parâmetros próprios nas versões novas do `websockets`;
+            # mandá-los também em additional_headers duplicaria o cabeçalho.
+            extra = dict(headers)
             if "user_agent_header" in params:
-                connect_kwargs["user_agent_header"] = headers["User-Agent"]
+                connect_kwargs["user_agent_header"] = extra.pop("User-Agent")
             if "origin" in params:
-                connect_kwargs["origin"] = headers["Origin"]
+                connect_kwargs["origin"] = extra.pop("Origin")
+            if "additional_headers" in params:
+                connect_kwargs["additional_headers"] = extra
+            elif "extra_headers" in params:
+                connect_kwargs["extra_headers"] = extra
 
             async with _ws.connect(ws_url, **connect_kwargs) as ws:
                 await ws.send(_js.dumps({
                     "op": "login",
                     "args": [{"apiKey": key, "passphrase": passphrase, "timestamp": ts, "sign": sign}],
                 }))
-                login_raw = await ws.recv()
-                login_msg = _js.loads(login_raw)
+                # A OKX pode enviar avisos (event "notice") antes da resposta do login; eles não
+                # são erro de login e precisam ser ignorados.
+                login_raw, login_msg = None, {}
+                for _ in range(5):
+                    login_raw = await asyncio.wait_for(ws.recv(), timeout=15)
+                    login_msg = _js.loads(login_raw)
+                    if login_msg.get("event") != "notice":
+                        break
+                    log.info("OKX WS notice: %s", login_msg.get("msg"))
                 if login_msg.get("event") != "login":
                     raise RuntimeError(f"OKX WS login falhou: {login_raw}")
 
@@ -952,7 +964,7 @@ class OKXPrivateStream:
                 async for raw in ws:
                     try:
                         msg = _js.loads(raw)
-                        if msg.get("event") in ("subscribe", "login", "error"):
+                        if msg.get("event") in ("subscribe", "login", "error", "notice"):
                             continue
                         for order in msg.get("data", []):
                             state = order.get("state", "")
