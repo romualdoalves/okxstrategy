@@ -31,7 +31,7 @@ def _assert_okx_spot_symbol(symbol: str):
 
 
 def get_service() -> MarketDataService:
-    from ..main import market_data_svc
+    from ..common import market_data_svc
 
     return market_data_svc
 
