@@ -50,7 +50,7 @@ log_info "Container okx_strategy ativo. Verificando posições abertas via API..
 ENV_FILE="$(dirname "$COMPOSE_FILE")/.env"
 API_TOKEN="${API_AUTH_TOKEN:-}"
 if [ -z "$API_TOKEN" ] && [ -f "$ENV_FILE" ]; then
-    API_TOKEN=$(grep -E '^API_AUTH_TOKEN=' "$ENV_FILE" | tail -1 | cut -d= -f2- | tr -d '"'"'"' ')
+    API_TOKEN=$(grep -E '^API_AUTH_TOKEN=' "$ENV_FILE" | tail -1 | cut -d= -f2- | tr -d '"'"'"' ' || true)
 fi
 if [ -z "$API_TOKEN" ]; then
     log_warn "API_AUTH_TOKEN não encontrado em ${ENV_FILE} — a consulta pode retornar 401."
