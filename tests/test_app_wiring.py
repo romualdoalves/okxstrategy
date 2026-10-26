@@ -29,7 +29,7 @@ class TestAppWiring(unittest.TestCase):
     def test_relative_imports_resolve(self):
         """Um `from .x import y` dentro de uma função só quebra em runtime, ao mudar o módulo de pacote."""
         failures = []
-        files = [os.path.join(ROOT, "backend", "main.py"), os.path.join(ROOT, "backend", "common.py")]
+        files = [os.path.join(ROOT, "backend", n) for n in ("main.py", "common.py", "lifecycle.py")]
         files += glob.glob(os.path.join(ROOT, "backend", "routers", "*.py"))
         for path in files:
             rel = os.path.relpath(path, ROOT)[:-3].replace(os.sep, ".")
