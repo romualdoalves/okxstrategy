@@ -4,7 +4,7 @@ Testes unitários para a estratégia DEX Arbitrage Sentinel (A006).
 
 import unittest
 
-from backend.strategies.dex_arbitrage_sentinel import DexArbitrageSentinelStrategy
+from backend.strategies.factory.if002 import DexArbitrageSentinelStrategy
 from backend.strategies.base import Signal
 from backend.feeds.dex_price_feed import PriceSource
 
@@ -21,6 +21,7 @@ class DummyCandle:
 class TestDexArbitrageSentinel(unittest.TestCase):
     def setUp(self):
         self.strat = DexArbitrageSentinelStrategy()
+        self.strat.slippage_estimate_pct = 0.01
 
     def _make_candles(self, n=30, price=100.0):
         return [DummyCandle(price, price + 1, price - 1, price) for _ in range(n)]
@@ -53,7 +54,7 @@ class TestDexArbitrageSentinel(unittest.TestCase):
     def test_buy_signal_when_okx_cheaper(self):
         """OKX mais barata que DEX → sinal BUY."""
         self.strat.min_spread_pct = 0.1
-        self.strat.gas_cost_usd = 0.5  # reduz gas para permitir spread menor
+        self.strat.gas_cost_usd = 0.05  # custo baixo: o spread líquido desconta slippage e gas sobre stake de $100
         candles = self._make_candles(30, price=100.0)
         ctx = {
             "dex_prices": {
@@ -78,7 +79,7 @@ class TestDexArbitrageSentinel(unittest.TestCase):
     def test_hold_when_spread_too_small(self):
         """Spread abaixo do threshold → HOLD."""
         self.strat.min_spread_pct = 0.3  # threshold alto
-        self.strat.gas_cost_usd = 0.5
+        self.strat.gas_cost_usd = 0.05  # custo baixo: o spread líquido desconta slippage e gas sobre stake de $100
         candles = self._make_candles(30, price=100.0)
         ctx = {
             "dex_prices": {
@@ -103,7 +104,7 @@ class TestDexArbitrageSentinel(unittest.TestCase):
     def test_sell_signal_when_okx_expensive(self):
         """OKX mais cara que DEX → sinal SELL."""
         self.strat.min_spread_pct = 0.1
-        self.strat.gas_cost_usd = 0.5
+        self.strat.gas_cost_usd = 0.05  # custo baixo: o spread líquido desconta slippage e gas sobre stake de $100
         candles = self._make_candles(30, price=100.0)
         ctx = {
             "dex_prices": {
@@ -129,7 +130,7 @@ class TestDexArbitrageSentinel(unittest.TestCase):
     def test_hold_when_okx_not_in_spread_and_filter_on(self):
         """use_okx_only=True e OKX fora do spread → HOLD."""
         self.strat.min_spread_pct = 0.1
-        self.strat.gas_cost_usd = 0.5
+        self.strat.gas_cost_usd = 0.05  # custo baixo: o spread líquido desconta slippage e gas sobre stake de $100
         candles = self._make_candles(30, price=100.0)
         ctx = {
             "dex_prices": {
@@ -221,7 +222,7 @@ class TestDexArbitrageSentinel(unittest.TestCase):
     def test_info_returns_correct_id(self):
         """info() deve retornar ID A006."""
         info = DexArbitrageSentinelStrategy.info()
-        self.assertEqual(info.id, "A006")
+        self.assertEqual(info.id, "IF002")
         self.assertIn("arbitrage", info.tags)
 
 

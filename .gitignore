@@ -20,23 +20,5 @@ __pycache__/
 .claude/
 *.log
 
-# Artifact/debug files
-=
-CACHED
-ERROR
-resolve
-check_*.py
-fix_*.py
-find_*.py
-scan_*.py
-migrate_*.py
-setup_db.py
+# Screenshots locais
 images/
-
-# Docker build cache artifacts
-\[frontend-build
-\[internal\]
-\[runtime
-trading-platform@1.0.0
-transferring
-vite

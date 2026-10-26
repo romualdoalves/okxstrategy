@@ -150,7 +150,7 @@ class DexArbitrageSentinelStrategy(BaseStrategy):
             )
 
         # Calcula spreads
-        from ..feeds.dex_price_feed import DexPriceFeed
+        from backend.feeds.dex_price_feed import DexPriceFeed
         feed = DexPriceFeed(
             min_liquidity_usd=self.min_liquidity_usd,
             slippage_pct=self.slippage_estimate_pct,

@@ -1,7 +1,7 @@
 import unittest
 
 from backend.strategies.base import Signal
-from backend.strategies.influencers_followers import InfluencersFollowersStrategy
+from backend.strategies.factory.nw001 import InfluencersFollowersStrategy
 
 
 class DummyCandle:

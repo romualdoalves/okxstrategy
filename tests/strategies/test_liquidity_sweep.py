@@ -3,7 +3,7 @@ from datetime import datetime
 
 import pandas as pd
 
-from backend.strategies.price_action_liquidity_sweep import LiquiditySweepStrategy
+from backend.strategies.factory.pa005 import LiquiditySweepStrategy
 from backend.strategies.base import Signal
 
 
@@ -45,8 +45,8 @@ class TestLiquiditySweepStrategy(unittest.TestCase):
         result = self._run(candles)
         self.assertEqual(result.signal, Signal.BUY)
         self.assertIn('entry', result.metadata)
-        self.assertIn('stop', result.metadata)
-        self.assertIn('tp1', result.metadata)
+        self.assertIn('sl_price', result.metadata)
+        self.assertIn('tp1_price', result.metadata)
 
 if __name__ == '__main__':
     unittest.main()
