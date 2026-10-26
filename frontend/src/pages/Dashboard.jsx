@@ -5,6 +5,7 @@ import { getBots, getTradesSummary, getBalance, getAccountSnapshot, resetAccount
 import { useWebSocket } from '../hooks/useWebSocket'
 import { useLanguage } from '../i18n/LanguageContext'
 import StatCard from '../components/StatCard'
+import RiskCard from '../components/RiskCard'
 import BotCard  from '../components/BotCard'
 import { getCriteriaCount } from '../components/StrategyChecklist'
 
@@ -445,6 +446,8 @@ export default function Dashboard() {
           {resetting ? 'Resetando...' : 'Reset Geral'}
         </button>
       </div>
+
+      <RiskCard />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-4">
         <StatCard

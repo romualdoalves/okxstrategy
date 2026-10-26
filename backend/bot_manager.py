@@ -8,7 +8,6 @@ O BotManager expõe start/stop/status para a API REST.
 from __future__ import annotations
 import asyncio
 import logging
-import os
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -16,17 +15,7 @@ from typing import Optional
 import aiohttp
 from sqlalchemy.orm import Session
 
-# Fuso local em horas (ex.: -3 para BRT), o mesmo TZ_OFFSET usado pela API. Define a virada do "dia".
-_TZ_OFFSET_HOURS = int(os.getenv("TZ_OFFSET", "0"))
-
-
-def _current_day_start_utc() -> datetime:
-    """Início do dia local atual, como datetime UTC naive (formato gravado no banco)."""
-    offset = timedelta(hours=_TZ_OFFSET_HOURS)
-    local_now = datetime.now(timezone.utc).replace(tzinfo=None) + offset
-    return local_now.replace(hour=0, minute=0, second=0, microsecond=0) - offset
-
-
+from .risk import current_day_start_utc as _current_day_start_utc, guard as risk_guard
 from .database import BotModel, TradeModel, BotSnapshotModel, OrderRejectionModel, SignalLogModel, SessionLocal, StrategyModel
 from .exchanges.base import BaseExchange
 from .exchanges.factory import (
@@ -1781,6 +1770,29 @@ class BotInstance:
                     "closed_candles": self._closed_candle_count,
                     "last_closed_at": self._last_closed_candle_at,
                 },
+                "ts":          int(datetime.now(timezone.utc).timestamp() * 1000),
+            })
+            return
+        # ── Gate de risco global da conta (backend/risk.py) ───────────────────
+        # Síncrono e sem await desde o `_entry_inflight = True` acima: dois bots não
+        # passam juntos pelo mesmo limite. Só bloqueia ENTRADAS; saídas nunca passam aqui.
+        decision = risk_guard.check_entry(
+            manager._instances, self.config.id, self.config.stake_usd, self.config.leverage)
+        if not decision.allowed:
+            log.warning("[Bot %d] ENTRADA BLOQUEADA — %s", self.config.id, decision.reason)
+            self._hold_reason = decision.reason
+            self._entry_inflight = False
+            if decision.first_time:
+                asyncio.create_task(self._notifier.send(
+                    f"⛔ *Risco global* — entrada bloqueada\n{decision.reason}\n"
+                    f"Bot: {self.config.name} ({self.config.symbol})"))
+            await self._broadcast({
+                "type":        "indicators",
+                "bot_id":      self.config.id,
+                "indicators":  self._runtime_indicators(result),
+                "signal":      "hold",
+                "hold_reason": self._hold_reason,
+                "order_criteria": self._last_order_criteria,
                 "ts":          int(datetime.now(timezone.utc).timestamp() * 1000),
             })
             return

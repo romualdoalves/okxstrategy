@@ -171,3 +171,8 @@ export const removeTrackedMarketData = (symbol, timeframe = null) =>
   req(`/market-data/track/${encodeURIComponent(symbol)}${timeframe ? `/${encodeURIComponent(timeframe)}` : ''}`, {
     method: 'DELETE',
   })
+
+// Risco global da conta
+export const getRisk               = ()  => req('/risk')
+export const updateRisk            = (d) => req('/risk', { method: 'PUT', body: JSON.stringify(d) })
+export const releaseRiskDrawdown   = ()  => req('/risk/release-drawdown', { method: 'POST' })

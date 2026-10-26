@@ -53,6 +53,7 @@ from .database import (
 )
 from .bot_manager import manager
 from .security import ApiAuthMiddleware, get_cors_origins
+from .risk import RiskLimits, guard as risk_guard, load_limits, save_limits
 from .backtest_engine import BacktestEngine, backtest_recommendation, backtest_score
 from .predictive_scoring import PredictiveScoringService
 from .optimizer import StrategyOptimizer
@@ -2702,7 +2703,18 @@ async def _auto_scan_cycle():
         bot_id = None
         note = f"Melhor score para {symbol}: {best_score:.2f}" if best_row else f"Nenhum resultado válido para {symbol}."
 
+        auto_allowed = True
         if best_row and best_score >= _AUTO_SCAN_MIN_SCORE:
+            auto_ids = [r[0] for r in db.query(AutoScanRunLogModel.bot_id)
+                        .filter(AutoScanRunLogModel.bot_id.isnot(None)).all()]
+            active_auto = (db.query(func.count(BotModel.id))
+                           .filter(BotModel.id.in_(auto_ids), BotModel.active.is_(True)).scalar() or 0) if auto_ids else 0
+            auto_allowed, why = risk_guard.auto_scan_allowed(db, manager._instances, active_auto)
+            if not auto_allowed:
+                note = f"Score {best_score:.2f} qualificava, mas o bot não foi criado: {why}"
+                log.warning("[AutoScan] %s", note)
+
+        if best_row and best_score >= _AUTO_SCAN_MIN_SCORE and auto_allowed:
             try:
                 payload = BotCreate(
                     name=f"{best_row['strategy_id']} - {best_row.get('strategy_name', 'Auto-Scan')} ({symbol})",
@@ -4499,6 +4511,43 @@ async def market_ticker(symbol: str = "BTC-USDT"):
         except Exception as exc:
             raise HTTPException(502, str(exc)) from exc
         return {"code": "0", "msg": "", "data": [ticker]}
+
+
+# ── Risco global da conta ─────────────────────────────────────────────────────
+
+class RiskLimitsUpdate(BaseModel):
+    enabled: Optional[bool] = None
+    max_open_positions: Optional[int] = None
+    max_exposure_usd: Optional[float] = None
+    max_account_daily_loss_usd: Optional[float] = None
+    max_drawdown_pct: Optional[float] = None
+    capital_base_usd: Optional[float] = None
+    max_auto_bots: Optional[int] = None
+
+
+@app.get("/api/risk")
+def get_risk(db: Session = Depends(get_db)):
+    """Limites de risco globais, uso atual e se há bloqueio de novas entradas."""
+    return risk_guard.snapshot(db, manager._instances)
+
+
+@app.put("/api/risk")
+def update_risk(body: RiskLimitsUpdate, db: Session = Depends(get_db)):
+    limits = load_limits(db)
+    for k, v in body.model_dump(exclude_none=True).items():
+        setattr(limits, k, v)
+    try:
+        save_limits(db, limits)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return risk_guard.snapshot(db, manager._instances)
+
+
+@app.post("/api/risk/release-drawdown")
+def release_risk_drawdown(db: Session = Depends(get_db)):
+    """Libera o halt de drawdown (manual) e reinicia a medição do pico a partir de agora."""
+    risk_guard.release_drawdown(db)
+    return risk_guard.snapshot(db, manager._instances)
 
 
 # ── WebSocket: tempo real ──────────────────────────────────────────────────────
