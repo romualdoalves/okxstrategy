@@ -9,7 +9,9 @@ import logging
 import asyncio
 from datetime import timezone
 
-from pydantic import BaseModel
+from typing import Optional
+
+from pydantic import BaseModel, Field
 from fastapi import HTTPException
 
 from ..database import HistoricCandleModel, SessionLocal
@@ -30,6 +32,40 @@ class CategoryBacktestRequest(BaseModel):
     symbol: str
     exclude_strategies: list[str] = []
     strict: bool = True
+    # Se definido, o scan da categoria para assim que uma estratégia atingir esta nota (as demais
+    # que ainda não começaram são canceladas e não aparecem no resultado).
+    stop_at_score: Optional[float] = Field(default=None, ge=0, le=10)
+
+
+async def gather_until_score(tasks: list, stop_at_score: Optional[float]) -> tuple[list[dict], Optional[str], int]:
+    """
+    Aguarda os backtests. Sem `stop_at_score`, espera todos (como antes). Com ele, devolve assim que um
+    resultado tiver nota >= o limiar, cancela os que ainda não terminaram e conta quantos foram pulados.
+    Retorna (resultados, strategy_id que disparou a parada ou None, nº de estratégias puladas).
+    """
+    if stop_at_score is None:
+        return list(await asyncio.gather(*tasks)), None, 0
+
+    futures = [asyncio.ensure_future(t) for t in tasks]
+    results: list[dict] = []
+    stopped_by: Optional[str] = None
+    try:
+        for finished in asyncio.as_completed(futures):
+            result = await finished
+            results.append(result)
+            score = (result.get("recommendation") or {}).get("score")
+            if score is not None and score >= stop_at_score:
+                stopped_by = result.get("strategy_id")
+                break
+    finally:
+        skipped = 0
+        for fut in futures:
+            if not fut.done():
+                fut.cancel()
+                skipped += 1
+        # recolhe as tarefas canceladas para não deixar exceções pendentes
+        await asyncio.gather(*futures, return_exceptions=True)
+    return results, stopped_by, skipped
 
 _VERDICT_ORDER = {"INICIAR": 0, "CUIDADO": 1, "NÃO INICIAR": 2, "N/A": 3}
 
@@ -135,6 +171,7 @@ async def run_category_backtest(req: CategoryBacktestRequest):
         symbol=req.symbol,
         exclude_strategies=req.exclude_strategies,
         strict=req.strict,
+        stop_at_score=req.stop_at_score,
     )
 
 async def _run_category_backtest_core(
@@ -142,6 +179,7 @@ async def _run_category_backtest_core(
     symbol: str,
     exclude_strategies: list[str] | None = None,
     strict: bool = True,
+    stop_at_score: Optional[float] = None,
 ) -> dict:
     """
     Núcleo do backtest de categoria, usado pelo endpoint HTTP (/api/backtest/category).
@@ -327,9 +365,8 @@ async def _run_category_backtest_core(
                 "reasons": [f"Erro na execução: {exc}"],
             }}
 
-    import asyncio as _asyncio
     tasks = [_run(sid, tf) for tf, sids in tf_groups.items() for sid in sids]
-    results: list[dict] = list(await _asyncio.gather(*tasks))
+    results, stopped_by, skipped = await gather_until_score(tasks, stop_at_score)
 
     # Acrescenta entradas N/A para estratégias com contexto externo
     for sid in na_ids:
@@ -359,4 +396,7 @@ async def _run_category_backtest_core(
         -(x["recommendation"].get("score") or 0),
     ))
 
-    return {"category": prefix, "symbol": req.symbol, "results": results, "total": len(results)}
+    return {
+        "category": prefix, "symbol": req.symbol, "results": results, "total": len(results),
+        "stopped_early": stopped_by is not None, "stopped_by": stopped_by, "skipped": skipped,
+    }

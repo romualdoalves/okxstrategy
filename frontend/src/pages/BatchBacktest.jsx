@@ -105,6 +105,8 @@ function formatElapsed(ms) {
   return h ? `${h}:${mm}:${ss}` : `${mm}:${ss}`
 }
 
+const STOP_SCORE = 9.0
+
 function resultKey(r, fallbackSymbol = '') {
   return `${r.strategy_id}:${r.symbol || fallbackSymbol}`
 }
@@ -334,6 +336,7 @@ export default function BatchBacktest() {
   const [scanProgress, setScanProgress] = useState(null)
   const [now, setNow] = useState(Date.now())   // relógio do temporizador (atualiza 1x/s durante o scan)
   const [lastScanMs, setLastScanMs] = useState(null)
+  const [stopAtNine, setStopAtNine] = useState(false)   // parar assim que achar nota >= STOP_SCORE
 
   const { data: strategies = [] } = useQuery({ queryKey: ['strategies'], queryFn: getStrategies })
   const { data: bots = [] }       = useQuery({ queryKey: ['bots'],       queryFn: getBots       })
@@ -369,7 +372,7 @@ export default function BatchBacktest() {
             }
           : item
       )
-      const completed = items.filter(item => item.status === 'done' || item.status === 'failed').length
+      const completed = items.filter(item => ['done', 'failed', 'skipped'].includes(item.status)).length
       const current = items.find(item => item.status === 'running')?.id || null
       return { ...prev, items, completed, current }
     })
@@ -400,11 +403,12 @@ export default function BatchBacktest() {
       })
       const merged = []
       const failedCategories = []
+      let stopInfo = null
 
       for (const cat of categoriesToScan) {
         setCategoryProgress(cat, 'running', { error: '' })
         const scan = await requestCategoryScan(
-          { category: cat, symbol, exclude_strategies: usedStrategies, strict: true },
+          { category: cat, symbol, exclude_strategies: usedStrategies, strict: true, ...(stopAtNine ? { stop_at_score: STOP_SCORE } : {}) },
           3,
         )
         if (!scan.ok) {
@@ -419,6 +423,21 @@ export default function BatchBacktest() {
         const data = scan.data
         setCategoryProgress(cat, 'done', { resultCount: (data.results || []).length })
         merged.push(...(data.results || []).map(r => ({ ...r, category: cat, symbol })))
+        if (stopAtNine) {
+          const hit = (data.results || []).filter(r => (r.recommendation?.score ?? 0) >= STOP_SCORE)
+            .sort((a, b) => (b.recommendation?.score ?? 0) - (a.recommendation?.score ?? 0))[0]
+          if (hit) {
+            stopInfo = { strategy: hit.strategy_id, score: hit.recommendation.score, category: cat, skipped: data.skipped || 0 }
+            // categorias que ainda não rodaram ficam marcadas como ignoradas
+            setScanProgress(prev => {
+              if (!prev) return prev
+              const items = prev.items.map(item => item.status === 'pending' ? { ...item, status: 'skipped' } : item)
+              const completed = items.filter(item => ['done', 'failed', 'skipped'].includes(item.status)).length
+              return { ...prev, items, completed, current: null }
+            })
+            break
+          }
+        }
       }
       if (!merged.length && failedCategories.length) {
         throw new Error(`Nenhuma categoria retornou resultado. ${failedCategories.join(' | ')}`)
@@ -427,6 +446,7 @@ export default function BatchBacktest() {
         category,
         symbol,
         failedCategories,
+        stopInfo,
         total: merged.length,
         results: merged.sort((a, b) => {
           const verdictA = VERDICT_CFG[a.recommendation?.verdict] ? a.recommendation?.verdict : 'N/A'
@@ -659,6 +679,22 @@ export default function BatchBacktest() {
             </div>
           </div>
 
+          <label className="flex items-start gap-2 text-sm text-white/80 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={stopAtNine}
+              onChange={e => setStopAtNine(e.target.checked)}
+              disabled={loading}
+              className="mt-0.5 accent-[rgb(var(--accent-rgb))]"
+            />
+            <span>
+              Parar assim que encontrar uma estratégia com nota ≥ {STOP_SCORE.toFixed(1)}
+              <span className="block text-[11px] text-muted">
+                Interrompe o scan no primeiro resultado que atingir a nota (as estratégias e categorias restantes não rodam).
+              </span>
+            </span>
+          </label>
+
           <button
             onClick={run}
             disabled={loading || !symbol}
@@ -714,6 +750,7 @@ export default function BatchBacktest() {
                   const isRunning = item.status === 'running'
                   const isDone = item.status === 'done'
                   const isFailed = item.status === 'failed'
+                  const isSkipped = item.status === 'skipped'
                   return (
                     <div key={item.id} className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
                       <div className="flex items-center justify-between gap-2 mb-1">
@@ -724,13 +761,13 @@ export default function BatchBacktest() {
                               {formatElapsed((item.finishedAt || now) - item.startedAt)}
                             </span>
                           )}
-                          <span>{isDone ? `Concluida (${item.resultCount})` : isFailed ? 'Falhou' : isRunning ? 'Executando' : 'Pendente'}</span>
+                          <span>{isDone ? `Concluida (${item.resultCount})` : isFailed ? 'Falhou' : isSkipped ? 'Ignorada (nota alvo atingida)' : isRunning ? 'Executando' : 'Pendente'}</span>
                         </div>
                       </div>
                       <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
                         <div
-                          className={`h-1.5 transition-all ${isDone ? 'bg-green-400' : isFailed ? 'bg-red-400' : isRunning ? 'bg-accent animate-pulse' : 'bg-transparent'}`}
-                          style={{ width: isDone || isFailed ? '100%' : isRunning ? '55%' : '0%' }}
+                          className={`h-1.5 transition-all ${isDone ? 'bg-green-400' : isFailed ? 'bg-red-400' : isSkipped ? 'bg-white/20' : isRunning ? 'bg-accent animate-pulse' : 'bg-transparent'}`}
+                          style={{ width: isDone || isFailed || isSkipped ? '100%' : isRunning ? '55%' : '0%' }}
                         />
                       </div>
                       {isFailed && item.error && (
@@ -748,6 +785,14 @@ export default function BatchBacktest() {
       {/* Summary badges */}
       {results && counts && (
         <>
+          {results.stopInfo && (
+            <div className="mb-4 rounded-lg border border-green-500/30 bg-green-500/10 p-3 text-sm text-green-300">
+              Scan interrompido: {results.stopInfo.strategy} atingiu nota {Number(results.stopInfo.score).toFixed(2)} (≥ {STOP_SCORE.toFixed(1)}) na categoria {results.stopInfo.category}.
+              {results.stopInfo.skipped > 0 && ` ${results.stopInfo.skipped} estratégia(s) dessa categoria não chegaram a rodar.`}
+              {' '}As demais categorias não foram escaneadas.
+            </div>
+          )}
+
           {results.failedCategories?.length > 0 && (
             <div className="mb-4 rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3 text-sm text-yellow-300">
               Algumas categorias falharam e foram ignoradas: {results.failedCategories.join(' | ')}
