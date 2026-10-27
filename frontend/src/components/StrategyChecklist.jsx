@@ -177,7 +177,7 @@ function makeCriteriaMap(t, bot) {
     TF008: wrap((ind) => [
       { id: 'cycle', label: 'C1 Ciclo Macro', sub: 'Weekly EMA 21', value: ind?.c1_full_above ? 'Rompido' : 'Bear', status: ind?.c1_full_above ? 'green' : 'red', detail: 'Vela semanal completa acima da EMA 21' },
       { id: 'support', label: 'C2 Suporte', sub: 'Confirmação', value: ind?.c2_support_ok ? 'Mantido' : 'Abaixo', status: ind?.c2_support_ok ? 'green' : 'red', detail: 'Preço sustentado acima da média semanal' },
-      { id: 'test', label: 'C3 Proximidade', sub: 'Reteste', value: `${fmt(ind?.dist_ema_w, 2)}%`, status: ind?.dist_ema_w != null && Math.abs(ind.dist_ema_w) < 5 ? 'green' : 'yellow', detail: 'Distância ideal para entrada (até 5%)' }
+      { id: 'test', label: 'C3 Proximidade', sub: 'Reteste', value: `${fmt(ind?.dist_close_pct, 2)}%`, status: ind?.c3_near_ok ? 'green' : 'yellow', detail: 'Distância do fechamento à EMA semanal dentro do limite configurado (0 = sem limite)' }
     ]),
 
     IF002: wrap((ind) => [

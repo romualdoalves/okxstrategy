@@ -10,11 +10,12 @@ from typing import Optional
 from datetime import datetime, timezone
 
 from ..exchanges.base import BaseExchange
+from ..candle_store import drop_open_candle
 from ..database import BotModel, SessionLocal, StrategyModel
 from ..feeds.dex_price_feed import DexPriceFeed
 from ..feeds.gex_feed import GexFeed
 from ..feeds.okx_market_players import OkxMarketPlayersFeed
-from ..strategies.base import Signal
+from ..strategies.base import STRATEGY_WINDOW, Signal
 from ..notifications import TelegramNotifier, build_start_msg
 from ..risk import current_day_start_utc as _current_day_start_utc
 from ..exchanges.factory import build_exchange, get_exchange_maintenance, get_exchange_provider, get_public_stream_class, map_timeframe_for_history, map_timeframe_for_ws_channel
@@ -357,7 +358,7 @@ class BotInstance(OrderGateMixin, EntryMixin, PositionMixin, AccountingMixin, St
                 for _attempt in range(1, _INIT_MAX + 1):
                     try:
                         candles = await exchange.fetch_candles(
-                            self.config.symbol, bar, limit=300)
+                            self.config.symbol, bar, limit=STRATEGY_WINDOW + 1)
                         break
                     except asyncio.CancelledError:
                         raise
@@ -372,6 +373,10 @@ class BotInstance(OrderGateMixin, EntryMixin, PositionMixin, AccountingMixin, St
                         else:
                             raise
 
+                # A OKX devolve o candle em formação junto com os fechados. Mantê-lo faria o warmup
+                # sinalizar (e até entrar) em cima de um candle parcial e, no fechamento dele, o
+                # `_on_candle` descartaria o candle por já existir esse epoch (ciclo perdido).
+                candles = drop_open_candle(candles, bar)
                 if candles:
                     self._candles = candles
                     self._last_closed_candle_at = datetime.fromtimestamp(
@@ -603,7 +608,7 @@ class BotInstance(OrderGateMixin, EntryMixin, PositionMixin, AccountingMixin, St
             ):
                 self._closed_candle_count += 1
                 self._last_counted_closed_epoch = bar_epoch
-            if len(self._candles) > 300:
+            if len(self._candles) > STRATEGY_WINDOW:
                 self._candles.pop(0)
             self._roll_day()
             await self._process_strategy(bar, exchange, session)

@@ -9,6 +9,8 @@ import asyncio
 import time
 
 from ..exchanges.base import BaseExchange
+from ..candle_store import drop_open_candle
+from ..strategies.base import STRATEGY_WINDOW
 from ..notifications import build_order_confirmed_msg
 from ..exchanges.factory import get_private_stream_class
 from ..feeds.onchain_monitor import onchain_monitor
@@ -32,7 +34,9 @@ class StreamsMixin:
         for tf_bar in extra_tfs:
             try:
                 candles = await exchange.fetch_candles(
-                    self.config.symbol, tf_bar, limit=200)
+                    self.config.symbol, tf_bar, limit=STRATEGY_WINDOW + 1)
+                # Só candles fechados: o semanal/4H em formação mudaria a cada consulta (repaint).
+                candles = drop_open_candle(candles, tf_bar)
                 if candles:
                     self._extra_candles[tf_bar] = candles
             except asyncio.CancelledError:

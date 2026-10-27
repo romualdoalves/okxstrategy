@@ -48,6 +48,19 @@ def timeframe_ms(timeframe: str) -> Optional[int]:
     return _TF_MS.get((timeframe or "").strip().lower())
 
 
+def drop_open_candle(candles: list, timeframe: str, now_ms: Optional[int] = None) -> list:
+    """Remove o último candle se ainda estiver em formação (abertura + duração > agora).
+    A OKX devolve o candle corrente junto com os fechados; estratégias só devem ver candles fechados."""
+    step = timeframe_ms(timeframe)
+    if not candles or step is None:
+        return candles
+    now = int(now_ms if now_ms is not None else time.time() * 1000)
+    epoch = int(candles[-1].epoch)
+    if epoch < 10_000_000_000:  # epoch em segundos
+        epoch *= 1000
+    return candles[:-1] if epoch + step > now else candles
+
+
 SPACING_TOLERANCE = 0.01
 _SPACING_SAMPLE = 200
 

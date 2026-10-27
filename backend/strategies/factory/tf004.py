@@ -74,6 +74,9 @@ class SuperTrendStrategy(BaseStrategy):
                 "ts_mult": ParamDef(
                     type="float", default=2.0, min=0.5, max=5.0, step=0.5,
                     description="Multiplicador ATR para Trailing Stop (ativado após TP1)"),
+                "exit_any_trend": ParamDef(
+                    type="int", default=1, min=0, max=1, step=1,
+                    description="SELL (saída) sem o filtro de tendência/RSI da entrada espelhada (1=sim). Em spot long-only a saída não pode depender do filtro que só vale para abrir short"),
             },
             criteria=[
                 {"id": "c1", "label": "Flip SuperTrend", "description": "SuperTrend inverte direção"},
@@ -94,6 +97,7 @@ class SuperTrendStrategy(BaseStrategy):
         self.sl_mult    = p["sl_mult"].default
         self.tp1_pct    = p["tp1_pct"].default
         self.ts_mult    = p["ts_mult"].default
+        self.exit_any_trend = p["exit_any_trend"].default
 
     def set_params(self, params: dict) -> None:
         for k, v in params.items():
@@ -149,7 +153,8 @@ class SuperTrendStrategy(BaseStrategy):
         # ── Sinal final com filtro RSI ─────────────────────────────────────────
         if flip_long and rsi_now > self.rsi_min:
             signal = Signal.BUY
-        elif flip_short and rsi_now < self.rsi_max:
+        elif flip_short and (self.exit_any_trend or rsi_now < self.rsi_max):
+            # SELL = sair: o flip do SuperTrend basta; o filtro RSI só vale para abrir short
             signal = Signal.SELL
         else:
             signal = Signal.HOLD

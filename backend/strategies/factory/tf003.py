@@ -53,6 +53,9 @@ class MacdStrategy(BaseStrategy):
                 "tp1_pct": ParamDef(
                     type="float", default=2.0, min=0.5, max=10.0, step=0.1,
                     description="Take Profit 1 (%)"),
+                "exit_any_trend": ParamDef(
+                    type="int", default=1, min=0, max=1, step=1,
+                    description="SELL (saída) sem o filtro de tendência/RSI da entrada espelhada (1=sim). Em spot long-only a saída não pode depender do filtro que só vale para abrir short"),
             },
             criteria=[
                 {"id": "c1", "label": "Cruzamento MACD", "description": "MACD cruza a linha Signal"},
@@ -70,6 +73,7 @@ class MacdStrategy(BaseStrategy):
         self.atr_period  = p["atr_period"].default
         self.atr_mult_sl = p["atr_mult_sl"].default
         self.tp1_pct     = p["tp1_pct"].default
+        self.exit_any_trend = p["exit_any_trend"].default
 
     def set_params(self, params: dict) -> None:
         for k, v in params.items():
@@ -124,9 +128,11 @@ class MacdStrategy(BaseStrategy):
         long_ready = macd_now > sig_now and hist > 0 and trend_ok_long
         short_ready = macd_now < sig_now and hist < 0 and trend_ok_short
 
+        # SELL = sair da posição long: MACD virou para baixo basta (sem exigir close < MA de tendência)
+        exit_ready = (macd_now < sig_now and hist < 0) if self.exit_any_trend else short_ready
         if long_ready:
             signal = Signal.BUY
-        elif short_ready:
+        elif exit_ready:
             signal = Signal.SELL
         else:
             signal = Signal.HOLD

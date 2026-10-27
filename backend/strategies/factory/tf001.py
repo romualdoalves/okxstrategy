@@ -5,7 +5,6 @@ Estratégia EMA+VWAP consolidada como classe reutilizável.
 """
 
 from __future__ import annotations
-from datetime import datetime, timezone
 from typing import Optional
 
 import pandas as pd
@@ -50,6 +49,12 @@ class EmaVwapStrategy(BaseStrategy):
                 "tp1_pct": ParamDef(
                     type="float", default=2.0, min=0.5, max=10.0, step=0.1,
                     description="Take Profit 1 (% de ganho para fechar 50%)"),
+                "entry_mode": ParamDef(
+                    type="int", default=0, min=0, max=1, step=1,
+                    description="0 = entra em qualquer candle de tendência (EMA+VWAP); 1 = só até N candles após o cruzamento"),
+                "cross_window": ParamDef(
+                    type="int", default=3, min=1, max=10, step=1,
+                    description="Janela (candles) após o cruzamento EMA rápida/lenta em que a entrada vale (entry_mode=1)"),
             },
             criteria=[
                 {"id": "c1", "label": "Tendência EMA", "description": "EMA rápida alinhada com EMA lenta"},
@@ -68,6 +73,8 @@ class EmaVwapStrategy(BaseStrategy):
         self.atr_mult_sl = p["atr_mult_sl"].default
         self.atr_mult_ts = p["atr_mult_ts"].default
         self.tp1_pct     = p["tp1_pct"].default
+        self.entry_mode   = p["entry_mode"].default
+        self.cross_window = p["cross_window"].default
 
     def set_params(self, params: dict) -> None:
         for k, v in params.items():
@@ -102,7 +109,12 @@ class EmaVwapStrategy(BaseStrategy):
 
         crossover_up   = ef_p <= el_p and ef > el
         crossover_down = ef_p >= el_p and ef < el
-        trend_alta     = ef > el and close > vwap
+        crossed_recent = crossover_up
+        if self.entry_mode == 1:
+            gap = (ema_f - ema_l).iloc[-(int(self.cross_window) + 1):]
+            crossed_recent = bool(((gap.shift(1) <= 0) & (gap > 0)).any())
+        # SELL = sair da posição (spot long-only): tendência virou E preço abaixo do VWAP
+        trend_alta     = ef > el and close > vwap and (self.entry_mode == 0 or crossed_recent)
         trend_baixa    = ef < el and close < vwap
 
         if trend_alta:
@@ -143,10 +155,15 @@ class EmaVwapStrategy(BaseStrategy):
     # ── VWAP diário ───────────────────────────────────────────────────────────
 
     def _vwap(self, candles: list) -> float:
-        today_utc   = datetime.now(timezone.utc).replace(
-            hour=0, minute=0, second=0, microsecond=0)
-        midnight_ms = int(today_utc.timestamp()) * 1000
-        today = [c for c in candles if c.epoch >= midnight_ms] or candles[-10:]
+        """VWAP ancorado à meia-noite UTC do DIA DO ÚLTIMO CANDLE (nunca o relógio do servidor, que
+        quebrava o backtest e qualquer reprocessamento). Nos primeiros candles do dia, ou em timeframes
+        >= 1D, ancorar daria 1-2 candles: usa a janela móvel dos últimos 20."""
+        last_epoch  = int(candles[-1].epoch)
+        day_ms      = 86_400_000
+        midnight_ms = last_epoch - (last_epoch % day_ms)
+        today = [c for c in candles if c.epoch >= midnight_ms]
+        if len(today) < 3:
+            today = candles[-20:]
         total_vol = sum(c.volume for c in today)
         if total_vol == 0:
             return candles[-1].close

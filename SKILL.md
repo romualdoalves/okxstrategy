@@ -384,6 +384,21 @@ Migrations adicionais são executadas via lista `migrations` em `database.py` us
 - Arquivos: `backend/strategies/factory/[a-z]{2}[0-9]{3}.py`
 - Volume Docker `okx_strategy_factory` → `/app/backend/strategies/factory`
 
+### Contrato das estratégias (spot long-only)
+- **BUY** = entrada; **SELL** = **sair** da posição long (nunca abre short; flat ignora). O bot executa a saída
+  no candle do sinal (`_sw_exit`) e o backtest estrito faz o mesmo — live e backtest têm a mesma regra.
+- A estratégia só enxerga **candles fechados** (`candle_store.drop_open_candle` no warmup e nos TF extras) e a
+  mesma janela (`STRATEGY_WINDOW = 500`, `strategies/base.py`) no live e no backtest.
+- No backtest, candles de TF superior só ficam visíveis depois de fechados (sem lookahead multi-TF).
+- Estratégia **pura**: nada de relógio do servidor (`tests/strategies/test_tf_contract.py` verifica).
+- Saída não herda o filtro de entrada espelhada (ex.: MA200/RSI só valem para abrir short) — param `exit_any_trend`.
+
+### Validação e otimização (`backend/validation/run.py`)
+Roda no VPS: `docker exec okx_strategy python -m backend.validation.run baseline|walkforward|export ...`
+(ver docstring do módulo). `baseline --legacy` reproduz os números antigos (com lookahead). `walkforward` escolhe
+parâmetros só no treino de cada dobra, mede no teste seguinte, informa nº de combinações testadas e se o
+candidato está num planalto. Nunca aplicar parâmetros sem passar por ele.
+
 ### Critérios de ordem
 O backend expõe `runtime.order_criteria` — a ordem só é enviada quando BUY/SELL
 **e** todos os critérios de ordem (O1–O8) estão verdes: O1 sinal, O2 execução (bot rodando,

@@ -22,6 +22,8 @@ class StrategyOptimizer:
                 "ema_slow": [55, 89],
                 "atr_mult_sl": [1.2, 1.5, 2.0],
                 "tp1_pct": [1.5, 2.0, 3.0],
+                "entry_mode": [0, 1],
+                "cross_window": [1, 3, 5],
             },
             "TF002": {
                 "rsi_oversold": [25, 30, 35],
@@ -62,6 +64,8 @@ class StrategyOptimizer:
                 "ema_period": [13, 21, 34],
                 "sl_mult": [2.0, 2.5, 3.0],
                 "tp_rr": [3.0, 4.0, 5.0],
+                "max_dist_pct": [0.0, 10.0, 20.0],
+                "exit_buffer_pct": [0.0, 2.0],
             },
             "TF009": {
                 "fast_ma_period": [10, 20, 34],

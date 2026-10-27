@@ -13,6 +13,11 @@ from enum import Enum
 from typing import Any, Optional
 
 
+# Janela (nº de candles) entregue à estratégia por timeframe — IGUAL no live e no backtest.
+# Estratégias com máquina de estados / EMAs recursivas decidem diferente se a janela difere.
+STRATEGY_WINDOW = 500
+
+
 class Signal(str, Enum):
     BUY  = "buy"
     SELL = "sell"

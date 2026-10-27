@@ -484,6 +484,13 @@ class EntryMixin:
             self._hold_reason = "Circuit Breaker: Bot pausado (Stop Loss atingido)"
             return
         if self._direction != 0:
+            # Contrato (spot long-only): SELL da estratégia = sair da posição long.
+            # Mesmo comportamento do backtest estrito (fecha no candle do sinal).
+            if self._direction == 1 and result.signal == Signal.SELL:
+                self._hold_reason = "Saída por sinal SELL da estratégia"
+                log.info("[Bot %d] SINAL SELL = SAÍDA | %s", self.config.id, result.indicators)
+                await self._sw_exit(bar.close, exchange)
+                return
             self._hold_reason = f"Em operação: { 'LONG' if self._direction == 1 else 'SHORT' }"
             return
 

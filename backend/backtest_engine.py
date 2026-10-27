@@ -1,8 +1,10 @@
 import logging
 from bisect import bisect_right
+from typing import Optional
 
+from .candle_store import observed_step_ms, timeframe_ms
 from .backtest_stats import robust_summary
-from .strategies.base import Signal
+from .strategies.base import STRATEGY_WINDOW, Signal
 from .strategies.registry import get_strategy
 
 log = logging.getLogger("backtest_engine")
@@ -13,7 +15,7 @@ STRICT_FEE_RATE = 0.001
 STRICT_SLIPPAGE_RATE = 0.0005
 # Janela máxima de candles entregue à estratégia a cada passo. Mantém o custo linear no tamanho do
 # histórico (antes a janela crescia até 500 candles, que era o próprio limite de dados do scan).
-STRICT_WINDOW = 500
+STRICT_WINDOW = STRATEGY_WINDOW
 
 
 class BacktestEngine:
@@ -45,17 +47,6 @@ class BacktestEngine:
         if not trs:
             return fallback_price * 0.005
         return sum(trs) / len(trs)
-
-    @staticmethod
-    def _context_until(extra_candles: dict[str, list] | None, epoch: int) -> dict:
-        if not extra_candles:
-            return {}
-        return {
-            "extra_candles": {
-                tf: [c for c in candles if int(getattr(c, "epoch", 0) or 0) <= epoch]
-                for tf, candles in extra_candles.items()
-            }
-        }
 
     @staticmethod
     def _risk_from_result(result, entry: float, direction: int, atr: float) -> tuple[float, float, float]:
@@ -104,10 +95,14 @@ class BacktestEngine:
         stake_usd: float = FIXED_STAKE_USD,
         fee_rate: float = STRICT_FEE_RATE,
         slippage_rate: float = STRICT_SLIPPAGE_RATE,
+        legacy_lookahead: bool = False,
     ):
         """
         Backtest estrito para o Scanner: usa compute_with_context(), simula SPOT
         long-only, SL inicial, TP1 que arma trailing, custos e slippage.
+
+        `legacy_lookahead=True` reproduz o comportamento ANTIGO (candle extra visível desde a
+        abertura, com OHLC final). Existe só para medir o viés em comparações antes/depois.
         """
         stake_usd = FIXED_STAKE_USD
         self.balance = INITIAL_BALANCE
@@ -151,17 +146,25 @@ class BacktestEngine:
         warmup = 100
 
         # Epochs dos timeframes extras ordenados: corte por bisect em vez de varrer a lista a cada passo.
-        extra_sorted: dict[str, tuple[list, list[int]]] = {}
+        extra_sorted: dict[str, tuple[list, list[int], Optional[int]]] = {}
         for tf, extra in (extra_candles or {}).items():
             ordered = sorted(extra, key=lambda c: int(getattr(c, "epoch", 0) or 0))
-            extra_sorted[tf] = (ordered, [int(getattr(c, "epoch", 0) or 0) for c in ordered])
+            extra_sorted[tf] = (ordered, [int(getattr(c, "epoch", 0) or 0) for c in ordered], timeframe_ms(tf))
+
+        base_step = observed_step_ms([int(getattr(c, "epoch", 0) or 0) for c in candles]) or 0
 
         def context_until(epoch: int) -> dict:
+            """Candles extras visíveis no fechamento do candle base que abre em `epoch`.
+            `epoch` é a ABERTURA: um candle extra só existe de fato depois de fechado
+            (abertura + duração <= fechamento do candle base). Incluir o candle semanal em
+            formação, com o OHLC final, seria lookahead."""
             if not extra_sorted:
                 return {}
+            bar_close = epoch + base_step
             out = {}
-            for tf, (ordered, epochs) in extra_sorted.items():
-                end = bisect_right(epochs, epoch)
+            for tf, (ordered, epochs, tf_ms) in extra_sorted.items():
+                cutoff = bar_close - tf_ms if (tf_ms and base_step and not legacy_lookahead) else epoch
+                end = bisect_right(epochs, cutoff)
                 out[tf] = ordered[max(0, end - STRICT_WINDOW):end]
             return {"extra_candles": out}
 
@@ -254,9 +257,8 @@ class BacktestEngine:
                 if not result:
                     continue
 
-                exit_requested = result.signal == Signal.SELL or (
-                    bool(result.hold_reason) and "saída" in result.hold_reason.lower()
-                )
+                # Contrato (spot long-only): SELL = sair da posição; nunca abre short.
+                exit_requested = result.signal == Signal.SELL
 
                 if position is None:
                     if result.signal == Signal.BUY:
@@ -397,9 +399,8 @@ class BacktestEngine:
                 if not result:
                     continue
 
-                exit_requested = result.signal == Signal.SELL or (
-                    bool(result.hold_reason) and "saída" in result.hold_reason.lower()
-                )
+                # Contrato (spot long-only): SELL = sair da posição; nunca abre short.
+                exit_requested = result.signal == Signal.SELL
 
                 if position is None:
                     if result.signal == Signal.BUY:
