@@ -8,6 +8,7 @@ from typing import Optional
 import math
 import pandas as pd
 import pandas_ta as ta
+from backend.strategies.indicators import session_vwap
 from backend.strategies.base import BaseStrategy, ParamDef, Signal, StrategyInfo, StrategyResult
 
 
@@ -82,11 +83,7 @@ class AbsorçãoInstitucionalStrategy(BaseStrategy):
         atr = float(atr_s.iloc[-1])
 
         # VWAP (Corrigido)
-        vwap_s = ta.vwap(df["high"], df["low"], df["close"], df["volume"])
-        if vwap_s is None:
-            vwap = close
-        else:
-            vwap = float(vwap_s.iloc[-1])
+        vwap = float(session_vwap(candles).iloc[-1])   # ta.vwap exige DatetimeIndex: devolvia None e o VWAP virava o preço
 
         # Perfil de volume simplificado: POC, VAH, VAL (Últimos 20 candles)
         lookback = min(20, len(df))

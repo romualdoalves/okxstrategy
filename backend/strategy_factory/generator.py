@@ -132,7 +132,8 @@ from backend.strategies.base import BaseStrategy, ParamDef, Signal, StrategyInfo
 ```
 
 ## REGRAS ESTRITAS:
-1. Imports PERMITIDOS: apenas os acima (pandas, pandas_ta, math, typing, ..base)
+1. Imports PERMITIDOS: apenas os acima (pandas, pandas_ta, math, typing, ..base) e, só se precisar de VWAP,
+   `from backend.strategies.indicators import session_vwap`
 2. PROIBIDO: subprocess, os, sys, socket, eval, exec, open(), __import__, requests, aiohttp
 3. Nome da classe: {{ClassName}}Strategy (ClassName = CamelCase do nome sem prefixo ID)
 4. SEMPRE checagem de aquecimento com hold_reason descritivo em português
@@ -156,6 +157,13 @@ from backend.strategies.base import BaseStrategy, ParamDef, Signal, StrategyInfo
         {{"id": "c2_pullback", "label": "Pullback", "description": "Preço retorna à EMA"}},
         {{"id": "c3_trigger", "label": "Gatilho", "description": "Candle de força confirma"}},
     ]
+
+14. NUNCA use ta.vwap(): ele exige DatetimeIndex e devolve None com o DataFrame destas estratégias.
+    Para VWAP use `session_vwap(candles)` (Série alinhada aos candles; `.iloc[-1]` é o atual).
+15. A plataforma é SPOT long-only: Signal.BUY = entrar; Signal.SELL = SAIR da posição comprada (nunca abre short).
+    Defina SELL como a perda da tese (ex.: tendência/viés revertido), sem exigir os filtros que só valem para abrir.
+16. Não use relógio do servidor (datetime.now, time.time): o resultado deve depender só dos candles recebidos.
+17. O stop (sl_price) e o TP1 (tp1_price) devem usar a MESMA distância de risco: tp1 = entrada + risco * tp1_rr.
 
 ## EXEMPLO DE REFERÊNCIA:
 {_EXAMPLE_SIMPLE}
@@ -317,6 +325,8 @@ Modifique SOMENTE o que é necessário para corrigir os erros listados.
 - indicators DEVE conter "atr" como float (obrigatório para Trailing Stop do bot_manager)
 - metadata DEVE conter: sl_price, tp1_price, sl_pct, tp1_pct, ts_pct
 - ts_pct = round(atr * self.ts_mult / close, 5)
+- NUNCA use ta.vwap(); use session_vwap(candles) de backend.strategies.indicators
+- SELL = sair da posição (spot long-only); sem datetime.now/time.time; tp1 calculado sobre a distância real do stop
 - criteria_total DEVE ser igual ao número EXATO de critérios da estratégia. Se há 3 critérios (ex: tendência, pullback, gatilho), criteria_total DEVE ser 3, NUNCA 1.
 - Se a estratégia precisar de timeframe superior (ex: EMA macro), use extra_timeframes() e context["extra_candles"]
 - Sem dados de contexto extra, retorne HOLD com hold_reason descritivo (não gere sinal sem dados)

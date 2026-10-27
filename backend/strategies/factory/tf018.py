@@ -8,6 +8,7 @@ from typing import Optional
 import math
 import pandas as pd
 import pandas_ta as ta
+from backend.strategies.indicators import session_vwap
 from backend.strategies.base import BaseStrategy, ParamDef, Signal, StrategyInfo, StrategyResult
 
 
@@ -96,7 +97,7 @@ class SistemaHibridoMrEMomentumStrategy(BaseStrategy):
         rsi_series = ta.rsi(df["close"], length=self.rsi_period)
         kc = ta.kc(df["high"], df["low"], df["close"], length=self.keltner_period, scalar=self.keltner_mult)
         adx_series = ta.adx(df["high"], df["low"], df["close"], length=self.regime_lookback)
-        vwap_series = ta.vwap(df["high"], df["low"], df["close"], df["volume"])
+        vwap_series = session_vwap(candles)   # ta.vwap exige DatetimeIndex e devolvia None (a estratégia nunca operava)
 
         if rsi_series is None or kc is None or adx_series is None or vwap_series is None:
             return None

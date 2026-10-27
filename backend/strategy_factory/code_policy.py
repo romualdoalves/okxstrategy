@@ -19,7 +19,7 @@ ALLOWED_IMPORT_ROOTS = {
     "pandas", "pandas_ta", "numpy", "networkx",
 }
 # Único módulo interno permitido (absoluto ou relativo `from ..base import ...`).
-BASE_MODULES = {"backend.strategies.base"}
+BASE_MODULES = {"backend.strategies.base", "backend.strategies.indicators"}
 
 FORBIDDEN_NAMES = {
     "eval", "exec", "compile", "open", "input", "breakpoint", "globals", "locals",
