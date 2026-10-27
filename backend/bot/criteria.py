@@ -18,6 +18,27 @@ class OrderGateMixin:
         s = (symbol or "").upper()
         return "-" in s and not (s.endswith("-SWAP") or s.endswith("-FUTURES"))
 
+    def _baseline_qty(self) -> float:
+        """Holdings do usuário anteriores ao bot (só spot). Não são posição do bot."""
+        if not self._is_spot_symbol(self.config.symbol):
+            return 0.0
+        return abs(float(getattr(self.config, "baseline_balance", 0.0) or 0.0))
+
+    def _net_size(self, pos) -> float:
+        """Tamanho da posição que é DO BOT: em spot, `get_position` devolve o saldo TOTAL da moeda, então
+        desconta o baseline. Em derivativos é o próprio tamanho."""
+        if not pos:
+            return 0.0
+        return max(0.0, abs(float(getattr(pos, "size", 0.0) or 0.0)) - self._baseline_qty())
+
+    def _exchange_has_bot_position(self, pos) -> bool:
+        """True se a OKX mostra uma posição que precisa ser tratada antes de uma nova entrada. Com posição
+        local aberta, qualquer saldo conta; com o bot flat, só o que passa do baseline (saldo apenas do
+        usuário NÃO bloqueia a entrada)."""
+        if not pos or float(getattr(pos, "size", 0.0) or 0.0) == 0.0:
+            return False
+        return self._direction != 0 or self._net_size(pos) > 1e-9
+
     def _position_notional(self, pos, reference_price: float | None = None) -> float:
         price = float(reference_price or getattr(pos, "avg_price", 0.0) or 0.0)
         size = abs(float(getattr(pos, "size", 0.0) or 0.0))
@@ -82,11 +103,11 @@ class OrderGateMixin:
         if self._is_spot_symbol(self.config.symbol) and self._direction >= 0:
             try:
                 pos = await exchange.get_position(self.config.symbol)
-                if pos and pos.side == "long" and pos.size > 0:
-                    real_size = abs(float(pos.size))
+                real_size = self._net_size(pos)
+                if pos and pos.side == "long" and real_size > 0:
                     if fallback_size > 0 and abs(real_size - fallback_size) > max(1e-8, fallback_size * 0.001):
                         log.warning(
-                            "[Bot %d] Entrada SPOT ajustada pelo saldo líquido OKX: fill=%.8f saldo=%.8f.",
+                            "[Bot %d] Entrada SPOT ajustada pelo saldo líquido OKX: fill=%.8f saldo líquido=%.8f.",
                             self.config.id, fallback_size, real_size,
                         )
                     return real_size
@@ -117,12 +138,13 @@ class OrderGateMixin:
         for _ in range(12):
             try:
                 pos = await exchange.get_position(self.config.symbol)
-                if pos and pos.size > 0:
-                    real_size = abs(float(pos.size))
-                    real_price = float(pos.avg_price or fill_price)
+                real_size = self._net_size(pos)
+                if pos and real_size > 0:
+                    # Em spot o avg_price da OKX é o ÚLTIMO preço (não o custo): o preço de entrada é o do fill.
+                    real_price = fill_price if self._is_spot_symbol(self.config.symbol) else float(pos.avg_price or fill_price)
                     if abs(real_size - fill_size) > max(1e-8, fill_size * 0.001):
                         log.warning(
-                            "[Bot %d] Entrada SPOT ajustada pelo saldo OKX: fill=%.8f saldo=%.8f.",
+                            "[Bot %d] Entrada SPOT ajustada pelo saldo líquido OKX: fill=%.8f saldo líquido=%.8f.",
                             self.config.id, fill_size, real_size,
                         )
                     return real_price, real_size
@@ -136,10 +158,11 @@ class OrderGateMixin:
         for _ in range(12):
             try:
                 pos = await exchange.get_position(self.config.symbol)
-                if pos is None or abs(float(pos.size or 0.0)) <= 1e-9:
+                net = self._net_size(pos)
+                if pos is None or net <= 1e-9:      # só o baseline do usuário sobrou = a posição do bot zerou
                     await self._on_position_closed(price, size, exchange)
                     return True
-                self._sz = abs(float(pos.size))
+                self._sz = net
                 self._sz_remaining = self._sz
             except Exception:
                 pass

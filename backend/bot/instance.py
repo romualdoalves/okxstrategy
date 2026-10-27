@@ -227,15 +227,21 @@ class BotInstance(OrderGateMixin, EntryMixin, PositionMixin, AccountingMixin, St
                 # Sincroniza posição real da exchange para evitar reentradas
                 try:
                     pos = await exchange.get_position(self.config.symbol)
+                    # Com trade aberto no banco, o que importa é a posição do BOT (saldo menos baseline em spot).
+                    if pos is not None and self._direction != 0 and self._net_size(pos) <= 1e-9:
+                        pos = None
                     if pos is not None:
                         if self._direction != 0:
                             # Sincroniza posição se o banco de dados já possui um trade ativo
-                            actual_pos = pos.size if pos.side == "long" else -pos.size
+                            net_size   = self._net_size(pos)
+                            actual_pos = net_size if pos.side == "long" else -net_size
                             old_entry  = self._entry_price  # guarda para comparação
+                            # Em spot o avg_price da OKX é o ÚLTIMO preço, não o custo: mantém o do banco.
+                            exch_entry = old_entry if (self._is_spot_symbol(self.config.symbol) and old_entry > 0) else pos.avg_price
                             self._direction   = 1 if actual_pos > 0 else -1
                             self._sz          = abs(actual_pos)
                             self._sz_remaining = self._sz
-                            self._entry_price = pos.avg_price
+                            self._entry_price = exch_entry
                             self._save_trade(
                                 {"size": self._sz, "entry_price": self._entry_price},
                                 update_id=self._current_trade_id,
@@ -253,20 +259,20 @@ class BotInstance(OrderGateMixin, EntryMixin, PositionMixin, AccountingMixin, St
                             # (ou abaixo para um SHORT), distorcendo guaranteed_pnl e
                             # eventualmente disparando o SW-TS de forma prematura.
                             if (old_entry > 0
-                                    and abs(pos.avg_price - old_entry) / old_entry > 0.005
+                                    and abs(exch_entry - old_entry) / old_entry > 0.005
                                     and self._sl_price > 0):
                                 old_dist_pct = abs(self._sl_price - old_entry) / old_entry
                                 # Preserva a distância percentual do SL, com teto de 5 %
                                 safe_pct = min(max(old_dist_pct, 0.005), 0.05)
                                 new_sl = round(
-                                    pos.avg_price * (1 - safe_pct) if self._direction == 1
-                                    else pos.avg_price * (1 + safe_pct),
+                                    exch_entry * (1 - safe_pct) if self._direction == 1
+                                    else exch_entry * (1 + safe_pct),
                                     4,
                                 )
                                 log.warning(
                                     "[Bot %d] Entrada diverge DB %.4f vs OKX %.4f — "
                                     "SL recalculado de %.4f para %.4f.",
-                                    self.config.id, old_entry, pos.avg_price,
+                                    self.config.id, old_entry, exch_entry,
                                     self._sl_price, new_sl,
                                 )
                                 self._sl_price = new_sl

@@ -86,7 +86,7 @@ class EntryMixin:
             for _ in range(12):
                 try:
                     pos = await exchange.get_position(self.config.symbol)
-                    if pos is None or abs(float(pos.size or 0.0)) <= 1e-9:
+                    if pos is None or self._net_size(pos) <= 1e-9:
                         log.critical(
                             "[Bot %d] Entrada sem proteção encerrada a mercado. Ordem: %s Motivo: %s",
                             self.config.id,
@@ -704,15 +704,18 @@ class EntryMixin:
         # Isso evita entradas múltiplas se o estado local estiver dessincronizado
         try:
             pos = await exchange.get_position(self.config.symbol)
-            if pos and pos.size != 0:
+            # Saldo spot apenas do usuário (coberto pelo baseline) NÃO é posição do bot: segue para a entrada.
+            # Antes qualquer saldo != 0 abortava a entrada em silêncio quando o bot estava flat.
+            if self._exchange_has_bot_position(pos):
                 if self._direction != 0:
                     self._hold_reason = "Bloqueio: Posição já aberta na exchange."
                     log.warning("[Bot %d] Bloqueio de reentrada: Posição detectada na exchange (%.4f %s @ %f).", 
                                 self.config.id, pos.size, pos.side, pos.avg_price)
                     self._direction = 1 if pos.side == "long" else -1
-                    self._sz = abs(pos.size)
+                    self._sz = self._net_size(pos)          # sem o baseline do usuário
                     self._sz_remaining = self._sz
-                    self._entry_price = pos.avg_price
+                    if not self._is_spot_symbol(self.config.symbol) or not self._entry_price:
+                        self._entry_price = pos.avg_price   # em spot o avg_price da OKX é o último preço, não o custo
                     self._save_trade(
                         {"size": self._sz, "entry_price": self._entry_price},
                         update_id=self._current_trade_id,

@@ -505,7 +505,7 @@ class PositionMixin:
                             return
                         continue
                 pos = await exchange.get_position(self.config.symbol)
-                if pos is None:
+                if pos is None or self._net_size(pos) <= 1e-9:
                     exit_price = price
                     if ord_id:
                         try:
@@ -571,7 +571,7 @@ class PositionMixin:
                             return
                         continue
                 pos = await exchange.get_position(self.config.symbol)
-                if pos is None:
+                if pos is None or self._net_size(pos) <= 1e-9:
                     exit_price = last_price
                     if ord_id:
                         try:
