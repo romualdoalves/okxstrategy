@@ -63,22 +63,6 @@ export const getBalance        = (ccy = 'USDT', demo = false) => req(`/account/b
 export const getAccountSnapshot = (demo = false) => req(`/account/snapshot?demo=${demo}`)
 export const getIntegrityCheck  = () => req('/integrity/check')
 
-// Auto-Scan horário
-export const getAutoScanStatus = () => req('/auto-scan/status')
-export const toggleAutoScan    = (enabled) => req('/auto-scan/toggle', {
-  method: 'POST', body: JSON.stringify({ enabled }),
-})
-export const getAutoScanRuns   = (filters = {}) => {
-  const params = new URLSearchParams()
-  const { limit = 20, symbol, strategyId, category, dateFrom, dateTo } = filters
-  params.set('limit', limit)
-  if (symbol)    params.set('symbol', symbol)
-  if (strategyId) params.set('strategy_id', strategyId)
-  if (category)  params.set('category', category)
-  if (dateFrom)  params.set('date_from', dateFrom)
-  if (dateTo)    params.set('date_to', dateTo)
-  return req(`/auto-scan/runs?${params.toString()}`)
-}
 export const resetAccount      = () => req('/account/reset-data', { method: 'POST' })
 
 // OKX — Conexão via banco

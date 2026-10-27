@@ -57,11 +57,10 @@ class RiskLimits:
     max_account_daily_loss_usd: float = 100.0   # valor positivo = perda máxima do dia
     max_drawdown_pct: float = 10.0
     capital_base_usd: float = 2000.0            # base do % de drawdown (10% = $200, o dobro da perda diária)
-    max_auto_bots: int = 3                      # bots ativos criados pelo auto-scan
 
     def validate(self) -> "RiskLimits":
-        if self.max_open_positions < 1 or self.max_auto_bots < 0:
-            raise ValueError("max_open_positions deve ser >= 1 e max_auto_bots >= 0")
+        if self.max_open_positions < 1:
+            raise ValueError("max_open_positions deve ser >= 1")
         for name in ("max_exposure_usd", "max_account_daily_loss_usd", "capital_base_usd"):
             if getattr(self, name) <= 0:
                 raise ValueError(f"{name} deve ser > 0")
@@ -272,18 +271,6 @@ class RiskGuard:
                 "exposure", self._first_time("exposure"))
 
         return RiskDecision(True)
-
-    def auto_scan_allowed(self, db: Session, instances: dict[int, Any], active_auto_bots: int) -> tuple[bool, str]:
-        """O auto-scan não deve criar bots se a conta já está no limite ou no teto de bots automáticos."""
-        limits = load_limits(db)
-        if not limits.enabled:
-            return True, ""
-        if active_auto_bots >= limits.max_auto_bots:
-            return False, f"Teto de bots automáticos atingido ({active_auto_bots}/{limits.max_auto_bots})."
-        snap = self.snapshot(db, instances)
-        if snap["blocking"]:
-            return False, f"Limite de risco global ativo: {', '.join(snap['breaches'])}."
-        return True, ""
 
 
 guard = RiskGuard()

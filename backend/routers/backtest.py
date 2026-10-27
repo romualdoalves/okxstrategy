@@ -1,5 +1,5 @@
 """
-Rotas de backtest por categoria e histórico do auto-scan.
+Rotas de backtest por categoria (Scanner).
 """
 
 from __future__ import annotations
@@ -13,8 +13,10 @@ from pydantic import BaseModel
 from fastapi import Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from ..database import AutoScanHistoryModel, HistoricCandleModel, SessionLocal, get_db
+from ..database import HistoricCandleModel, SessionLocal, get_db
 from ..backtest_engine import BacktestEngine, backtest_recommendation
+from ..backtest_worker import run_strict_async
+from ..market_data_service import HISTORY_TARGET_CANDLES
 from ..predictive_scoring import PredictiveScoringService
 from ..exchanges.factory import build_exchange, map_timeframe_for_history
 from ..common import market_data_svc
@@ -22,29 +24,6 @@ from ..common import market_data_svc
 router = APIRouter()
 log = logging.getLogger("main")
 
-
-class AutoScanHistoryPayload(BaseModel):
-    results: list
-
-@router.post("/api/backtest/auto-scan-history", status_code=201)
-def save_auto_scan_history(payload: AutoScanHistoryPayload, db: Session = Depends(get_db)):
-    record = AutoScanHistoryModel(results=payload.results)
-    db.add(record)
-    db.commit()
-    db.refresh(record)
-    return {"ok": True, "id": record.id}
-
-@router.get("/api/backtest/auto-scan-history")
-def get_auto_scan_history(db: Session = Depends(get_db)):
-    records = db.query(AutoScanHistoryModel).order_by(AutoScanHistoryModel.created_at.desc()).all()
-    return [{"id": r.id, "created_at": r.created_at.isoformat() + "Z", "results": r.results} for r in records]
-
-@router.delete("/api/backtest/auto-scan-history/{history_id}", status_code=204)
-def delete_auto_scan_history(history_id: int, db: Session = Depends(get_db)):
-    record = db.get(AutoScanHistoryModel, history_id)
-    if record:
-        db.delete(record)
-        db.commit()
 
 class CategoryBacktestRequest(BaseModel):
     category: str
@@ -156,9 +135,7 @@ async def _run_category_backtest_core(
     strict: bool = True,
 ) -> dict:
     """
-    Núcleo do backtest de categoria — reaproveitado pelo endpoint HTTP
-    (/api/backtest/category) e pela rotina de auto-scan (_auto_scan_loop),
-    sem round-trip HTTP entre eles.
+    Núcleo do backtest de categoria, usado pelo endpoint HTTP (/api/backtest/category).
     """
     import aiohttp as _aiohttp
     from types import SimpleNamespace
@@ -191,7 +168,7 @@ async def _run_category_backtest_core(
     for extra_tfs in extra_tf_by_sid.values():
         all_timeframes.update(extra_tfs)
 
-    def _candles_from_db(symbol: str, timeframe: str, limit: int = 500):
+    def _candles_from_db(symbol: str, timeframe: str, limit: int = HISTORY_TARGET_CANDLES):
         db_local = SessionLocal()
         try:
             rows = (
@@ -223,7 +200,7 @@ async def _run_category_backtest_core(
 
     for tf in all_timeframes:
         try:
-            local = _candles_from_db(req.symbol, tf, limit=500)
+            local = _candles_from_db(req.symbol, tf, limit=HISTORY_TARGET_CANDLES)
             if local:
                 candle_cache[tf] = local
         except Exception as exc:
@@ -237,7 +214,7 @@ async def _run_category_backtest_core(
                 for tf in missing_tfs:
                     try:
                         bar = map_timeframe_for_history(tf)
-                        candle_cache[tf] = await ex.fetch_candles(req.symbol, bar, limit=500) or []
+                        candle_cache[tf] = await ex.fetch_history_candles(req.symbol, bar, limit=HISTORY_TARGET_CANDLES) or []
                     except Exception as exc:
                         log.warning(
                             "Category backtest candle fetch error %s/%s (%s): %s",
@@ -306,7 +283,7 @@ async def _run_category_backtest_core(
                     extra_tf: candle_cache.get(extra_tf, [])
                     for extra_tf in extra_tf_by_sid.get(sid, [])
                 }
-                result = await engine.run_strict(candles, extra_candles=extra_candles)
+                result = await run_strict_async(sid, candles, extra_candles)
             else:
                 result = await engine.run(candles)
                 result["coverage"] = {

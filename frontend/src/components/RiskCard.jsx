@@ -16,7 +16,6 @@ const FIELDS = [
   ['max_account_daily_loss_usd', 'Perda diária (US$)', 5],
   ['max_drawdown_pct', 'Drawdown (%)', 0.5],
   ['capital_base_usd', 'Base do drawdown (US$)', 100],
-  ['max_auto_bots', 'Bots automáticos (máx.)', 1],
 ]
 
 function Meter({ label, value, max, text, danger }) {

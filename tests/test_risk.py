@@ -85,10 +85,7 @@ class TestRiskGuard(unittest.TestCase):
         d = self.guard.check_entry({}, 1, 100)
         self.assertEqual((d.allowed, d.kind), (False, "error"))
 
-    def test_auto_scan_cap_and_validation(self):
-        ok, _ = self.guard.auto_scan_allowed(self.db, {}, active_auto_bots=3)
-        self.assertFalse(ok)
-        self.assertTrue(self.guard.auto_scan_allowed(self.db, {}, active_auto_bots=2)[0])
+    def test_limits_validation(self):
         with self.assertRaises(ValueError):
             risk.save_limits(self.db, risk.RiskLimits(max_drawdown_pct=0))
 

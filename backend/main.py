@@ -30,7 +30,7 @@ except ImportError:
 
 from . import lifecycle  # noqa: E402
 from .routers import (  # noqa: E402
-    account, auto_scan, backtest, bot_analysis, bots, integrity, market, market_data, risk,
+    account, backtest, bot_analysis, bots, integrity, market, market_data, risk,
     spa, strategies, system, trades, ws,
 )
 from .security import ApiAuthMiddleware, get_cors_origins  # noqa: E402
@@ -44,7 +44,7 @@ app = FastAPI(title="OKXStrategy API", version="1.0.0")
 
 app.include_router(market_data.router, prefix="/api")
 for _router in (system.router, strategies.router, market.router, bots.router, bot_analysis.router,
-                account.router, trades.router, integrity.router, backtest.router, auto_scan.router,
+                account.router, trades.router, integrity.router, backtest.router,
                 risk.router):
     app.include_router(_router)
 

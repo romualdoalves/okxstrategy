@@ -198,15 +198,6 @@ class OrderRejectionModel(Base):
     updated_at       = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
 
-class AutoScanHistoryModel(Base):
-    """Histórico salvo de Auto-Scans para criação sequencial de bots."""
-    __tablename__ = "auto_scan_history"
-
-    id         = Column(Integer,  primary_key=True, autoincrement=True)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow, index=True)
-    results    = Column(JSON,     default=[])  # Lista de combinações INICIAR
-
-
 class TrackedSymbolModel(Base):
     """Ativos spot OKX rastreados pelo serviço de Market Data."""
     __tablename__ = "tracked_symbols"
@@ -253,32 +244,6 @@ class MarketDataSyncJobModel(Base):
     finished_at    = Column(DateTime, nullable=True)
 
 
-class AutoScanStateModel(Base):
-    """Estado (singleton, id=1) da rotina de auto-scan horária: liga/desliga e cursor
-    de rotação de ativos. Separado de `settings` (reservada a credenciais criptografadas)."""
-    __tablename__ = "auto_scan_state"
-
-    id            = Column(Integer, primary_key=True, default=1)
-    enabled       = Column(Boolean, default=False)
-    cursor_symbol = Column(String,  nullable=True)   # último símbolo processado (retoma dali)
-    updated_at    = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
-
-
-class AutoScanRunLogModel(Base):
-    """Histórico de decisões da rotina de auto-scan horária — um registro por ciclo."""
-    __tablename__ = "auto_scan_runs"
-
-    id               = Column(Integer, primary_key=True, autoincrement=True)
-    created_at       = Column(DateTime, default=datetime.datetime.utcnow, index=True)
-    symbol           = Column(String,  nullable=True, index=True)
-    category         = Column(String,  nullable=True, index=True)   # prefixo da estratégia vencedora (TF/MR/PA/...)
-    best_score       = Column(Float,   nullable=True)
-    best_strategy_id = Column(String,  nullable=True, index=True)
-    bot_created      = Column(Boolean, default=False)
-    bot_id           = Column(Integer, nullable=True)
-    note             = Column(Text,    nullable=True)
-
-
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def get_db() -> Session:
@@ -300,10 +265,6 @@ def _run_migrations():
     migrations = [
         "ALTER TABLE trades ADD COLUMN IF NOT EXISTS fee FLOAT",
         "ALTER TABLE trades ADD COLUMN IF NOT EXISTS peak_price FLOAT",
-        "ALTER TABLE auto_scan_runs ADD COLUMN IF NOT EXISTS category VARCHAR",
-        "CREATE INDEX IF NOT EXISTS idx_auto_scan_runs_symbol ON auto_scan_runs(symbol)",
-        "CREATE INDEX IF NOT EXISTS idx_auto_scan_runs_category ON auto_scan_runs(category)",
-        "CREATE INDEX IF NOT EXISTS idx_auto_scan_runs_strategy ON auto_scan_runs(best_strategy_id)",
         """
         CREATE TABLE IF NOT EXISTS factory_strategies (
             id SERIAL PRIMARY KEY,
@@ -345,14 +306,6 @@ def _run_migrations():
         "CREATE INDEX IF NOT EXISTS idx_order_rejections_resolved ON order_rejections(resolved)",
         "CREATE UNIQUE INDEX IF NOT EXISTS ux_bots_symbol_upper ON bots (UPPER(symbol))",
         "ALTER TABLE bots ADD COLUMN IF NOT EXISTS baseline_balance FLOAT DEFAULT 0.0",
-        """
-        CREATE TABLE IF NOT EXISTS auto_scan_history (
-            id SERIAL PRIMARY KEY,
-            created_at TIMESTAMP DEFAULT NOW(),
-            results JSON DEFAULT '[]'::json
-        )
-        """,
-        "CREATE INDEX IF NOT EXISTS idx_auto_scan_history_created_at ON auto_scan_history(created_at)",
         """
         CREATE TABLE IF NOT EXISTS tracked_symbols (
             id SERIAL PRIMARY KEY,

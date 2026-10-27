@@ -9,12 +9,12 @@ from __future__ import annotations
 import asyncio
 import logging
 
+from .backtest_worker import shutdown_pool as shutdown_backtest_pool
 from .bot_manager import manager
 from .common import market_data_svc
 from .database import BotModel, SessionLocal, create_tables
 from .feeds.economic_calendar import calendar_feed
 from .notifications import TelegramNotifier, build_stop_msg
-from .routers.auto_scan import _auto_scan_loop
 from .routers.trades import _sync_trade_fees_impl
 
 log = logging.getLogger("main")
@@ -78,10 +78,6 @@ async def startup():
     # Reconciliação periódica: detecta posições fechadas externamente na OKX
     asyncio.create_task(manager._reconcile_loop())
 
-    # Auto-Scan horário: roda o Scanner (Todas as categorias) a cada hora cheia,
-    # um ativo habilitado por vez, criando+iniciando bot se score >= threshold
-    asyncio.create_task(_auto_scan_loop())
-
     # Sincronização de taxas de corretagem: preenche fee nos trades recentes sem dados
     async def _startup_fee_sync():
         await asyncio.sleep(10)   # aguarda exchange estar disponível
@@ -141,5 +137,6 @@ async def shutdown():
         )
 
     await market_data_svc.stop()
+    shutdown_backtest_pool()
 
     log.info("[Shutdown] Graceful shutdown completo.")
