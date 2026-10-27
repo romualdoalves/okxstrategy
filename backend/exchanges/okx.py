@@ -894,21 +894,31 @@ class OKXStream:
 
 
 class OKXPrivateStream:
-    """WebSocket private stream para fills da OKX (channel: orders)."""
+    """WebSocket private stream para fills da OKX (channel: orders).
+
+    A OKX avisou (event "notice", code 64010) que a porta 8443 será desativada; a 443 é a
+    sucessora. Tenta a 443 primeiro e cai para a 8443 se a conexão/login falhar, lembrando
+    qual funcionou (o BotInstance cria um stream novo a cada reconexão).
+    OKX_WS_PRIVATE_URL força uma URL única (sem fallback).
+    """
+
+    _last_good: dict[bool, str] = {}     # demo -> URL que completou o login por último
 
     def __init__(self, exchange: OKXExchange):
         _, _, _, demo = _get_credentials()
-        # A OKX avisou (event "notice", code 64010) que a porta 8443 será desativada; a 443 é a
-        # sucessora. OKX_WS_PRIVATE_URL permite migrar (ou voltar atrás) sem novo deploy.
-        self._ws_url = os.getenv("OKX_WS_PRIVATE_URL", "").strip() or (
-            "wss://wspap.okx.com:8443/ws/v5/private"
-            if demo
-            else "wss://ws.okx.com:8443/ws/v5/private"
-        )
+        self._demo = demo
+        forced = os.getenv("OKX_WS_PRIVATE_URL", "").strip()
+        host = "wspap.okx.com" if demo else "ws.okx.com"
+        urls = [forced] if forced else [
+            f"wss://{host}/ws/v5/private",            # porta 443
+            f"wss://{host}:8443/ws/v5/private",       # legado (sendo desativado)
+        ]
+        good = self._last_good.get(demo)
+        if good in urls:
+            urls.insert(0, urls.pop(urls.index(good)))
+        self._ws_urls = urls
 
     def iter(self):
-        ws_url = self._ws_url
-
         async def _aiter():
             import websockets as _ws
             import json as _js
@@ -939,52 +949,69 @@ class OKXPrivateStream:
             elif "extra_headers" in params:
                 connect_kwargs["extra_headers"] = extra
 
-            async with _ws.connect(ws_url, **connect_kwargs) as ws:
-                await ws.send(_js.dumps({
-                    "op": "login",
-                    "args": [{"apiKey": key, "passphrase": passphrase, "timestamp": ts, "sign": sign}],
-                }))
-                # A OKX pode enviar avisos (event "notice") antes da resposta do login; eles não
-                # são erro de login e precisam ser ignorados.
-                login_raw, login_msg = None, {}
-                for _ in range(5):
-                    login_raw = await asyncio.wait_for(ws.recv(), timeout=15)
-                    login_msg = _js.loads(login_raw)
-                    if login_msg.get("event") != "notice":
-                        break
-                    log.info("OKX WS notice: %s", login_msg.get("msg"))
-                if login_msg.get("event") != "login":
-                    raise RuntimeError(f"OKX WS login falhou: {login_raw}")
+            last_exc: Optional[Exception] = None
+            for ws_url in self._ws_urls:
+                logged_in = False
+                try:
+                    async with _ws.connect(ws_url, **connect_kwargs) as ws:
+                        await ws.send(_js.dumps({
+                            "op": "login",
+                            "args": [{"apiKey": key, "passphrase": passphrase, "timestamp": ts, "sign": sign}],
+                        }))
+                        # A OKX pode enviar avisos (event "notice") antes da resposta do login; eles
+                        # não são erro de login e precisam ser ignorados.
+                        login_raw, login_msg = None, {}
+                        for _ in range(5):
+                            login_raw = await asyncio.wait_for(ws.recv(), timeout=15)
+                            login_msg = _js.loads(login_raw)
+                            if login_msg.get("event") != "notice":
+                                break
+                            log.info("OKX WS notice: %s", login_msg.get("msg"))
+                        if login_msg.get("event") != "login":
+                            raise RuntimeError(f"OKX WS login falhou: {login_raw}")
 
-                await ws.send(_js.dumps({
-                    "op": "subscribe",
-                    "args": [{"channel": "orders", "instType": "ANY"}],
-                }))
+                        logged_in = True
+                        OKXPrivateStream._last_good[self._demo] = ws_url
+                        log.info("OKX WS privado conectado em %s", ws_url)
 
-                async for raw in ws:
-                    try:
-                        msg = _js.loads(raw)
-                        if msg.get("event") in ("subscribe", "login", "error", "notice"):
-                            continue
-                        for order in msg.get("data", []):
-                            state = order.get("state", "")
-                            if state not in ("filled", "partially_filled"):
-                                continue
-                            yield {
-                                "state":  "filled",
-                                "instId": order.get("instId", ""),
-                                "side":   order.get("side", ""),
-                                "ordId":  order.get("ordId", ""),
-                                "algoId": order.get("algoId"),
-                                "source": order.get("source"),
-                                "fillPx": order.get("fillPx") or order.get("avgPx"),
-                                "fillSz": order.get("accFillSz") or order.get("fillSz"),
-                                "avgPx":  order.get("avgPx"),
-                                "sz":     order.get("accFillSz"),
-                            }
-                    except asyncio.CancelledError:
-                        raise
-                    except Exception:
-                        pass
+                        await ws.send(_js.dumps({
+                            "op": "subscribe",
+                            "args": [{"channel": "orders", "instType": "ANY"}],
+                        }))
+
+                        async for raw in ws:
+                            try:
+                                msg = _js.loads(raw)
+                                if msg.get("event") in ("subscribe", "login", "error", "notice"):
+                                    continue
+                                for order in msg.get("data", []):
+                                    state = order.get("state", "")
+                                    if state not in ("filled", "partially_filled"):
+                                        continue
+                                    yield {
+                                        "state":  "filled",
+                                        "instId": order.get("instId", ""),
+                                        "side":   order.get("side", ""),
+                                        "ordId":  order.get("ordId", ""),
+                                        "algoId": order.get("algoId"),
+                                        "source": order.get("source"),
+                                        "fillPx": order.get("fillPx") or order.get("avgPx"),
+                                        "fillSz": order.get("accFillSz") or order.get("fillSz"),
+                                        "avgPx":  order.get("avgPx"),
+                                        "sz":     order.get("accFillSz"),
+                                    }
+                            except asyncio.CancelledError:
+                                raise
+                            except Exception:
+                                pass
+                    return                      # conexão encerrada normalmente: o chamador reconecta
+                except Exception as exc:
+                    if logged_in:
+                        raise                   # caiu depois de conectar: o chamador reconecta
+                    last_exc = exc
+                    if len(self._ws_urls) > 1:
+                        log.warning("OKX WS privado: falha em %s (%s); tentando próxima URL.", ws_url, exc)
+            if last_exc:
+                raise last_exc
 
         return _aiter()
