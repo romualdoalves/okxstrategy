@@ -13,11 +13,10 @@ from typing import Optional
 from pydantic import BaseModel
 from fastapi import HTTPException
 
-from ..candle_store import load_candles
+from ..candle_store import history_target, load_candles
 from ..database import SessionLocal
 from ..backtest_engine import BacktestEngine, backtest_recommendation
 from ..backtest_worker import run_strict_async
-from ..market_data_service import HISTORY_TARGET_CANDLES
 from ..verdict_gate import SCORE_CAP_WITHOUT_ROBUSTNESS, is_suitable_to_start, robustness_gate
 from ..predictive_scoring import PredictiveScoringService
 from ..exchanges.factory import build_exchange, map_timeframe_for_history
@@ -215,13 +214,13 @@ async def _run_category_backtest_core(
     for extra_tfs in extra_tf_by_sid.values():
         all_timeframes.update(extra_tfs)
 
-    def _candles_from_db(symbol: str, timeframe: str, limit: int = HISTORY_TARGET_CANDLES):
+    def _candles_from_db(symbol: str, timeframe: str, limit: int):
         with SessionLocal() as db_local:
             return load_candles(db_local, symbol, timeframe, limit=limit)
 
     for tf in all_timeframes:
         try:
-            local = _candles_from_db(req.symbol, tf, limit=HISTORY_TARGET_CANDLES)
+            local = _candles_from_db(req.symbol, tf, limit=history_target(tf))
             if local:
                 candle_cache[tf] = local
         except Exception as exc:
@@ -235,7 +234,7 @@ async def _run_category_backtest_core(
                 for tf in missing_tfs:
                     try:
                         bar = map_timeframe_for_history(tf)
-                        candle_cache[tf] = await ex.fetch_history_candles(req.symbol, bar, limit=HISTORY_TARGET_CANDLES) or []
+                        candle_cache[tf] = await ex.fetch_history_candles(req.symbol, bar, limit=history_target(tf)) or []
                     except Exception as exc:
                         log.warning(
                             "Category backtest candle fetch error %s/%s (%s): %s",

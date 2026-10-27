@@ -12,10 +12,6 @@ from .exchanges.factory import build_exchange, map_timeframe_for_history
 
 log = logging.getLogger("market_data")
 
-# Candles que o Scanner lê por série (símbolo/timeframe). O banco guarda o alvo de cada timeframe
-# (candle_store.history_target: 3000, e anos para 1h/4h) e o sync só baixa o que falta.
-HISTORY_TARGET_CANDLES = 3000
-
 _ALLOWED_TIMEFRAMES = {"1m", "3m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "12h", "1D", "1W"}
 
 
