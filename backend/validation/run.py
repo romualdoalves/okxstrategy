@@ -91,9 +91,25 @@ def _init_worker(data):
     _DATA.update(data)
 
 
+def _base(symbol: str, tf: str, max_bars: int) -> list:
+    c = _DATA[(symbol, tf)]
+    return c[-max_bars:] if max_bars else c
+
+
 def _run_job(job: dict) -> dict:
+    t0 = time.time()
+    try:
+        out = _run_job_unsafe(job)
+    except Exception as exc:  # um job com erro não pode derrubar as centenas seguintes
+        out = {"job": {k: job[k] for k in ("sid", "symbol", "tf", "params")}, "trades": [], "mdd": 0.0,
+               "n": 0, "error": f"{type(exc).__name__}: {exc}"}
+    out["secs"] = round(time.time() - t0, 1)
+    return out
+
+
+def _run_job_unsafe(job: dict) -> dict:
     sid, params, symbol, tf = job["sid"], job["params"], job["symbol"], job["tf"]
-    candles = _DATA[(symbol, tf)]
+    candles = _base(symbol, tf, job.get("max_bars", 0))
     extra = {x: _DATA[(symbol, x)] for x in job["extra"] if (symbol, x) in _DATA}
     res = BacktestEngine(sid, params or None).run_strict_sync(candles, extra_candles=extra,
                                                               legacy_lookahead=job["legacy"])
@@ -103,11 +119,31 @@ def _run_job(job: dict) -> dict:
             "mdd": res.get("max_drawdown", 0.0), "n": len(candles), "error": res.get("error")}
 
 
-def _run_many(jobs: list[dict], workers: int) -> list[dict]:
+def _run_many(jobs: list[dict], workers: int, quiet: bool = False) -> list[dict]:
+    """Executa os jobs imprimindo o progresso (flush) a cada término. Ordem de saída = ordem dos jobs."""
+    results: list = [None] * len(jobs)
+    done, t0 = 0, time.time()
+
+    def note(i, r):
+        nonlocal done
+        results[i] = r
+        done += 1
+        if not quiet:
+            j = r["job"]
+            print(f"[{done}/{len(jobs)}] {j['sid']} {j['symbol']} {j['tf']} trades={len(r['trades'])} "
+                  f"{r['secs']}s total={time.time() - t0:.0f}s" + (f" ERRO={r['error']}" if r["error"] else ""),
+                  flush=True)
+
     if workers <= 1 or len(jobs) == 1:
-        return [_run_job(j) for j in jobs]
+        for i, j in enumerate(jobs):
+            note(i, _run_job(j))
+        return results
     with ProcessPoolExecutor(max_workers=workers, initializer=_init_worker, initargs=(dict(_DATA),)) as pool:
-        return list(pool.map(_run_job, jobs, chunksize=1))
+        futures = {pool.submit(_run_job, j): i for i, j in enumerate(jobs)}
+        from concurrent.futures import as_completed
+        for fut in as_completed(futures):
+            note(futures[fut], fut.result())
+    return results
 
 
 def _metrics(r: dict, candles: list) -> dict:
@@ -151,9 +187,16 @@ def cmd_baseline(a) -> None:
                 if any(not _series(sym, x, a.source, a.csv_dir) for x in extra):
                     print(f"[sem dados extra] {sid} {sym} {tf} precisa de {extra}")
                     continue
-                jobs.append({"sid": sid, "params": None, "symbol": sym, "tf": tf, "extra": extra, "legacy": a.legacy})
+                jobs.append({"sid": sid, "params": None, "symbol": sym, "tf": tf, "extra": extra,
+                             "legacy": a.legacy, "max_bars": a.max_bars})
+    print(f"{len(jobs)} backtests (workers={a.workers}, max_bars={a.max_bars or 'todas'})", flush=True)
     t0 = time.time()
-    rows = [_metrics(r, _DATA[(r["job"]["symbol"], r["job"]["tf"])]) for r in _run_many(jobs, a.workers)]
+    rows = []
+    for r in _run_many(jobs, a.workers):
+        if r["error"] or not r["n"]:
+            rows.append({**r["job"], "error": r["error"] or "dados insuficientes", "trades": 0})
+        else:
+            rows.append(_metrics(r, _base(r["job"]["symbol"], r["job"]["tf"], a.max_bars)))
     _emit(rows, a.out, f"baseline{'_legacy' if a.legacy else ''}", time.time() - t0)
 
 
@@ -183,8 +226,11 @@ def _walkforward_one(sid, sym, tf, space, extra, a) -> dict:
     if len(combos) > a.max_combos:
         rnd = random.Random(7)
         combos = rnd.sample(combos, a.max_combos)
-    jobs = [{"sid": sid, "params": c, "symbol": sym, "tf": tf, "extra": extra, "legacy": False} for c in combos]
-    jobs.append({"sid": sid, "params": None, "symbol": sym, "tf": tf, "extra": extra, "legacy": False})  # parâmetros atuais
+    jobs = [{"sid": sid, "params": c, "symbol": sym, "tf": tf, "extra": extra, "legacy": False,
+             "max_bars": a.max_bars} for c in combos]
+    jobs.append({"sid": sid, "params": None, "symbol": sym, "tf": tf, "extra": extra, "legacy": False,
+                 "max_bars": a.max_bars})  # parâmetros atuais
+    print(f"{sid} {sym} {tf}: {len(jobs)} backtests", flush=True)
     t0 = time.time()
     results = _run_many(jobs, a.workers)
     base, runs = results[-1], results[:-1]
@@ -278,12 +324,12 @@ def _emit(rows: list[dict], out: str, name: str, secs: float) -> None:
             "avg_trade_pct", "oos_trades", "oos_pf", "mdd_usd", "exposure_pct", "buy_hold_pct"]
     with open(out_dir / f"{name}.csv", "w", newline="") as fh:
         w = csv.writer(fh)
-        w.writerow(cols)
-        w.writerows([[r.get(c) for c in cols] for r in rows])
+        w.writerow(cols + ["error"])
+        w.writerows([[r.get(c) for c in cols + ["error"]] for r in rows])
     print(f"\n{name}: {len(rows)} séries em {secs:.0f}s -> {out_dir}")
     print(" | ".join(cols))
     for r in sorted(rows, key=lambda r: (r["sid"], r["symbol"], r["tf"])):
-        print(" | ".join(str(r.get(c)) for c in cols))
+        print(" | ".join(str(r.get(c)) for c in cols) + (f" | ERRO: {r['error']}" if r.get("error") else ""))
 
 
 def _emit_wf(summary: list[dict], out: str) -> None:
@@ -309,6 +355,7 @@ def main() -> None:
     p.add_argument("--csv-dir", default=None)
     p.add_argument("--out", default="validation_out")
     p.add_argument("--workers", type=int, default=1)
+    p.add_argument("--max-bars", type=int, default=0, help="usa só os N candles mais recentes de cada série (0 = todos)")
     p.add_argument("--legacy", action="store_true", help="reproduz o backtest ANTIGO (com lookahead multi-TF)")
     p.add_argument("--folds", type=int, default=4)
     p.add_argument("--max-combos", type=int, default=120)
