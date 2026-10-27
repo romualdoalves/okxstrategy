@@ -72,12 +72,18 @@ echo "${#NEW[@]} arquivo(s) copiado(s) para ${DEST}."
 
 # 3) Commit + push (precisa de credencial de escrita no GitHub; se não houver, deixa os arquivos prontos).
 git add -- "${NEW[@]/#/backend/strategies/factory/}"
-if git -c user.name="VPS migrate" -c user.email="vps@okx-strategy.local" \
-       commit -q -m "Migrate Factory strategies from the VPS into git (single source of truth): ${NEW[*]}" \
-   && git push -q origin HEAD:main; then
+BEFORE="$(git rev-parse HEAD)"
+PUSHED=false
+if git -c user.name="VPS migrate" -c user.email="vps@okx-strategy.local"        commit -q -m "Migrate Factory strategies from the VPS into git (single source of truth): ${NEW[*]}"; then
+    if git push -q origin HEAD:main; then
+        PUSHED=true
+    else
+        git reset -q --mixed "${BEFORE}"   # desfaz SÓ o commit criado aqui; os arquivos ficam na pasta
+    fi
+fi
+if [ "${PUSHED}" = true ]; then
     echo "[OK] Commit e push feitos. Atualize seu clone local com: git pull"
 else
-    git reset -q --mixed HEAD~1 2>/dev/null || true       # mantém os arquivos, desfaz só o commit local
     TAR="/tmp/factory_migrated.tgz"
     tar czf "${TAR}" -C "${DEST}" "${NEW[@]}"
     echo "[AVISO] Push não foi possível daqui. Os arquivos estão em ${DEST} (não rastreados) e em ${TAR}."
