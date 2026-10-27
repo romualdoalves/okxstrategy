@@ -10,13 +10,13 @@ import asyncio
 from datetime import timezone
 
 from pydantic import BaseModel
-from fastapi import Depends, HTTPException
-from sqlalchemy.orm import Session
+from fastapi import HTTPException
 
-from ..database import HistoricCandleModel, SessionLocal, get_db
+from ..database import HistoricCandleModel, SessionLocal
 from ..backtest_engine import BacktestEngine, backtest_recommendation
 from ..backtest_worker import run_strict_async
 from ..market_data_service import HISTORY_TARGET_CANDLES
+from ..verdict_gate import SCORE_CAP_WITHOUT_ROBUSTNESS, robustness_gate
 from ..predictive_scoring import PredictiveScoringService
 from ..exchanges.factory import build_exchange, map_timeframe_for_history
 from ..common import market_data_svc
@@ -87,8 +87,16 @@ def _compose_predictive_recommendation(result: dict, predictive: dict) -> dict:
     if (result.get("trades_count") or 0) == 0 or (result.get("total_profit") or 0.0) <= 0:
         final_score = min(final_score, 3.32)
 
+    # Freio de robustez: INICIAR exige amostra suficiente e fora da amostra positivo.
+    gate = robustness_gate(result.get("robust"))
+    capped = gate["applied"] and not gate["passed"] and final_score >= SCORE_CAP_WITHOUT_ROBUSTNESS
+    if capped:
+        final_score = SCORE_CAP_WITHOUT_ROBUSTNESS
+
     verdict, level = _verdict_from_score(final_score)
     reasons = list(rec.get("reasons") or [])
+    if capped:
+        reasons.insert(0, "Veredito limitado a CUIDADO: " + "; ".join(gate["failed"]) + ".")
     pred_reasons = predictive.get("reasons") or []
     if pred_reasons:
         reasons.append(
@@ -107,6 +115,7 @@ def _compose_predictive_recommendation(result: dict, predictive: dict) -> dict:
         "predictive_score": round(predictive_score, 2),
         "robustness_score": round(robustness_score, 2),
         "operational_score": round(operational_score, 2),
+        "robust_gate": gate,
         "score_model": "composite_v1",
         "score_weights": {
             "historical": 0.60,

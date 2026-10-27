@@ -72,7 +72,7 @@ function RobustnessBlock({ robust }) {
     <div className="rounded-lg border border-white/10 bg-black/20 p-2 mb-2">
       <div className="flex items-center justify-between gap-2 mb-1.5">
         <span className="text-[11px] font-bold text-white/80">Robustez da amostra</span>
-        <span className="text-[10px] text-muted">informativo — não entra no score</span>
+        <span className="text-[10px] text-muted">INICIAR exige ≥ 30 trades e fora da amostra positivo</span>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
         <ScorePill label="Fora da amostra (últimos 30%)" value={oosText} tone={oosTone} />
