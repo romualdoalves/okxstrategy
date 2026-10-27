@@ -9,6 +9,8 @@ import math
 import random
 from types import SimpleNamespace as NS
 
+from backend.exchanges.base import CandleBar
+
 import pytest
 
 from backend.candle_store import timeframe_ms
@@ -16,6 +18,7 @@ from backend.strategies.base import Signal
 from backend.strategies.registry import REGISTRY
 
 TF_IDS = sorted(s for s in REGISTRY if s.startswith("TF"))
+ALL_IDS = sorted(REGISTRY)
 
 
 def _walk(n, step_ms, seed, start=1_600_000_000_000, p0=100.0, drift=0.0005):
@@ -23,9 +26,8 @@ def _walk(n, step_ms, seed, start=1_600_000_000_000, p0=100.0, drift=0.0005):
     for i in range(n):
         ret = drift + rnd.gauss(0, 0.012)
         o, c = price, price * math.exp(ret)
-        out.append(NS(epoch=start + i * step_ms, open=o, high=max(o, c) * 1.004, low=min(o, c) * 0.996,
-                      close=c, volume=rnd.uniform(50, 500), hlc3=0.0))
-        out[-1].hlc3 = (out[-1].high + out[-1].low + out[-1].close) / 3
+        out.append(CandleBar(epoch=start + i * step_ms, open=o, high=max(o, c) * 1.004, low=min(o, c) * 0.996,
+                             close=c, volume=rnd.uniform(50, 500)))
         price = c
     return out
 
@@ -82,3 +84,16 @@ def test_tf_short_series_returns_none_or_hold(sid):
         pytest.skip("depende de contexto externo")
     r = cls().compute_with_context(_walk(8, 900_000, seed=3), {"extra_candles": {}})
     assert r is None or r.signal == Signal.HOLD
+
+
+@pytest.mark.parametrize("sid", ALL_IDS)
+def test_every_strategy_runs_on_real_candlebars(sid):
+    """Qualquer estratégia (não só TF) tem de rodar com CandleBar de verdade: antes a SC005 e a PA011 liam
+    c.time (inexistente) e lançavam AttributeError em toda chamada, sem ninguém notar."""
+    cls = REGISTRY[sid]
+    if any(getattr(cls, a, False) for a in dir(cls) if a.startswith("needs_")):
+        pytest.skip("depende de contexto externo")
+    step = timeframe_ms(cls.info().recommended_timeframe or "15m") or 900_000
+    candles = _walk(500, step, seed=21)
+    for end in (350, 450, 500):
+        cls().compute_with_context(candles[:end], _context(cls, step))

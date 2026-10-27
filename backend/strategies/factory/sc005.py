@@ -84,7 +84,7 @@ class AberturaDiáriaCriptoStrategy(BaseStrategy):
 
         # Otimização de Performance: Fatiar apenas as velas necessárias para o cálculo do ATR
         candles_necessarios = candles[-min_c:]
-        df = pd.DataFrame([{"high": c.high, "low": c.low, "close": c.close, "volume": c.volume, "open": c.open, "time": c.time} for c in candles_necessarios])
+        df = pd.DataFrame([{"high": c.high, "low": c.low, "close": c.close, "volume": c.volume, "open": c.open, "time": c.epoch} for c in candles_necessarios])
         
         atr_s = ta.atr(df["high"], df["low"], df["close"], length=self.atr_period)
         if atr_s is None or atr_s.empty:
@@ -95,8 +95,8 @@ class AberturaDiáriaCriptoStrategy(BaseStrategy):
         open_price = float(candles[-1].open)
         body_pct = abs(close - open_price) / open_price * 100.0
 
-        # CORREÇÃO CRÍTICA: Tratamento seguro do tempo de c.time (Suporta int, float e datetime)
-        raw_time = candles[-1].time
+        # CORREÇÃO CRÍTICA: Tratamento seguro do tempo de c.epoch (CandleBar não tem .time) (Suporta int, float e datetime)
+        raw_time = candles[-1].epoch
         try:
             # Caso seja int/float (Unix timestamp), assume milissegundos se for muito grande
             if isinstance(raw_time, (int, float)):

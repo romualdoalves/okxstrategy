@@ -60,7 +60,7 @@ class LiquidezAmd1hStrategy(BaseStrategy):
                 criteria_total=3,
             )
 
-        df = pd.DataFrame([{"high": c.high, "low": c.low, "close": c.close, "volume": c.volume, "time": c.time} for c in candles])
+        df = pd.DataFrame([{"high": c.high, "low": c.low, "close": c.close, "volume": c.volume, "time": c.epoch} for c in candles])
 
         # Calcular ATR
         atr_series = ta.atr(df["high"], df["low"], df["close"], length=self.atr_period)
