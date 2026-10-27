@@ -57,6 +57,43 @@ function ScorePill({ label, value, tone = 'white' }) {
   )
 }
 
+function RobustnessBlock({ robust }) {
+  if (!robust || !robust.all) return null
+  const { all, in_sample: ins, out_of_sample: oos, bootstrap: boot } = robust
+  if (!all.trades) return null
+
+  const oosTone = !robust.oos_conclusive ? 'white' : robust.oos_positive ? 'green' : 'red'
+  const oosText = !robust.oos_conclusive
+    ? `inconclusivo (${oos.trades} trades)`
+    : `${oos.profit >= 0 ? '+' : ''}$${oos.profit.toFixed(2)} · PF ${oos.profit_factor.toFixed(2)} · ${oos.trades} trades`
+  const pTone = boot.prob_pf_gt_1 >= 0.95 ? 'green' : boot.prob_pf_gt_1 >= 0.8 ? 'yellow' : 'red'
+
+  return (
+    <div className="rounded-lg border border-white/10 bg-black/20 p-2 mb-2">
+      <div className="flex items-center justify-between gap-2 mb-1.5">
+        <span className="text-[11px] font-bold text-white/80">Robustez da amostra</span>
+        <span className="text-[10px] text-muted">informativo — não entra no score</span>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <ScorePill label="Fora da amostra (últimos 30%)" value={oosText} tone={oosTone} />
+        <ScorePill label="Dentro da amostra (70%)" value={`PF ${ins.profit_factor.toFixed(2)} · ${ins.trades} trades`} />
+        <ScorePill label="PF pessimista (5º pct.)" value={boot.pf_p5.toFixed(2)} tone={boot.pf_p5 >= 1 ? 'green' : 'red'} />
+        <ScorePill label="Chance de PF > 1" value={`${Math.round(boot.prob_pf_gt_1 * 100)}%`} tone={pTone} />
+      </div>
+      {!robust.min_trades_met && (
+        <p className="text-[11px] text-yellow-300/90 mt-1.5">
+          Poucos trades ({all.trades}; mínimo de 30 para confiar): o resultado pode ser sorte.
+        </p>
+      )}
+      {robust.min_trades_met && (
+        <p className="text-[11px] mt-1.5 text-white/55">
+          Amostra de {all.trades} trades em {robust.bars_evaluated} candles.
+        </p>
+      )}
+    </div>
+  )
+}
+
 function resultKey(r, fallbackSymbol = '') {
   return `${r.strategy_id}:${r.symbol || fallbackSymbol}`
 }
@@ -214,6 +251,8 @@ function ResultCard({ r, symbol, selected, disabled, disabledReason, onToggle })
           {predictive?.regime && <MetricPill label="Regime" value={predictive.regime} />}
         </div>
       )}
+
+      {hasMetrics && <RobustnessBlock robust={r.robust} />}
 
       {/* Reasons toggle */}
       <button
