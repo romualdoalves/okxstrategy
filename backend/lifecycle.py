@@ -20,6 +20,25 @@ from .routers.trades import _sync_trade_fees_impl
 log = logging.getLogger("main")
 
 
+def normalize_bots(db) -> None:
+    """
+    Ajustes idempotentes aplicados a todos os bots a cada startup:
+      - IDs legados da Fábrica antiga (F001/F002) -> taxonomia semântica;
+      - símbolos spot (remove -SWAP/-FUTURES);
+      - stake fixo de US$100 e alavancagem 1x (política do projeto, ver SKILL.md).
+    O timeframe NÃO é tocado: ele é escolhido na criação/edição do bot e precisa sobreviver a restarts
+    (antes, um mapa de "timeframes recomendados" sobrescrevia a escolha do usuário a cada startup).
+    """
+    from sqlalchemy import text
+    db.execute(text("UPDATE bots SET strategy_id = 'TF014' WHERE strategy_id = 'F001'"))
+    db.execute(text("UPDATE bots SET strategy_id = 'PA007' WHERE strategy_id = 'F002'"))
+    db.execute(text("UPDATE bots SET symbol = REPLACE(symbol, '-SWAP', '') WHERE symbol LIKE '%-SWAP'"))
+    db.execute(text("UPDATE bots SET symbol = REPLACE(symbol, '-FUTURES', '') WHERE symbol LIKE '%-FUTURES'"))
+    db.execute(text("UPDATE bots SET leverage = 1 WHERE leverage IS NULL OR leverage <> 1"))
+    db.execute(text("UPDATE bots SET stake_usd = 100.0 WHERE stake_usd IS NULL OR stake_usd <> 100.0"))
+    db.commit()
+
+
 async def startup():
     create_tables()
     log.info("Banco de dados inicializado.")
@@ -32,36 +51,11 @@ async def startup():
     await calendar_feed.start()
     await market_data_svc.start()
 
-    # Migração automática: remove -SWAP e força stake fixo global de 100
+    # Normalização dos bots no startup (IDs legados, símbolos spot, stake/alavancagem fixos)
     db = SessionLocal()
     try:
-        from sqlalchemy import text
-        # Migração automática de IDs legados → taxonomia semântica
-        # F001/F002 (Factory antiga) → semântico
-        db.execute(text("UPDATE bots SET strategy_id = 'TF014' WHERE strategy_id = 'F001'"))
-        db.execute(text("UPDATE bots SET strategy_id = 'PA007' WHERE strategy_id = 'F002'"))
-        
-        # Migração Global de Timeframes para os recomendados (nova taxonomia)
-        tf_recommendations = {
-            "TF008": "1D",
-            "PA002": "4h", "IF001": "4h",
-            "TF002": "1h", "TF003": "1h", "TF011": "1h", "MR001": "1h", "PA003": "1h", "RG002": "1h", "PA005": "1h",
-            "TF001": "15m", "TF013": "15m", "TF004": "15m", "PA001": "15m", "TF010": "15m", "SC003": "15m", "NW001": "15m", "TF007": "15m", "PA007": "15m", "IF003": "15m",
-            "SC001": "5m",
-            "PA004": "15m",
-            "MR002": "15m",
-            "MR005": "15m",
-            "IF002": "5m",
-        }
-        for strat_id, tf in tf_recommendations.items():
-            db.execute(text("UPDATE bots SET timeframe = :tf WHERE strategy_id = :sid"), {"tf": tf, "sid": strat_id})
-
-        db.execute(text("UPDATE bots SET symbol = REPLACE(symbol, '-SWAP', '') WHERE symbol LIKE '%-SWAP'"))
-        db.execute(text("UPDATE bots SET symbol = REPLACE(symbol, '-FUTURES', '') WHERE symbol LIKE '%-FUTURES'"))
-        db.execute(text("UPDATE bots SET leverage = 1 WHERE leverage IS NULL OR leverage <> 1"))
-        db.execute(text("UPDATE bots SET stake_usd = 100.0 WHERE stake_usd IS NULL OR stake_usd <> 100.0"))
-        db.commit()
-        log.info("Migração de IDs, símbolos, stakes e TIMEFRAMES concluída.")
+        normalize_bots(db)
+        log.info("Normalização de IDs, símbolos, stakes e alavancagem concluída.")
 
         active = db.query(BotModel).filter(BotModel.active == True).all()
         for bot in active:

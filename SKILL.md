@@ -285,6 +285,7 @@ OKXStrategy/
 |--------|--------|-----------|
 | `bots` | `baseline_balance` | Qtde bruta do ativo spot na OKX ao criar o bot (ex: 1.0 BTC). Migrations automáticas no startup. |
 | `bots` | `stake_usd` | Sempre 100.0 — sobrescrito no create/edit/startup. |
+| `bots` | `timeframe` | Escolhido na criação/edição e preservado nos restarts (o startup não o sobrescreve; ver `normalize_bots` em `lifecycle.py`). |
 | `settings` | `key/value` | Credenciais OKX criptografadas (nunca em `.env`). |
 | `order_rejections` | — | Auditoria de ordens rejeitadas/canceladas. |
 
