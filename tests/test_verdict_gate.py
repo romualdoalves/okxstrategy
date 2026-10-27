@@ -1,7 +1,7 @@
 import unittest
 
 from backend.routers.backtest import _compose_predictive_recommendation
-from backend.verdict_gate import SCORE_CAP_WITHOUT_ROBUSTNESS, robustness_gate
+from backend.verdict_gate import SCORE_CAP_WITHOUT_ROBUSTNESS, min_trades_for, robustness_gate
 
 
 def robust(total=40, oos_trades=8, oos_profit=12.0, oos_pf=1.6, conclusive=True, positive=True):
@@ -42,8 +42,57 @@ class TestRobustnessGate(unittest.TestCase):
         self.assertIn("negativo", negative["failed"][0])
 
     def test_not_applied_without_robust_block(self):
-        self.assertEqual(robustness_gate(None), {"applied": False, "passed": True, "failed": []})
+        g = robustness_gate(None)
+        self.assertEqual((g["applied"], g["passed"], g["failed"]), (False, True, []))
         self.assertEqual(robustness_gate({})["applied"], False)
+
+
+class TestMinTradesByTimeframe(unittest.TestCase):
+    """Estratégias lentas fazem poucos trades: o mínimo cai com o timeframe, mas exige mais evidência."""
+
+    def test_minimums_per_timeframe(self):
+        self.assertEqual([min_trades_for(tf) for tf in ("1m", "15m", "1h", "4H", "1D", "1w")], [30, 30, 30, 20, 15, 15])
+        self.assertEqual(min_trades_for(None), 30)
+        self.assertEqual(min_trades_for("estranho"), 30)
+
+    def test_daily_strategy_with_16_trades_passes_when_the_bootstrap_is_strong(self):
+        r = robust(total=16)
+        r["bootstrap"] = {"prob_pf_gt_1": 0.97}
+        g = robustness_gate(r, "1D")
+        self.assertTrue(g["passed"], g["failed"])
+        self.assertEqual((g["min_trades"], g["timeframe"]), (15, "1D"))
+
+    def test_the_same_16_trades_fail_on_a_short_timeframe(self):
+        r = robust(total=16)
+        r["bootstrap"] = {"prob_pf_gt_1": 0.99}
+        g = robustness_gate(r, "15m")
+        self.assertFalse(g["passed"])
+        self.assertIn("mínimo de 30 para este timeframe", g["failed"][0])
+
+    def test_lower_minimum_requires_stronger_bootstrap_evidence(self):
+        r = robust(total=16)
+        r["bootstrap"] = {"prob_pf_gt_1": 0.80}
+        g = robustness_gate(r, "1D")
+        self.assertFalse(g["passed"])
+        self.assertIn("80%", g["failed"][0])
+
+    def test_four_hour_needs_20_trades(self):
+        r = robust(total=19)
+        r["bootstrap"] = {"prob_pf_gt_1": 0.99}
+        self.assertFalse(robustness_gate(r, "4h")["passed"])
+        r = robust(total=20)
+        r["bootstrap"] = {"prob_pf_gt_1": 0.99}
+        self.assertTrue(robustness_gate(r, "4h")["passed"])
+
+    def test_default_30_does_not_need_the_bootstrap_condition(self):
+        """Sem timeframe conhecido ou em timeframes curtos nada muda em relação à regra anterior."""
+        self.assertTrue(robustness_gate(robust(total=40))["passed"])
+        self.assertTrue(robustness_gate(robust(total=40), "15m")["passed"])
+
+    def test_out_of_sample_still_applies_on_slow_timeframes(self):
+        r = robust(total=30, oos_profit=-5.0, oos_pf=0.8, positive=False)
+        r["bootstrap"] = {"prob_pf_gt_1": 0.99}
+        self.assertFalse(robustness_gate(r, "1D")["passed"])
 
 
 class TestVerdictBrake(unittest.TestCase):

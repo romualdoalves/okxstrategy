@@ -4,20 +4,17 @@ from datetime import datetime, timezone
 from typing import Optional
 
 import aiohttp
-from sqlalchemy import func
-from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from .database import HistoricCandleModel, SessionLocal, TrackedSymbolModel
+from .candle_store import ensure_history, upsert_candles
+from .database import SessionLocal, TrackedSymbolModel
 from .exchanges.factory import build_exchange, map_timeframe_for_history
 
 log = logging.getLogger("market_data")
 
-# Histórico alvo por série (símbolo/timeframe), usado pelo backtest. O 1º sync busca isso tudo via
-# history-candles; depois só os candles recentes (o /market/candles entrega ~1440, mas a cada 5 min
-# repetir 1500 por série era carga desnecessária).
+# Candles que o Scanner lê por série (símbolo/timeframe). O banco guarda o alvo de cada timeframe
+# (candle_store.history_target: 3000, e anos para 1h/4h) e o sync só baixa o que falta.
 HISTORY_TARGET_CANDLES = 3000
-_RECENT_CANDLES = 300
 
 _ALLOWED_TIMEFRAMES = {"1m", "3m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "12h", "1D", "1W"}
 
@@ -88,53 +85,16 @@ class MarketDataService:
             return
 
         bar = map_timeframe_for_history(tf)
-        stored = (
-            db.query(func.count(HistoricCandleModel.epoch))
-            .filter(HistoricCandleModel.symbol == symbol, HistoricCandleModel.timeframe == tf)
-            .scalar()
-            or 0
-        )
-        deep = stored < HISTORY_TARGET_CANDLES * 0.95 and (symbol, tf) not in self._history_exhausted
         async with aiohttp.ClientSession() as http_session:
             ex = build_exchange(http_session)
-            if deep:
-                candles = await ex.fetch_history_candles(symbol, bar, limit=HISTORY_TARGET_CANDLES)
-                if len(candles) < HISTORY_TARGET_CANDLES * 0.95:
-                    self._history_exhausted.add((symbol, tf))   # a OKX não tem mais histórico: não insistir
-            else:
-                candles = await ex.fetch_candles(symbol, bar, limit=_RECENT_CANDLES)
-
-        if not candles:
-            return
-
-        records = []
-        for c in candles:
-            dt = datetime.fromtimestamp(int(c.epoch) / 1000, tz=timezone.utc).replace(tzinfo=None)
-            records.append({
-                "symbol": symbol,
-                "timeframe": tf,
-                "epoch": dt,
-                "open": float(c.open),
-                "high": float(c.high),
-                "low": float(c.low),
-                "close": float(c.close),
-                "volume": float(c.volume),
-            })
-
-        stmt = insert(HistoricCandleModel).values(records)
-        stmt = stmt.on_conflict_do_update(
-            index_elements=["symbol", "timeframe", "epoch"],
-            set_={
-                "open": stmt.excluded.open,
-                "high": stmt.excluded.high,
-                "low": stmt.excluded.low,
-                "close": stmt.excluded.close,
-                "volume": stmt.excluded.volume,
-            },
-        )
-        db.execute(stmt)
-        db.commit()
-        log.info("[MarketData] %d candles sincronizados para %s (%s)", len(records), symbol, tf)
+            result = await ensure_history(
+                db, ex, symbol, tf, bar, exhausted=(symbol, tf) in self._history_exhausted)
+        if result["exhausted"]:
+            self._history_exhausted.add((symbol, tf))      # a OKX não tem mais histórico: não insistir
+        if result["added"]:
+            log.info("[MarketData] %d candles sincronizados para %s (%s); total armazenado %d",
+                     result["added"], symbol, tf, result["count"])
+        return
 
     async def sync_symbol(self, symbol: str):
         sym = (symbol or "").strip().upper().replace("/", "-")
@@ -172,9 +132,8 @@ class MarketDataService:
             db.close()
 
     async def persist_candles(self, symbol: str, candles_by_tf: dict) -> None:
-        """Persiste incrementalmente candles já buscados (ex: Scanner) em historic_candles.
+        """Persiste candles já buscados (ex.: pelo Scanner) em historic_candles, sem chamar a OKX de novo.
 
-        Reutiliza o mesmo upsert do _sync_symbol_timeframe sem chamar a OKX novamente.
         Silencia exceções para não interromper o chamador (fire-and-forget).
         """
         if not candles_by_tf:
@@ -183,38 +142,9 @@ class MarketDataService:
         try:
             total = 0
             for tf, candles in candles_by_tf.items():
-                if not candles or tf not in _ALLOWED_TIMEFRAMES:
-                    continue
-                records = [
-                    {
-                        "symbol": symbol,
-                        "timeframe": tf,
-                        "epoch": datetime.fromtimestamp(int(c.epoch) / 1000, tz=timezone.utc).replace(tzinfo=None),
-                        "open": float(c.open),
-                        "high": float(c.high),
-                        "low": float(c.low),
-                        "close": float(c.close),
-                        "volume": float(c.volume),
-                    }
-                    for c in candles
-                ]
-                if not records:
-                    continue
-                stmt = insert(HistoricCandleModel).values(records)
-                stmt = stmt.on_conflict_do_update(
-                    index_elements=["symbol", "timeframe", "epoch"],
-                    set_={
-                        "open": stmt.excluded.open,
-                        "high": stmt.excluded.high,
-                        "low": stmt.excluded.low,
-                        "close": stmt.excluded.close,
-                        "volume": stmt.excluded.volume,
-                    },
-                )
-                db.execute(stmt)
-                total += len(records)
+                if candles and tf in _ALLOWED_TIMEFRAMES:
+                    total += upsert_candles(db, symbol, tf, candles)
             if total:
-                db.commit()
                 log.info("[MarketData] Scanner: %d candles persistidos para %s", total, symbol)
         except Exception as exc:
             log.warning("[MarketData] Falha ao persistir candles do Scanner (%s): %s", symbol, exc)

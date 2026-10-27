@@ -47,10 +47,11 @@ class BaseExchange(ABC):
         """Retorna candles históricos em ordem cronológica."""
 
     async def fetch_history_candles(
-        self, symbol: str, timeframe: str, limit: int = 3000
+        self, symbol: str, timeframe: str, limit: int = 3000, before: Optional[int] = None
     ) -> list[CandleBar]:
-        """Histórico profundo (mais antigo que o endpoint de candles recentes). Por padrão usa
-        fetch_candles; exchanges com endpoint de histórico sobrescrevem."""
+        """Histórico profundo (mais antigo que o endpoint de candles recentes). `before` (epoch em ms)
+        pede os candles ANTERIORES a esse instante. Por padrão usa fetch_candles (sem `before`);
+        exchanges com endpoint de histórico sobrescrevem."""
         return await self.fetch_candles(symbol, timeframe, limit=limit)
 
     @abstractmethod

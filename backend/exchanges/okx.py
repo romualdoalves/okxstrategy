@@ -330,12 +330,14 @@ class OKXExchange(BaseExchange):
         # OKX retorna do mais recente para o mais antigo — invertemos para ordem cronológica
         return [_parse_candle(r) for r in reversed(all_rows)]
 
-    async def fetch_history_candles(self, symbol: str, timeframe: str, limit: int = 3000) -> list[CandleBar]:
+    async def fetch_history_candles(self, symbol: str, timeframe: str, limit: int = 3000,
+                                     before: Optional[int] = None) -> list[CandleBar]:
         """Histórico profundo via /market/history-candles (o /market/candles só entrega ~1440
-        candles recentes). Endpoint público, 100 candles por página, limite de 20 req/2s."""
+        candles recentes). Endpoint público, 100 candles por página, limite de 20 req/2s.
+        `before` (epoch em ms) começa a paginar nos candles anteriores a esse instante."""
         bar = _tf_to_okx(timeframe)
         rows: list = []
-        after = ""
+        after = str(int(before)) if before else ""
         async with aiohttp.ClientSession() as s:
             while len(rows) < limit:
                 path = f"/api/v5/market/history-candles?instId={symbol}&bar={bar}&limit=100"

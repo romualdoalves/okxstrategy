@@ -60,8 +60,9 @@ function ScorePill({ label, value, tone = 'white' }) {
   )
 }
 
-function RobustnessBlock({ robust }) {
+function RobustnessBlock({ robust, gate }) {
   if (!robust || !robust.all) return null
+  const minTrades = gate?.min_trades ?? 30
   const { all, in_sample: ins, out_of_sample: oos, bootstrap: boot } = robust
   if (!all.trades) return null
 
@@ -75,7 +76,7 @@ function RobustnessBlock({ robust }) {
     <div className="rounded-lg border border-white/10 bg-black/20 p-2 mb-2">
       <div className="flex items-center justify-between gap-2 mb-1.5">
         <span className="text-[11px] font-bold text-white/80">Robustez da amostra</span>
-        <span className="text-[10px] text-muted">INICIAR exige ≥ 30 trades e fora da amostra positivo</span>
+        <span className="text-[10px] text-muted">INICIAR exige ≥ {minTrades} trades neste timeframe e fora da amostra positivo</span>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
         <ScorePill label="Fora da amostra (últimos 30%)" value={oosText} tone={oosTone} />
@@ -83,12 +84,15 @@ function RobustnessBlock({ robust }) {
         <ScorePill label="PF pessimista (5º pct.)" value={boot.pf_p5.toFixed(2)} tone={boot.pf_p5 >= 1 ? 'green' : 'red'} />
         <ScorePill label="Chance de PF > 1" value={`${Math.round(boot.prob_pf_gt_1 * 100)}%`} tone={pTone} />
       </div>
-      {!robust.min_trades_met && (
+      {all.trades < minTrades && (
         <p className="text-[11px] text-yellow-300/90 mt-1.5">
-          Poucos trades ({all.trades}; mínimo de 30 para confiar): o resultado pode ser sorte.
+          Poucos trades ({all.trades}; mínimo de {minTrades} neste timeframe): o resultado pode ser sorte.
         </p>
       )}
-      {robust.min_trades_met && (
+      {gate?.failed?.length > 0 && all.trades >= minTrades && (
+        <p className="text-[11px] text-yellow-300/90 mt-1.5">{gate.failed[0]}.</p>
+      )}
+      {all.trades >= minTrades && (
         <p className="text-[11px] mt-1.5 text-white/55">
           Amostra de {all.trades} trades em {robust.bars_evaluated} candles.
         </p>
@@ -341,7 +345,7 @@ function ResultCard({ r, symbol, selected, disabled, disabledReason, onToggle })
         </div>
       )}
 
-      {hasMetrics && <RobustnessBlock robust={r.robust} />}
+      {hasMetrics && <RobustnessBlock robust={r.robust} gate={r.recommendation?.robust_gate} />}
 
       {/* Reasons toggle */}
       <button
@@ -813,7 +817,7 @@ export default function BatchBacktest() {
             <span>
               Parar assim que encontrar uma estratégia adequada para iniciar.
               <span className="block text-[11px] text-muted">
-                Adequada = veredito INICIAR com robustez aprovada (≥ 30 trades e fora da amostra positivo). Se nenhuma atender, o scan roda por inteiro.
+                Adequada = veredito INICIAR com robustez aprovada (mínimo de trades por timeframe e fora da amostra positivo). Se nenhuma atender, o scan roda por inteiro.
               </span>
             </span>
           </label>

@@ -7,14 +7,14 @@ from fastapi import APIRouter
 import logging
 
 import asyncio
-from datetime import timezone
 
 from typing import Optional
 
 from pydantic import BaseModel
 from fastapi import HTTPException
 
-from ..database import HistoricCandleModel, SessionLocal
+from ..candle_store import load_candles
+from ..database import SessionLocal
 from ..backtest_engine import BacktestEngine, backtest_recommendation
 from ..backtest_worker import run_strict_async
 from ..market_data_service import HISTORY_TARGET_CANDLES
@@ -124,7 +124,7 @@ def _compose_predictive_recommendation(result: dict, predictive: dict) -> dict:
         final_score = min(final_score, 3.32)
 
     # Freio de robustez: INICIAR exige amostra suficiente e fora da amostra positivo.
-    gate = robustness_gate(result.get("robust"))
+    gate = robustness_gate(result.get("robust"), result.get("timeframe"))
     capped = gate["applied"] and not gate["passed"] and final_score >= SCORE_CAP_WITHOUT_ROBUSTNESS
     if capped:
         final_score = SCORE_CAP_WITHOUT_ROBUSTNESS
@@ -216,34 +216,8 @@ async def _run_category_backtest_core(
         all_timeframes.update(extra_tfs)
 
     def _candles_from_db(symbol: str, timeframe: str, limit: int = HISTORY_TARGET_CANDLES):
-        db_local = SessionLocal()
-        try:
-            rows = (
-                db_local
-                .query(HistoricCandleModel)
-                .filter(HistoricCandleModel.symbol == symbol)
-                .filter(HistoricCandleModel.timeframe == timeframe)
-                .order_by(HistoricCandleModel.epoch.desc())
-                .limit(limit)
-                .all()
-            )
-        finally:
-            db_local.close()
-        if not rows:
-            return []
-        rows = list(reversed(rows))
-        from ..exchanges.base import CandleBar as _CandleBar
-        return [
-            _CandleBar(
-                epoch=int(r.epoch.replace(tzinfo=timezone.utc).timestamp() * 1000),
-                open=float(r.open),
-                high=float(r.high),
-                low=float(r.low),
-                close=float(r.close),
-                volume=float(r.volume),
-            )
-            for r in rows
-        ]
+        with SessionLocal() as db_local:
+            return load_candles(db_local, symbol, timeframe, limit=limit)
 
     for tf in all_timeframes:
         try:
