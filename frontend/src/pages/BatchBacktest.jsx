@@ -17,6 +17,9 @@ const CATEGORIES = [
 ]
 
 const SYMBOLS = ['BTC-USDT', 'ETH-USDT', 'SOL-USDT', 'BNB-USDT', 'XRP-USDT', 'DOGE-USDT', 'ADA-USDT', 'AVAX-USDT']
+const ALL_ASSETS = '__ALL_ASSETS__'          // opção "Todos os ativos" (só com uma categoria específica)
+const SECONDS_PER_STRATEGY = 15              // referência medida: ~15 s por estratégia (2 workers)
+const CONSISTENT_MIN_ASSETS = 3              // aprovada em >= 3 ativos = "consistente"
 
 const VERDICT_CFG = {
   INICIAR:       { color: 'text-green-400',  bg: 'bg-green-500/15',  border: 'border-green-500/30'  },
@@ -109,6 +112,75 @@ function formatElapsed(ms) {
 function isSuitableToStart(r) {
   const rec = r?.recommendation
   return rec?.verdict === 'INICIAR' && !!rec?.robust_gate?.applied && !!rec?.robust_gate?.passed
+}
+
+function median(values) {
+  if (!values.length) return 0
+  const v = [...values].sort((a, b) => a - b)
+  const mid = Math.floor(v.length / 2)
+  return v.length % 2 ? v[mid] : (v[mid - 1] + v[mid]) / 2
+}
+
+// Quantos ativos aprovam cada estratégia: uma estratégia que passa em vários ativos é muito mais
+// crível do que uma que passa em um só (com muitos testes, passar uma vez pode ser sorte).
+function AssetConsistency({ rows }) {
+  const by = {}
+  for (const r of rows) {
+    if (!r.recommendation || r.recommendation.verdict === 'N/A') continue
+    const entry = by[r.strategy_id] || (by[r.strategy_id] = { id: r.strategy_id, name: r.strategy_name, assets: [] })
+    entry.assets.push({
+      symbol: r.symbol,
+      verdict: r.recommendation.verdict,
+      score: r.recommendation.score ?? 0,
+      suitable: isSuitableToStart(r),
+    })
+  }
+  const list = Object.values(by).map(e => ({
+    ...e,
+    approved: e.assets.filter(a => a.suitable).length,
+    medianScore: median(e.assets.map(a => a.score)),
+  })).sort((a, b) => b.approved - a.approved || b.medianScore - a.medianScore)
+  if (!list.length) return null
+
+  const anyApproved = list.some(e => e.approved > 0)
+  const chip = (a) => a.suitable
+    ? 'bg-green-500/20 text-green-300 border-green-500/40'
+    : a.verdict === 'CUIDADO'
+    ? 'bg-yellow-500/10 text-yellow-300 border-yellow-500/25'
+    : 'bg-red-500/10 text-red-300/80 border-red-500/20'
+
+  return (
+    <div className="card p-4 mb-4">
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <span className="text-sm font-bold">Consistência entre ativos</span>
+        <span className="text-[11px] text-muted">aprovada = INICIAR com robustez aprovada · consistente = em {CONSISTENT_MIN_ASSETS}+ ativos</span>
+      </div>
+      {!anyApproved && (
+        <p className="text-xs text-yellow-300/90 mb-2">
+          Nenhuma estratégia passou nos critérios em nenhum dos ativos. É o resultado mais comum e o mais honesto.
+        </p>
+      )}
+      <div className="space-y-1.5 max-h-72 overflow-y-auto">
+        {list.slice(0, 15).map(e => (
+          <div key={e.id} className="flex flex-wrap items-center gap-2 text-xs">
+            <span className="font-mono font-bold w-14 shrink-0">{e.id}</span>
+            <span className={`w-28 shrink-0 ${e.approved >= CONSISTENT_MIN_ASSETS ? 'text-green-300 font-bold' : e.approved > 0 ? 'text-white' : 'text-muted'}`}>
+              {e.approved} de {e.assets.length} ativos{e.approved >= CONSISTENT_MIN_ASSETS ? ' · consistente' : ''}
+            </span>
+            <span className="text-muted w-20 shrink-0">nota med. {e.medianScore.toFixed(2)}</span>
+            <span className="flex flex-wrap gap-1">
+              {e.assets.map(a => (
+                <span key={a.symbol} title={`${a.symbol}: ${a.verdict} (nota ${Number(a.score).toFixed(2)})${a.suitable ? ' · robustez aprovada' : ''}`}
+                  className={`px-1.5 py-0.5 rounded border font-mono text-[10px] ${chip(a)}`}>
+                  {a.symbol.replace('-USDT', '')}{a.suitable ? ' ✔' : ''}
+                </span>
+              ))}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 function resultKey(r, fallbackSymbol = '') {
@@ -346,6 +418,12 @@ export default function BatchBacktest() {
   const { data: bots = [] }       = useQuery({ queryKey: ['bots'],       queryFn: getBots       })
 
   const usedSymbols = new Set(bots.map(b => b.symbol))
+  const isAllAssets = symbol === ALL_ASSETS
+  const freeAssets = SYMBOLS.filter(s => !usedSymbols.has(s))          // ativos sem bot (os únicos que dá para operar)
+  const comboForbidden = category === 'ALL' && isAllAssets             // demora demais: proibido
+  const estimateMin = isAllAssets && category !== 'ALL'
+    ? Math.max(1, Math.round(((strategyCounts[category] || 0) * freeAssets.length * SECONDS_PER_STRATEGY) / 60))
+    : null
   const usedStrategies = Array.from(new Set(bots.map(b => b.strategy_id)))
   const selectedList = Object.values(selectedRows)
 
@@ -392,46 +470,56 @@ export default function BatchBacktest() {
     setBulkMessage(null)
     setError(null)
     try {
-      const categoriesToScan = category === 'ALL'
+      if (category === 'ALL' && symbol === ALL_ASSETS) {
+        throw new Error('Todas as categorias + Todos os ativos não é permitido (levaria horas). Escolha uma categoria ou um ativo.')
+      }
+      const assetMode = symbol === ALL_ASSETS
+      // unidade de scan: um ativo (modo "Todos os ativos") ou uma categoria (modo "Todas as categorias")
+      const categoriesToScan = assetMode
+        ? freeAssets
+        : category === 'ALL'
         ? CATEGORIES.map(c => c.id).filter(cat => (strategyCounts[cat] || 0) > 0)
         : [category]
       if (!categoriesToScan.length) {
-        throw new Error('Nenhuma estratégia elegível para escanear.')
+        throw new Error(assetMode ? 'Nenhum ativo livre (sem bot) para escanear.' : 'Nenhuma estratégia elegível para escanear.')
       }
       setScanProgress({
         total: categoriesToScan.length,
         completed: 0,
         current: null,
         startedAt: scanStartedAt,
+        unitKind: assetMode ? 'asset' : 'category',
         items: categoriesToScan.map(cat => ({ id: cat, status: 'pending', resultCount: 0, error: '', startedAt: null, finishedAt: null })),
       })
       const merged = []
       const failedCategories = []
       let stopInfo = null
 
-      for (const cat of categoriesToScan) {
-        setCategoryProgress(cat, 'running', { error: '' })
+      for (const unit of categoriesToScan) {
+        const cat = assetMode ? category : unit        // categoria da requisição
+        const sym = assetMode ? unit : symbol          // ativo da requisição
+        setCategoryProgress(unit, 'running', { error: '' })
         const scan = await requestCategoryScan(
-          { category: cat, symbol, exclude_strategies: usedStrategies, strict: true, ...(stopWhenSuitable ? { stop_when_suitable: true } : {}) },
+          { category: cat, symbol: sym, exclude_strategies: usedStrategies, strict: true, ...(stopWhenSuitable ? { stop_when_suitable: true } : {}) },
           3,
         )
         if (!scan.ok) {
           const message = scan.message
-          setCategoryProgress(cat, 'failed', { error: message })
-          if (category === 'ALL') {
-            failedCategories.push(`${cat}: ${message}`)
+          setCategoryProgress(unit, 'failed', { error: message })
+          if (categoriesToScan.length > 1) {
+            failedCategories.push(`${unit}: ${message}`)
             continue
           }
           throw new Error(message)
         }
         const data = scan.data
-        setCategoryProgress(cat, 'done', { resultCount: (data.results || []).length })
-        merged.push(...(data.results || []).map(r => ({ ...r, category: cat, symbol })))
+        setCategoryProgress(unit, 'done', { resultCount: (data.results || []).length })
+        merged.push(...(data.results || []).map(r => ({ ...r, category: cat, symbol: sym })))
         if (stopWhenSuitable) {
           const hit = (data.results || []).filter(isSuitableToStart)
             .sort((a, b) => (b.recommendation?.score ?? 0) - (a.recommendation?.score ?? 0))[0]
           if (hit) {
-            stopInfo = { strategy: hit.strategy_id, score: hit.recommendation.score, category: cat, skipped: data.skipped || 0 }
+            stopInfo = { strategy: hit.strategy_id, score: hit.recommendation.score, category: cat, symbol: sym, skipped: data.skipped || 0 }
             // categorias que ainda não rodaram ficam marcadas como ignoradas
             setScanProgress(prev => {
               if (!prev) return prev
@@ -444,11 +532,13 @@ export default function BatchBacktest() {
         }
       }
       if (!merged.length && failedCategories.length) {
-        throw new Error(`Nenhuma categoria retornou resultado. ${failedCategories.join(' | ')}`)
+        throw new Error(`Nenhum resultado retornado. ${failedCategories.join(' | ')}`)
       }
       setResults({
         category,
-        symbol,
+        symbol: assetMode ? ALL_ASSETS : symbol,
+        multiAsset: assetMode,
+        assetCount: categoriesToScan.length,
         failedCategories,
         stopInfo,
         total: merged.length,
@@ -593,10 +683,15 @@ export default function BatchBacktest() {
           <label className="text-xs text-muted uppercase tracking-wider mb-2 block">Categoria</label>
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
             <button
-              onClick={() => setCategory('ALL')}
-              title="Executa todas as categorias disponíveis para o ativo selecionado"
+              onClick={() => !isAllAssets && setCategory('ALL')}
+              disabled={isAllAssets}
+              title={isAllAssets
+                ? 'Não combina com "Todos os ativos" (levaria horas). Escolha um ativo para usar todas as categorias.'
+                : 'Executa todas as categorias disponíveis para o ativo selecionado'}
               className={`px-3 py-2 rounded-lg text-sm font-bold border transition-all ${
-                category === 'ALL'
+                isAllAssets
+                  ? 'opacity-35 cursor-not-allowed bg-white/3 border-white/8 text-muted'
+                  : category === 'ALL'
                   ? 'bg-accent/20 border-accent/50 text-accent'
                   : 'bg-white/5 border-white/10 text-muted hover:text-white hover:border-white/20'
               }`}
@@ -674,13 +769,40 @@ export default function BatchBacktest() {
                   </button>
                 )
               })}
+              <button
+                onClick={() => setSymbol(ALL_ASSETS)}
+                disabled={category === 'ALL' || !freeAssets.length}
+                title={category === 'ALL'
+                  ? 'Não combina com "Todas as categorias" (levaria horas). Escolha uma categoria específica.'
+                  : `Roda a categoria em ${freeAssets.length} ativos sem bot e compara a consistência entre eles`}
+                className={`px-2.5 py-1 rounded text-xs font-bold border transition-all ${
+                  category === 'ALL' || !freeAssets.length
+                    ? 'opacity-35 cursor-not-allowed bg-white/3 border-white/8 text-muted'
+                    : isAllAssets
+                    ? 'bg-accent/20 border-accent/50 text-accent'
+                    : 'bg-white/5 border-white/10 text-muted hover:text-white'
+                }`}
+              >
+                Todos os ativos ({freeAssets.length})
+              </button>
               <input
-                value={SYMBOLS.includes(symbol) ? '' : symbol}
+                value={SYMBOLS.includes(symbol) || isAllAssets ? '' : symbol}
                 onChange={e => setSymbol(e.target.value.toUpperCase())}
                 placeholder="Outro (ex: LINK-USDT)"
                 className="px-2.5 py-1 rounded text-xs font-mono bg-white/5 border border-white/10 text-white placeholder-muted focus:outline-none focus:border-accent/50 w-36"
               />
             </div>
+            {comboForbidden && (
+              <p className="text-[11px] text-red-300 mt-1.5">
+                Todas as categorias + Todos os ativos não é permitido (levaria horas). Escolha uma categoria ou um ativo.
+              </p>
+            )}
+            {isAllAssets && !comboForbidden && (
+              <p className="text-[11px] text-muted mt-1.5">
+                {category} em {freeAssets.length} ativos sem bot ({freeAssets.map(a => a.replace('-USDT', '')).join(', ')}).
+                {estimateMin != null && ` Estimativa grosseira: ~${estimateMin} min (referência de ${SECONDS_PER_STRATEGY} s por estratégia).`}
+              </p>
+            )}
           </div>
 
           <label className="flex items-start gap-2 text-sm text-white/80 cursor-pointer select-none">
@@ -701,14 +823,14 @@ export default function BatchBacktest() {
 
           <button
             onClick={run}
-            disabled={loading || !symbol}
+            disabled={loading || !symbol || comboForbidden || (isAllAssets && !freeAssets.length)}
             className="btn flex items-center gap-2 bg-accent text-black font-bold hover:bg-accent/90 shadow-[0_0_20px_rgba(var(--accent-rgb),0.3)] disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading
               ? <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
               : <Play size={15} />
             }
-            {loading ? 'Executando…' : category === 'ALL' ? 'Executar Todas as Categorias' : 'Executar Backtest da Categoria'}
+            {loading ? 'Executando…' : isAllAssets ? `Executar ${category} em Todos os Ativos` : category === 'ALL' ? 'Executar Todas as Categorias' : 'Executar Backtest da Categoria'}
           </button>
         </div>
       </div>
@@ -723,7 +845,7 @@ export default function BatchBacktest() {
         <div className="card p-5 mb-6 space-y-4">
           <div className="flex items-center gap-2 text-muted">
             <div className="w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-            <p className="text-sm">Executando backtest para {category === 'ALL' ? 'todas as categorias' : `todas as estratégias ${category}`}…</p>
+            <p className="text-sm">Executando backtest para {isAllAssets ? `a categoria ${category} em ${freeAssets.length} ativos` : category === 'ALL' ? 'todas as categorias' : `todas as estratégias ${category}`}…</p>
           </div>
           <p className="text-xs text-muted">Isso pode levar alguns segundos</p>
 
@@ -791,20 +913,20 @@ export default function BatchBacktest() {
         <>
           {results.stopInfo && (
             <div className="mb-4 rounded-lg border border-green-500/30 bg-green-500/10 p-3 text-sm text-green-300">
-              Scan interrompido: {results.stopInfo.strategy} (categoria {results.stopInfo.category}, nota {Number(results.stopInfo.score).toFixed(2)}) está adequada para iniciar: veredito INICIAR com robustez aprovada.
+              Scan interrompido: {results.stopInfo.strategy} ({results.multiAsset ? `${results.stopInfo.symbol}, ` : ''}categoria {results.stopInfo.category}, nota {Number(results.stopInfo.score).toFixed(2)}) está adequada para iniciar: veredito INICIAR com robustez aprovada.
               {results.stopInfo.skipped > 0 && ` ${results.stopInfo.skipped} estratégia(s) dessa categoria não chegaram a rodar.`}
-              {' '}As demais categorias não foram escaneadas.
+              {' '}{results.multiAsset ? 'Os demais ativos' : 'As demais categorias'} não foram escaneados.
             </div>
           )}
 
           {results.failedCategories?.length > 0 && (
             <div className="mb-4 rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3 text-sm text-yellow-300">
-              Algumas categorias falharam e foram ignoradas: {results.failedCategories.join(' | ')}
+              {results.multiAsset ? 'Alguns ativos falharam' : 'Algumas categorias falharam'} e foram ignorados: {results.failedCategories.join(' | ')}
             </div>
           )}
 
           <div className="flex flex-wrap items-center gap-3 mb-4">
-            <span className="text-sm text-muted">{results.total} estratégias · {results.symbol}</span>
+            <span className="text-sm text-muted">{results.total} estratégias · {results.multiAsset ? `${results.assetCount} ativos` : results.symbol}</span>
             {lastScanMs != null && (
               <span className="flex items-center gap-1 text-xs text-muted" title="Duração total do último scan">
                 <Clock size={12} /> {formatElapsed(lastScanMs)}
@@ -867,6 +989,8 @@ export default function BatchBacktest() {
               </span>
             )}
           </div>
+
+          {results.multiAsset && <AssetConsistency rows={results.results} />}
 
           <div className="space-y-3">
             {results.results.map(r => {
