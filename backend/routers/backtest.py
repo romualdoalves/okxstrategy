@@ -11,14 +11,14 @@ from datetime import timezone
 
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from fastapi import HTTPException
 
 from ..database import HistoricCandleModel, SessionLocal
 from ..backtest_engine import BacktestEngine, backtest_recommendation
 from ..backtest_worker import run_strict_async
 from ..market_data_service import HISTORY_TARGET_CANDLES
-from ..verdict_gate import SCORE_CAP_WITHOUT_ROBUSTNESS, robustness_gate
+from ..verdict_gate import SCORE_CAP_WITHOUT_ROBUSTNESS, is_suitable_to_start, robustness_gate
 from ..predictive_scoring import PredictiveScoringService
 from ..exchanges.factory import build_exchange, map_timeframe_for_history
 from ..common import market_data_svc
@@ -32,18 +32,19 @@ class CategoryBacktestRequest(BaseModel):
     symbol: str
     exclude_strategies: list[str] = []
     strict: bool = True
-    # Se definido, o scan da categoria para assim que uma estratégia atingir esta nota (as demais
-    # que ainda não começaram são canceladas e não aparecem no resultado).
-    stop_at_score: Optional[float] = Field(default=None, ge=0, le=10)
+    # Se verdadeiro, o scan da categoria para assim que uma estratégia for "adequada para iniciar"
+    # (veredito INICIAR com robustez aprovada); as demais que ainda não começaram são canceladas.
+    stop_when_suitable: bool = False
 
 
-async def gather_until_score(tasks: list, stop_at_score: Optional[float]) -> tuple[list[dict], Optional[str], int]:
+async def gather_until_suitable(tasks: list, stop_when_suitable: bool) -> tuple[list[dict], Optional[str], int]:
     """
-    Aguarda os backtests. Sem `stop_at_score`, espera todos (como antes). Com ele, devolve assim que um
-    resultado tiver nota >= o limiar, cancela os que ainda não terminaram e conta quantos foram pulados.
+    Aguarda os backtests. Sem `stop_when_suitable`, espera todos (como antes). Com ele, devolve assim que um
+    resultado for adequado para iniciar (ver verdict_gate.is_suitable_to_start), cancela os que ainda não
+    terminaram e conta quantos foram pulados.
     Retorna (resultados, strategy_id que disparou a parada ou None, nº de estratégias puladas).
     """
-    if stop_at_score is None:
+    if not stop_when_suitable:
         return list(await asyncio.gather(*tasks)), None, 0
 
     futures = [asyncio.ensure_future(t) for t in tasks]
@@ -53,8 +54,7 @@ async def gather_until_score(tasks: list, stop_at_score: Optional[float]) -> tup
         for finished in asyncio.as_completed(futures):
             result = await finished
             results.append(result)
-            score = (result.get("recommendation") or {}).get("score")
-            if score is not None and score >= stop_at_score:
+            if is_suitable_to_start(result):
                 stopped_by = result.get("strategy_id")
                 break
     finally:
@@ -171,7 +171,7 @@ async def run_category_backtest(req: CategoryBacktestRequest):
         symbol=req.symbol,
         exclude_strategies=req.exclude_strategies,
         strict=req.strict,
-        stop_at_score=req.stop_at_score,
+        stop_when_suitable=req.stop_when_suitable,
     )
 
 async def _run_category_backtest_core(
@@ -179,7 +179,7 @@ async def _run_category_backtest_core(
     symbol: str,
     exclude_strategies: list[str] | None = None,
     strict: bool = True,
-    stop_at_score: Optional[float] = None,
+    stop_when_suitable: bool = False,
 ) -> dict:
     """
     Núcleo do backtest de categoria, usado pelo endpoint HTTP (/api/backtest/category).
@@ -366,7 +366,7 @@ async def _run_category_backtest_core(
             }}
 
     tasks = [_run(sid, tf) for tf, sids in tf_groups.items() for sid in sids]
-    results, stopped_by, skipped = await gather_until_score(tasks, stop_at_score)
+    results, stopped_by, skipped = await gather_until_suitable(tasks, stop_when_suitable)
 
     # Acrescenta entradas N/A para estratégias com contexto externo
     for sid in na_ids:

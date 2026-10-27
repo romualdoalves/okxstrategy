@@ -105,7 +105,11 @@ function formatElapsed(ms) {
   return h ? `${h}:${mm}:${ss}` : `${mm}:${ss}`
 }
 
-const STOP_SCORE = 9.0
+// "Adequada para iniciar": veredito INICIAR com a robustez aprovada (>= 30 trades e fora da amostra positivo).
+function isSuitableToStart(r) {
+  const rec = r?.recommendation
+  return rec?.verdict === 'INICIAR' && !!rec?.robust_gate?.applied && !!rec?.robust_gate?.passed
+}
 
 function resultKey(r, fallbackSymbol = '') {
   return `${r.strategy_id}:${r.symbol || fallbackSymbol}`
@@ -336,7 +340,7 @@ export default function BatchBacktest() {
   const [scanProgress, setScanProgress] = useState(null)
   const [now, setNow] = useState(Date.now())   // relógio do temporizador (atualiza 1x/s durante o scan)
   const [lastScanMs, setLastScanMs] = useState(null)
-  const [stopAtNine, setStopAtNine] = useState(false)   // parar assim que achar nota >= STOP_SCORE
+  const [stopWhenSuitable, setStopWhenSuitable] = useState(false)   // parar na 1ª estratégia adequada para iniciar
 
   const { data: strategies = [] } = useQuery({ queryKey: ['strategies'], queryFn: getStrategies })
   const { data: bots = [] }       = useQuery({ queryKey: ['bots'],       queryFn: getBots       })
@@ -408,7 +412,7 @@ export default function BatchBacktest() {
       for (const cat of categoriesToScan) {
         setCategoryProgress(cat, 'running', { error: '' })
         const scan = await requestCategoryScan(
-          { category: cat, symbol, exclude_strategies: usedStrategies, strict: true, ...(stopAtNine ? { stop_at_score: STOP_SCORE } : {}) },
+          { category: cat, symbol, exclude_strategies: usedStrategies, strict: true, ...(stopWhenSuitable ? { stop_when_suitable: true } : {}) },
           3,
         )
         if (!scan.ok) {
@@ -423,8 +427,8 @@ export default function BatchBacktest() {
         const data = scan.data
         setCategoryProgress(cat, 'done', { resultCount: (data.results || []).length })
         merged.push(...(data.results || []).map(r => ({ ...r, category: cat, symbol })))
-        if (stopAtNine) {
-          const hit = (data.results || []).filter(r => (r.recommendation?.score ?? 0) >= STOP_SCORE)
+        if (stopWhenSuitable) {
+          const hit = (data.results || []).filter(isSuitableToStart)
             .sort((a, b) => (b.recommendation?.score ?? 0) - (a.recommendation?.score ?? 0))[0]
           if (hit) {
             stopInfo = { strategy: hit.strategy_id, score: hit.recommendation.score, category: cat, skipped: data.skipped || 0 }
@@ -682,15 +686,15 @@ export default function BatchBacktest() {
           <label className="flex items-start gap-2 text-sm text-white/80 cursor-pointer select-none">
             <input
               type="checkbox"
-              checked={stopAtNine}
-              onChange={e => setStopAtNine(e.target.checked)}
+              checked={stopWhenSuitable}
+              onChange={e => setStopWhenSuitable(e.target.checked)}
               disabled={loading}
               className="mt-0.5 accent-[rgb(var(--accent-rgb))]"
             />
             <span>
-              Parar assim que encontrar uma estratégia com nota ≥ {STOP_SCORE.toFixed(1)}
+              Parar assim que encontrar uma estratégia adequada para iniciar.
               <span className="block text-[11px] text-muted">
-                Interrompe o scan no primeiro resultado que atingir a nota (as estratégias e categorias restantes não rodam).
+                Adequada = veredito INICIAR com robustez aprovada (≥ 30 trades e fora da amostra positivo). Se nenhuma atender, o scan roda por inteiro.
               </span>
             </span>
           </label>
@@ -761,7 +765,7 @@ export default function BatchBacktest() {
                               {formatElapsed((item.finishedAt || now) - item.startedAt)}
                             </span>
                           )}
-                          <span>{isDone ? `Concluida (${item.resultCount})` : isFailed ? 'Falhou' : isSkipped ? 'Ignorada (nota alvo atingida)' : isRunning ? 'Executando' : 'Pendente'}</span>
+                          <span>{isDone ? `Concluida (${item.resultCount})` : isFailed ? 'Falhou' : isSkipped ? 'Ignorada (estratégia adequada encontrada)' : isRunning ? 'Executando' : 'Pendente'}</span>
                         </div>
                       </div>
                       <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
@@ -787,7 +791,7 @@ export default function BatchBacktest() {
         <>
           {results.stopInfo && (
             <div className="mb-4 rounded-lg border border-green-500/30 bg-green-500/10 p-3 text-sm text-green-300">
-              Scan interrompido: {results.stopInfo.strategy} atingiu nota {Number(results.stopInfo.score).toFixed(2)} (≥ {STOP_SCORE.toFixed(1)}) na categoria {results.stopInfo.category}.
+              Scan interrompido: {results.stopInfo.strategy} (categoria {results.stopInfo.category}, nota {Number(results.stopInfo.score).toFixed(2)}) está adequada para iniciar: veredito INICIAR com robustez aprovada.
               {results.stopInfo.skipped > 0 && ` ${results.stopInfo.skipped} estratégia(s) dessa categoria não chegaram a rodar.`}
               {' '}As demais categorias não foram escaneadas.
             </div>

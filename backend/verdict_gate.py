@@ -17,6 +17,16 @@ from .backtest_stats import MIN_OOS_TRADES, MIN_TRADES_START
 SCORE_CAP_WITHOUT_ROBUSTNESS = 6.66   # logo abaixo do limiar de INICIAR (6,67)
 
 
+def is_suitable_to_start(result: dict) -> bool:
+    """
+    Estratégia "adequada para iniciar": veredito INICIAR **e** robustez aprovada (>= 30 trades e fora da
+    amostra positivo). Sem o bloco de robustez (backtest clássico) nunca é considerada adequada.
+    """
+    rec = result.get("recommendation") or {}
+    gate = rec.get("robust_gate") or {}
+    return rec.get("verdict") == "INICIAR" and bool(gate.get("applied")) and bool(gate.get("passed"))
+
+
 def robustness_gate(robust: Optional[dict]) -> dict:
     """Retorna {"applied": bool, "passed": bool, "failed": [motivos]}. Sem bloco `robust`, não se aplica."""
     if not robust or not robust.get("all"):
