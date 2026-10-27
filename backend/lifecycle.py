@@ -11,6 +11,7 @@ import logging
 
 from .backtest_worker import shutdown_pool as shutdown_backtest_pool
 from .bot_manager import manager
+from .candle_store import purge_misaligned_series
 from .common import market_data_svc
 from .database import BotModel, SessionLocal, create_tables
 from .feeds.economic_calendar import calendar_feed
@@ -46,6 +47,13 @@ async def startup():
     from .crypto_utils import rotate_secrets
     with SessionLocal() as _db:
         rotate_secrets(_db)
+
+    # Séries de candles gravadas com timeframe errado (defeito antigo: 1h/4h vinham como 15m) são apagadas
+    # e o sync de mercado as baixa de novo, corretas.
+    with SessionLocal() as _db:
+        purged = purge_misaligned_series(_db)
+        if purged:
+            log.warning("Candles com timeframe incorreto removidos: %s", ", ".join(f"{s}/{t}" for s, t, _ in purged))
 
     # Inicia o feed do calendário económico do provider atual, se configurado
     await calendar_feed.start()

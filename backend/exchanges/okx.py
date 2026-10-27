@@ -128,8 +128,26 @@ _TF_MAP = {
 _TF_MAP_INV = {v: k for k, v in _TF_MAP.items()}
 
 
+_OKX_BARS = set(_TF_MAP.values())
+
+
 def _tf_to_okx(tf: str) -> str:
-    return _TF_MAP.get(tf, "15m")
+    """
+    Aceita o timeframe interno ("1h", "4h") OU o código da OKX ("1H", "4H"); os dois chegam aqui porque
+    map_timeframe_for_history() devolve o código da OKX. Timeframe desconhecido gera erro: antes caía em
+    "15m" em silêncio e a função devolvia candles de 15m no lugar de 1h/2h/4h/6h/12h.
+    """
+    if tf in _TF_MAP:
+        return _TF_MAP[tf]
+    if tf in _OKX_BARS:
+        return tf
+    if isinstance(tf, str):
+        for variant in (tf.lower(), tf.upper()):
+            if variant in _TF_MAP:
+                return _TF_MAP[variant]
+            if variant in _OKX_BARS:
+                return variant
+    raise ValueError(f"Timeframe desconhecido para a OKX: {tf!r}")
 
 
 def _parse_candle(row: list) -> CandleBar:

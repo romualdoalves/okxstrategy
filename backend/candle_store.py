@@ -48,6 +48,26 @@ def timeframe_ms(timeframe: str) -> Optional[int]:
     return _TF_MS.get((timeframe or "").strip().lower())
 
 
+SPACING_TOLERANCE = 0.01
+_SPACING_SAMPLE = 200
+
+
+def observed_step_ms(epochs: list[int]) -> Optional[int]:
+    """Espaçamento típico (mediana) entre candles consecutivos, em ms; None se houver poucos candles."""
+    ordered = sorted(epochs)[-_SPACING_SAMPLE:]
+    diffs = sorted(b - a for a, b in zip(ordered, ordered[1:]))
+    return diffs[len(diffs) // 2] if len(diffs) >= 2 else None
+
+
+def spacing_matches(epochs: list[int], timeframe: str) -> bool:
+    """True se o espaçamento dos candles corresponde ao timeframe (ou se não dá para saber)."""
+    expected = timeframe_ms(timeframe)
+    observed = observed_step_ms(epochs)
+    if expected is None or observed is None:
+        return True
+    return abs(observed - expected) <= expected * SPACING_TOLERANCE
+
+
 def _to_dt(ms: int) -> datetime:
     return datetime.fromtimestamp(int(ms) / 1000, tz=timezone.utc).replace(tzinfo=None)
 
@@ -87,6 +107,12 @@ def upsert_candles(db: Session, symbol: str, timeframe: str, candles: list) -> i
     """Grava (ou atualiza) candles; idempotente. Retorna quantos candles foram enviados ao banco."""
     if not candles:
         return 0
+    if not spacing_matches([int(c.epoch) for c in candles], timeframe):
+        got = observed_step_ms([int(c.epoch) for c in candles])
+        raise ValueError(
+            f"Candles recusados para {symbol}/{timeframe}: espaçamento de {(got or 0) / 60000:g} min não "
+            f"corresponde ao timeframe (esperado {(timeframe_ms(timeframe) or 0) / 60000:g} min)."
+        )
     dialect = db.get_bind().dialect.name
     insert = postgresql.insert if dialect == "postgresql" else sqlite.insert
     records = [
@@ -103,6 +129,35 @@ def upsert_candles(db: Session, symbol: str, timeframe: str, candles: list) -> i
         db.execute(stmt)
     db.commit()
     return len(records)
+
+
+def purge_misaligned_series(db: Session) -> list[tuple[str, str, float]]:
+    """
+    Apaga séries cujo espaçamento não corresponde ao timeframe rotulado (ex.: candles de 15m gravados como
+    1h por um defeito antigo no mapeamento de timeframe). O sync as baixa de novo, corretas.
+    Retorna [(símbolo, timeframe, espaçamento observado em minutos)].
+    """
+    purged: list[tuple[str, str, float]] = []
+    series = db.query(HistoricCandleModel.symbol, HistoricCandleModel.timeframe).distinct().all()
+    for symbol, timeframe in series:
+        if timeframe_ms(timeframe) is None:
+            continue
+        rows = (
+            db.query(HistoricCandleModel.epoch)
+            .filter(HistoricCandleModel.symbol == symbol, HistoricCandleModel.timeframe == timeframe)
+            .order_by(HistoricCandleModel.epoch.desc()).limit(_SPACING_SAMPLE + 1).all()
+        )
+        epochs = [_to_ms(r[0]) for r in rows]
+        if len(epochs) >= 3 and not spacing_matches(epochs, timeframe):
+            observed = observed_step_ms(epochs) or 0
+            db.query(HistoricCandleModel).filter(
+                HistoricCandleModel.symbol == symbol, HistoricCandleModel.timeframe == timeframe
+            ).delete(synchronize_session=False)
+            db.commit()
+            purged.append((symbol, timeframe, observed / 60000))
+            log.warning("Série %s/%s apagada: espaçamento de %g min não corresponde ao timeframe.",
+                        symbol, timeframe, observed / 60000)
+    return purged
 
 
 async def ensure_history(db: Session, ex, symbol: str, timeframe: str, bar: str,

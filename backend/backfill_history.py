@@ -26,7 +26,7 @@ try:   # o .env precisa ser carregado ANTES de importar o banco (lê DATABASE_UR
 except ImportError:
     pass
 
-from .candle_store import ensure_history, history_target  # noqa: E402
+from .candle_store import ensure_history, history_target, purge_misaligned_series  # noqa: E402
 from .exchanges.factory import map_timeframe_for_history  # noqa: E402
 
 ALLOWED = {"1m", "3m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "12h", "1D", "1W"}
@@ -78,6 +78,9 @@ def main(argv: list[str] | None = None) -> int:
 
     create_tables()
     with SessionLocal() as db:
+        purged = purge_misaligned_series(db)          # séries com timeframe errado são refeitas
+        for symbol, tf, minutes in purged:
+            print(f"  série {symbol}/{tf} apagada: espaçamento de {minutes:g} min não corresponde ao timeframe")
         pairs = _pairs_from_args(args, db)
         if not pairs:
             print("nada para fazer (nenhum par símbolo/timeframe).")

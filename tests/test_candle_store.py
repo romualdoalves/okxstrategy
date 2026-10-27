@@ -13,6 +13,13 @@ SYMBOL, TF, BAR = "BTC-USDT", "1h", "1H"
 STEP = 3_600_000
 
 
+def series_every(n, step_ms, end_ms=None):
+    """n candles espaçados de step_ms (ex.: 4h), em ordem cronológica."""
+    end = end_ms if end_ms is not None else (int(time.time() * 1000) // step_ms) * step_ms
+    return [CandleBar(epoch=end - (n - 1 - i) * step_ms, open=100, high=101, low=99, close=100.5, volume=10.0)
+            for i in range(n)]
+
+
 def series(n, end_ms=None):
     """n candles de 1h terminando em end_ms (ou na última hora cheia), em ordem cronológica."""
     end = end_ms if end_ms is not None else (int(time.time() * 1000) // STEP) * STEP
@@ -139,7 +146,7 @@ class TestStoreBasics(Base):
     def test_series_are_isolated_by_symbol_and_timeframe(self):
         cs.upsert_candles(self.db, "BTC-USDT", "1h", series(10))
         cs.upsert_candles(self.db, "ETH-USDT", "1h", series(7))
-        cs.upsert_candles(self.db, "BTC-USDT", "4h", series(5))
+        cs.upsert_candles(self.db, "BTC-USDT", "4h", series_every(5, 4 * STEP))
         self.assertEqual([cs.coverage(self.db, s, t)["count"] for s, t in
                           (("BTC-USDT", "1h"), ("ETH-USDT", "1h"), ("BTC-USDT", "4h"), ("SOL-USDT", "1h"))], [10, 7, 5, 0])
 
