@@ -54,6 +54,14 @@ for id in ${IDS}; do
     fi
 done
 
+# 2b) Arquivos já copiados numa execução anterior, mas ainda sem commit (ex.: o push falhou por falta de credencial).
+cd "${DEPLOY_DIR}"
+while IFS= read -r f; do
+    b="$(basename "$f")"
+    [[ "$b" =~ $PATTERN ]] || continue
+    case " ${NEW[*]:-} " in *" ${b} "*) ;; *) NEW+=("${b}"); echo "[+] ${b}  (já copiado, sem commit)";; esac
+done < <(git ls-files --others --exclude-standard -- backend/strategies/factory)
+
 if [ ${#NEW[@]} -eq 0 ]; then
     echo "Nada a migrar: todas as estratégias já estão no repositório."
     exit 0
@@ -63,7 +71,6 @@ echo
 echo "${#NEW[@]} arquivo(s) copiado(s) para ${DEST}."
 
 # 3) Commit + push (precisa de credencial de escrita no GitHub; se não houver, deixa os arquivos prontos).
-cd "${DEPLOY_DIR}"
 git add -- "${NEW[@]/#/backend/strategies/factory/}"
 if git -c user.name="VPS migrate" -c user.email="vps@okx-strategy.local" \
        commit -q -m "Migrate Factory strategies from the VPS into git (single source of truth): ${NEW[*]}" \
