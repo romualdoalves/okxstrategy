@@ -18,8 +18,8 @@ WORKDIR /app
 
 RUN groupadd --system app && useradd --system --gid app --home-dir /app app
 
-COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements.txt requirements.lock.txt ./
+RUN pip install --no-cache-dir -r requirements.txt -c requirements.lock.txt
 
 COPY .git/ ./.git/
 COPY backend/ ./backend/

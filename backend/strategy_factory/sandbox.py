@@ -48,10 +48,13 @@ def run_in_sandbox(code: str, plan: dict) -> dict:
     payload = json.dumps({"code": code, "plan": plan, "root": _PROJECT_ROOT})
     try:
         with tempfile.TemporaryDirectory(prefix="okx_sandbox_") as workdir:
+            env = _child_env()
+            # numba (usado pelo pandas_ta) grava cache de compilação; mantém tudo na pasta temporária.
+            env["NUMBA_CACHE_DIR"] = os.path.join(workdir, "numba_cache")
             proc = subprocess.run(
                 [sys.executable, *_PY_FLAGS, _RUNNER],
                 input=payload, capture_output=True, text=True, encoding="utf-8",
-                timeout=TIMEOUT_SECONDS, cwd=workdir, env=_child_env(),
+                timeout=TIMEOUT_SECONDS, cwd=workdir, env=env,
                 preexec_fn=_limit_memory if os.name == "posix" else None,
             )
     except subprocess.TimeoutExpired:
