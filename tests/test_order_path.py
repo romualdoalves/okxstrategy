@@ -13,6 +13,8 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from backend import bot_manager, risk
+from backend.bot import accounting, criteria, entry, instance, position, streams
+from backend.bot import manager as manager_module
 from backend.bot_manager import BotInstance
 from backend.database import (
     BotModel, OrderRejectionModel, SettingsModel, SignalLogModel, TradeModel,
@@ -111,10 +113,12 @@ class OrderPathBase(unittest.TestCase):
         for model in (BotModel, TradeModel, SignalLogModel, OrderRejectionModel, SettingsModel):
             model.__table__.create(engine)
         self.Session = sessionmaker(bind=engine)
-        self._patches = [
-            mock.patch.object(bot_manager, "SessionLocal", self.Session),
+        # SessionLocal é importado por valor em cada módulo do bot: troca em todos os que o usam.
+        bot_modules = [m for m in (accounting, criteria, entry, instance, position, streams, manager_module)
+                       if hasattr(m, "SessionLocal")]
+        self._patches = [mock.patch.object(m, "SessionLocal", self.Session) for m in bot_modules] + [
             mock.patch.object(risk, "SessionLocal", self.Session),
-            mock.patch("backend.bot_manager.asyncio.sleep", new=self._fast_sleep),
+            mock.patch("asyncio.sleep", new=self._fast_sleep),
         ]
         for p in self._patches:
             p.start()
