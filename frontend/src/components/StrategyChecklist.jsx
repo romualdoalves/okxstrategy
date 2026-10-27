@@ -840,6 +840,8 @@ export default function StrategyChecklist({ bot, indicators, mode = 'entry', sho
     ? { text: t('sc.waiting'), cls: 'text-muted' }
     : isOrder && orderState?.blocker?.id === 'signal'
     ? { text: 'Aguardando sinal', cls: 'text-yellow-400' }
+    : isOrder && orderState?.blocker?.status === 'grey'
+    ? { text: 'Sinal não aplicável', cls: 'text-muted' }
     : hasRed
     ? { text: t('sc.blocked'), cls: 'text-bear' }
     : allOk

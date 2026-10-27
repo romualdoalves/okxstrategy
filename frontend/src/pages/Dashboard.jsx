@@ -207,7 +207,9 @@ function OpsDiagnosticsPanel({ data, loading, days, setDays }) {
             const Icon = style.icon
             const topHold = bot.top_hold_reasons?.[0]?.reason
             const topRejection = bot.rejections?.top_reasons?.[0]?.reason
-            const reason = topRejection || topHold || bot.detail
+            const reason = bot.verdict === 'blocked' || bot.verdict === 'market'
+              ? bot.detail
+              : topRejection || topHold || bot.detail
             return (
               <div key={bot.bot_id} className={`rounded-lg border p-3 ${style.cls}`}>
                 <div className="flex items-start justify-between gap-3">

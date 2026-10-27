@@ -190,8 +190,9 @@ class OrderGateMixin:
         ok = [c for c in blocking if c.get("status") == "green"]
         blocked = [c for c in blocking if c.get("status") == "red"]
         waiting = [c for c in blocking if c.get("status") == "yellow"]
+        inapplicable = [c for c in blocking if c.get("status") == "grey"]
         ready = bool(blocking) and len(ok) == len(blocking)
-        first_blocker = blocked[0] if blocked else waiting[0] if waiting else None
+        first_blocker = inapplicable[0] if inapplicable else blocked[0] if blocked else waiting[0] if waiting else None
         return {
             "ready": ready,
             "ok": len(ok),
@@ -210,6 +211,11 @@ class OrderGateMixin:
         exchange: BaseExchange | None = None,
         check_exchange_position: bool = False,
     ) -> dict:
+        """
+        Gates de execução (O1–O8). Só cobrem o que a estratégia não sabe: se dá para enviar a
+        ordem com segurança. Sem BUY/SELL, O2–O8 ficam dormentes (status "none").
+        Status "grey" = sinal inaplicável neste mercado (ex.: SELL em spot) — não é falha.
+        """
         signal_value = getattr(getattr(result, "signal", Signal.HOLD), "value", Signal.HOLD.value)
         direction = direction or ("long" if signal_value == Signal.BUY.value else "short" if signal_value == Signal.SELL.value else None)
         symbol_upper = (self.config.symbol or "").upper()
@@ -226,16 +232,13 @@ class OrderGateMixin:
 
         if direction not in ("long", "short"):
             dormant = [
-                ("runtime", "O2 Runtime", self.status.upper(), "Aguardando sinal para validar runtime."),
-                ("circuit_breaker", "O3 Circuit Breaker", "—", "Aguardando sinal para validar circuit breaker."),
-                ("local_flat", "O4 Posição local", "—", "Aguardando sinal para validar posição local."),
-                ("inflight", "O5 Entrada pendente", "—", "Aguardando sinal para validar ordens pendentes."),
-                ("market_direction", "O6 Direção", "—", "Aguardando sinal para validar direção permitida."),
-                ("calendar", "O7 Calendário", "—", "Aguardando sinal para validar janela macro."),
-                ("exchange", "O8 Conexão OKX", "—", "Aguardando sinal para validar conexão OKX."),
-                ("sizing", "O9 Tamanho", "—", "Aguardando sinal para calcular tamanho."),
-                ("risk", "O10 SL/TP", "—", "Aguardando sinal para validar SL/TP."),
-                ("exchange_flat", "O11 Posição OKX", "—", "Será validado imediatamente antes do envio da ordem."),
+                ("runtime", "O2 Execução", self.status.upper(), "Aguardando sinal para validar bot, conexão OKX e posição local."),
+                ("market_direction", "O3 Direção", "—", "Aguardando sinal para validar direção permitida."),
+                ("circuit_breaker", "O4 Circuit Breaker", "—", "Aguardando sinal para validar circuit breaker."),
+                ("calendar", "O5 Calendário", "—", "Aguardando sinal para validar janela macro."),
+                ("sizing", "O6 Tamanho", "—", "Aguardando sinal para calcular tamanho."),
+                ("risk", "O7 SL/TP", "—", "Aguardando sinal para validar SL/TP."),
+                ("exchange_flat", "O8 Posição OKX", "—", "Será validado imediatamente antes do envio da ordem."),
             ]
             for id_, label, value, detail in dormant:
                 items.append(self._criterion(
@@ -252,63 +255,53 @@ class OrderGateMixin:
                 self._hold_reason = packed["reason"]
             return packed
 
+        # O2 — bot em execução, exchange disponível, sem posição local nem entrada em envio
+        if self.status != "running" or self._maintenance:
+            exec_status, exec_value, exec_detail = "red", self.status.upper(), (self._maintenance or "Bot não está em execução.")
+        elif exchange is None:
+            exec_status, exec_value, exec_detail = "red", "SEM EXCHANGE", "Exchange não inicializada."
+        elif self._direction != 0:
+            exec_status, exec_value, exec_detail = "red", "LONG" if self._direction > 0 else "SHORT", "Bot já está em operação."
+        elif self._entry_inflight:
+            exec_status, exec_value, exec_detail = "yellow", "ENVIANDO", "Uma entrada já está sendo enviada."
+        else:
+            exec_status, exec_value, exec_detail = "green", "OK", "Bot em execução, OKX conectada e sem posição local."
         items.append(self._criterion(
             id="runtime",
-            label="O2 Runtime",
-            value=self.status.upper(),
-            status="green" if self.status == "running" and not self._maintenance else "red",
-            detail="Bot em execução e exchange fora de manutenção." if self.status == "running" and not self._maintenance else (self._maintenance or "Bot não está em execução."),
+            label="O2 Execução",
+            value=exec_value,
+            status=exec_status,
+            detail=exec_detail,
         ))
-        items.append(self._criterion(
-            id="circuit_breaker",
-            label="O3 Circuit breaker",
-            value="OK" if not self._halted else "PAUSADO",
-            status="green" if not self._halted else "red",
-            detail="Stop diário não foi atingido." if not self._halted else "Circuit breaker ativo por stop diário.",
-        ))
-        items.append(self._criterion(
-            id="local_flat",
-            label="O4 Posição local",
-            value="FLAT" if self._direction == 0 else ("LONG" if self._direction > 0 else "SHORT"),
-            status="green" if self._direction == 0 else "red",
-            detail="Bot está sem posição local." if self._direction == 0 else "Bot já está em operação.",
-        ))
-        items.append(self._criterion(
-            id="pending_order",
-            label="O5 Ordem pendente",
-            value="LIVRE" if not self._entry_inflight else "ENVIANDO",
-            status="green" if not self._entry_inflight else "yellow",
-            detail="Nenhuma entrada está em envio." if not self._entry_inflight else "Uma entrada já está sendo enviada.",
-        ))
+
         spot_short_blocked = direction == "short" and not is_deriv
         items.append(self._criterion(
             id="market_direction",
-            label="O6 Mercado/direção",
+            label="O3 Direção",
             value="DERIV" if is_deriv else "SPOT",
-            status="red" if spot_short_blocked else "green",
-            detail="Direção permitida para este mercado." if not spot_short_blocked else "Mercado SPOT permite somente entradas compradas.",
+            status="grey" if spot_short_blocked else "green",
+            detail="Direção permitida para este mercado." if not spot_short_blocked else "SELL não se aplica: mercado SPOT permite somente entradas compradas.",
+        ))
+
+        items.append(self._criterion(
+            id="circuit_breaker",
+            label="O4 Circuit breaker",
+            value="OK" if not self._halted else "PAUSADO",
+            status="green" if not self._halted else "red",
+            detail="Stop diário não foi atingido." if not self._halted else "Circuit breaker ativo por stop diário.",
         ))
 
         in_window, event_name = calendar_feed.is_high_impact_window(self.config.strategy_id)
         items.append(self._criterion(
             id="calendar",
-            label="O7 Calendário",
+            label="O5 Calendário",
             value="LIVRE" if not in_window else "BLOQUEADO",
             status="green" if not in_window else "red",
             detail="Fora de janela macro de alto impacto." if not in_window else f"Calendário: {event_name}",
         ))
 
-        exchange_ok = exchange is not None
-        items.append(self._criterion(
-            id="exchange",
-            label="O8 Conexão OKX",
-            value="OK" if exchange_ok else "SEM EXCHANGE",
-            status="green" if exchange_ok else "red",
-            detail="Adaptador OKX disponível para envio." if exchange_ok else "Exchange não inicializada.",
-        ))
-
         sz = 0.0
-        if exchange and direction and price > 0:
+        if exchange and price > 0:
             try:
                 sz = float(exchange.num_contracts(
                     self.config.symbol,
@@ -319,7 +312,7 @@ class OrderGateMixin:
             except Exception as exc:
                 items.append(self._criterion(
                     id="sizing",
-                    label="O9 Tamanho",
+                    label="O6 Tamanho",
                     value="ERRO",
                     status="red",
                     detail=f"Falha ao calcular tamanho da ordem: {exc}",
@@ -327,7 +320,7 @@ class OrderGateMixin:
             else:
                 items.append(self._criterion(
                     id="sizing",
-                    label="O9 Tamanho",
+                    label="O6 Tamanho",
                     value=f"{sz:.6g}",
                     status="green" if sz > 0 else "red",
                     detail="Tamanho da ordem calculado." if sz > 0 else "Tamanho calculado é zero.",
@@ -335,14 +328,13 @@ class OrderGateMixin:
         else:
             items.append(self._criterion(
                 id="sizing",
-                label="O9 Tamanho",
+                label="O6 Tamanho",
                 value="—",
                 status="yellow",
-                detail="Aguardando preço, direção e exchange para calcular tamanho.",
+                detail="Aguardando preço e exchange para calcular tamanho.",
             ))
 
-        risk_ok = False
-        if result and direction and price > 0:
+        if result and price > 0:
             atr = self._get_dynamic_atr(result, price * 0.005)
             sl_px = result.metadata.get("sl_price", price - atr * 1.5 if direction == "long" else price + atr * 1.5)
             tp1_px = result.metadata.get("tp1_price", price * 1.02 if direction == "long" else price * 0.98)
@@ -353,7 +345,7 @@ class OrderGateMixin:
             )
             items.append(self._criterion(
                 id="risk",
-                label="O10 SL/TP",
+                label="O7 SL/TP",
                 value="OK" if risk_ok else "INVÁLIDO",
                 status="green" if risk_ok else "red",
                 detail="Stop Loss e TP1 coerentes com a direção." if risk_ok else "SL/TP inválidos para a direção do sinal.",
@@ -361,27 +353,37 @@ class OrderGateMixin:
         else:
             items.append(self._criterion(
                 id="risk",
-                label="O10 SL/TP",
+                label="O7 SL/TP",
                 value="—",
                 status="yellow",
                 detail="Aguardando sinal para validar SL/TP.",
             ))
 
-        if check_exchange_position and exchange and direction:
+        # O8 — posição OKX *líquida*: em spot, o baseline (holdings do usuário anteriores ao bot)
+        # não conta como posição do bot.
+        if check_exchange_position and exchange:
             try:
                 pos = await exchange.get_position(self.config.symbol)
                 qty = abs(float(getattr(pos, "size", 0.0) or 0.0)) if pos else 0.0
+                baseline = abs(float(getattr(self.config, "baseline_balance", 0.0) or 0.0)) if self._is_spot_symbol(self.config.symbol) else 0.0
+                net = max(0.0, qty - baseline)
+                if net > 1e-9:
+                    o8 = ("ABERTA", "red", f"OKX já possui posição aberta neste ativo (líquido: {net:.8f}).")
+                elif qty > 1e-9:
+                    o8 = ("FLAT", "green", f"Saldo spot {qty:.8f} coberto pelo baseline ({baseline:.8f}) — holdings do usuário ignorados.")
+                else:
+                    o8 = ("FLAT", "green", "OKX sem posição aberta neste ativo.")
                 items.append(self._criterion(
                     id="exchange_flat",
-                    label="O11 Posição OKX",
-                    value="FLAT" if qty <= 0 else "ABERTA",
-                    status="green" if qty <= 0 else "red",
-                    detail="OKX sem posição aberta neste ativo." if qty <= 0 else "OKX já possui posição aberta neste ativo.",
+                    label="O8 Posição OKX",
+                    value=o8[0],
+                    status=o8[1],
+                    detail=o8[2],
                 ))
             except Exception as exc:
                 items.append(self._criterion(
                     id="exchange_flat",
-                    label="O11 Posição OKX",
+                    label="O8 Posição OKX",
                     value="ERRO",
                     status="red",
                     detail=f"Falha ao validar posição na OKX: {exc}",
@@ -389,9 +391,9 @@ class OrderGateMixin:
         else:
             items.append(self._criterion(
                 id="exchange_flat",
-                label="O11 Posição OKX",
+                label="O8 Posição OKX",
                 value="—",
-                status="yellow" if direction else "none",
+                status="yellow",
                 detail="Será validado imediatamente antes do envio da ordem.",
             ))
 

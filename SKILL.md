@@ -386,11 +386,17 @@ Migrations adicionais são executadas via lista `migrations` em `database.py` us
 
 ### Critérios de ordem
 O backend expõe `runtime.order_criteria` — a ordem só é enviada quando BUY/SELL
-**e** todos os critérios de ordem estão verdes: runtime ativo, circuit breaker livre,
-posição flat, sem entrada pendente, direção permitida, calendário livre, OKX conectada,
-tamanho válido, SL/TP coerentes, posição OKX flat.
+**e** todos os critérios de ordem (O1–O8) estão verdes: O1 sinal, O2 execução (bot rodando,
+OKX conectada, sem posição local nem entrada em envio), O3 direção permitida, O4 circuit breaker,
+O5 calendário, O6 tamanho, O7 SL/TP, O8 posição OKX **líquida** (em spot desconta o
+`baseline_balance`, ou seja, holdings do usuário não contam como posição do bot).
+O gate de risco global (`risk_guard`) roda só em `_enter` (tem efeito colateral de notificação).
 
-- Sem sinal BUY/SELL os critérios O2–O11 ficam dormentes (`status="none"`).
+- Sem sinal BUY/SELL os critérios O2–O8 ficam dormentes (`status="none"`).
+- `status="grey"` = sinal inaplicável (ex.: SELL em spot, O3): impede a ordem mas não é falha;
+  o card mostra "Sinal não aplicável".
+- Diagnóstico (`/api/ops/diagnostics`): em spot só BUY conta como sinal executável;
+  SELL vai em `signals.ignored_sell_spot`.
 - Frontend usa `_criteria_met/_criteria_total/_criteria_names` do backend — nunca heurísticas locais.
 - `GET /api/ops/diagnostics?days=7` agrega `signal_logs`, `trades`,
   `order_rejections` e o status runtime para classificar cada bot como:

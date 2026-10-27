@@ -253,6 +253,7 @@ def _diagnostic_verdict(
     rejections: int,
     current_order_ready: bool | None,
     current_order_reason: str,
+    ignored_sell_spot: int = 0,
 ) -> tuple[str, str, str]:
     if signal_total <= 0:
         return (
@@ -267,11 +268,13 @@ def _diagnostic_verdict(
             "Houve falha ou recusa persistida em order_rejections.",
         )
     if executable_signals <= 0:
-        return (
-            "market",
-            "Mercado/filtro",
-            "A estratégia avaliou candles, mas não emitiu BUY/SELL no período.",
-        )
+        detail = "A estratégia avaliou candles, mas não emitiu BUY/SELL no período."
+        if ignored_sell_spot > 0:
+            detail = (
+                f"A estratégia avaliou candles e emitiu {ignored_sell_spot} SELL, mas em SPOT só há entradas "
+                "compradas — sem BUY executável no período."
+            )
+        return ("market", "Mercado/filtro", detail)
     if linked_signals <= 0:
         detail = current_order_reason or "Houve BUY/SELL sem trade vinculado."
         return ("blocked", "Bloqueio operacional", detail)
@@ -415,7 +418,11 @@ def ops_diagnostics(days: int = 7, bot_id: Optional[int] = None, db: Session = D
     for bot in bots:
         dist = signal_dist.get(bot.id, {"hold": 0, "buy": 0, "sell": 0})
         signal_total = int(sum(dist.values()))
-        executable = int(dist.get("buy", 0) + dist.get("sell", 0))
+        # Em spot só BUY é entrada executável: SELL é inaplicável (ou saída), nunca ordem de entrada.
+        sym = (bot.symbol or "").upper()
+        is_spot = not (sym.endswith("-SWAP") or sym.endswith("-FUTURES"))
+        ignored_sell = int(dist.get("sell", 0)) if is_spot else 0
+        executable = int(dist.get("buy", 0) + (0 if is_spot else dist.get("sell", 0)))
         linked = linked_by_bot.get(bot.id, 0)
         rejections = rejections_by_bot.get(bot.id, 0)
         runtime = statuses.get(bot.id) or {}
@@ -429,6 +436,7 @@ def ops_diagnostics(days: int = 7, bot_id: Optional[int] = None, db: Session = D
             rejections=rejections,
             current_order_ready=current_ready,
             current_order_reason=current_reason,
+            ignored_sell_spot=ignored_sell,
         )
         cause_counts[label] = cause_counts.get(label, 0) + 1
         trades = trades_by_bot.get(bot.id, {"entry": 0, "exit": 0, "tp1": 0})
@@ -451,6 +459,7 @@ def ops_diagnostics(days: int = 7, bot_id: Optional[int] = None, db: Session = D
                 "buy": int(dist.get("buy", 0)),
                 "sell": int(dist.get("sell", 0)),
                 "executable": executable,
+                "ignored_sell_spot": ignored_sell,
                 "linked_to_trade": linked,
                 "untraded_executable": max(0, executable - linked),
                 "hold_rate": _pct(dist.get("hold", 0), signal_total),
