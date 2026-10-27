@@ -50,6 +50,13 @@ Trabalhe somente no repositório `E:\Dell Inspiron\W\Dev\Trading\OKXTrader\OKXSt
 - Dashboard exibe exposição pelo notional real (`size × preço`); stake é fallback
   apenas quando preço não foi carregado ainda.
 - Nunca sugerir alterar stake como ação operacional.
+- **Exceção opcional, decisão do usuário:** o card "Risco global" tem o modo de dimensionamento `risk`
+  (`sizing_mode`, padrão `fixed`). Nele a ORDEM arrisca `risk_per_trade_pct` de `capital_base_usd` até o Stop
+  Loss (stake = risco / distância do SL, entre `min_stake_usd` e `max_stake_usd`, e até 95% do saldo). A coluna
+  `bots.stake_usd` continua 100.0; só o tamanho enviado à OKX muda, e só quando o usuário liga o modo.
+- **Risco global** (`backend/risk.py`): limites de posições, exposição (notional real), perda diária, drawdown e
+  correlação (máx. de posições em ativos com correlação 1h >= `correlation_threshold`; sem histórico, assume-se
+  correlacionado). Bloqueiam ENTRADAS; saídas e stops nunca são bloqueados.
 - `FIXED_STAKE_USD` é definido em `main.py` e duplicado (mesmo valor, `100.0`) em
   `bot_manager.py` — este último não importa de `main.py` porque `main.py` já importa
   `manager` de lá (import circular). Se adicionar novo uso da constante em `bot_manager.py`,

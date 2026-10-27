@@ -73,6 +73,7 @@ class BotInstance(OrderGateMixin, EntryMixin, PositionMixin, AccountingMixin, St
         self._last_order_criteria: dict = self._empty_order_criteria()
         self._last_order_error: Optional[dict] = None
         self._entry_inflight  = False
+        self._planned_stake_usd: Optional[float] = None   # stake planejado da entrada em envio (exposição global)
         self._maintenance     : Optional[str] = None
         self._started_at      : Optional[str] = None   # ISO timestamp de início
         self._started_epoch_ms: int = 0

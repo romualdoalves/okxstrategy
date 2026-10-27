@@ -12,8 +12,8 @@ from ..exchanges.base import BaseExchange
 from ..strategies.base import Signal
 from ..notifications import build_entry_msg, build_order_failed_msg
 from ..feeds.economic_calendar import calendar_feed
-from ..risk import guard as risk_guard
-from .common import FIXED_STAKE_USD, log, manager
+from ..risk import guard as risk_guard, compute_stake
+from .common import log, manager
 
 
 class EntryMixin:
@@ -567,8 +567,12 @@ class EntryMixin:
         # ── Gate de risco global da conta (backend/risk.py) ───────────────────
         # Síncrono e sem await desde o `_entry_inflight = True` acima: dois bots não
         # passam juntos pelo mesmo limite. Só bloqueia ENTRADAS; saídas nunca passam aqui.
+        sizing = risk_guard.sizing_limits()
+        # No modo "risk" o stake real só é conhecido depois do SL; o gate usa o teto (pior caso).
+        gate_stake = sizing.max_stake_usd if sizing.sizing_mode == "risk" else self.config.stake_usd
+        self._planned_stake_usd = gate_stake
         decision = risk_guard.check_entry(
-            manager._instances, self.config.id, self.config.stake_usd, self.config.leverage)
+            manager._instances, self.config.id, gate_stake, self.config.leverage, symbol=self.config.symbol)
         if not decision.allowed:
             log.warning("[Bot %d] ENTRADA BLOQUEADA — %s", self.config.id, decision.reason)
             self._hold_reason = decision.reason
@@ -665,6 +669,29 @@ class EntryMixin:
 
         sl_px = round(sl_px, 4)
         tp1_px = round(tp1_px, 4)
+
+        # Dimensionamento: stake fixo do bot (padrão) ou risco fixo por trade até o Stop Loss (opcional).
+        stake_usd = self.config.stake_usd
+        if sizing.sizing_mode == "risk":
+            balance = None
+            try:
+                balance = await exchange.get_balance("USDT")
+            except Exception as exc:
+                log.warning("[Bot %d] Saldo indisponível para dimensionar pelo risco: %s", self.config.id, exc)
+            plan = compute_stake(sizing, self.config.stake_usd, price, sl_px, balance)
+            if plan["blocked"]:
+                self._hold_reason = plan["blocked"]
+                self._entry_inflight = False
+                log.warning("[Bot %d] ENTRADA BLOQUEADA — %s", self.config.id, plan["blocked"])
+                return
+            stake_usd = plan["stake"]
+            sz = exchange.num_contracts(self.config.symbol, price, stake_usd, self.config.leverage)
+            log.info(
+                "[Bot %d] Dimensionamento por risco: arrisca $%s com SL a %.2f%% -> stake $%.2f%s",
+                self.config.id, plan["risk_usd"], (plan["sl_pct"] or 0) * 100, stake_usd,
+                f" (limitado por {plan['limited_by']})" if plan["limited_by"] else "",
+            )
+        self._planned_stake_usd = stake_usd
 
         # Proteção Extra: Verifica se já existe posição aberta na exchange antes de entrar
         # Isso evita entradas múltiplas se o estado local estiver dessincronizado
@@ -908,7 +935,7 @@ class EntryMixin:
             symbol        = self.config.symbol,
             timeframe     = self.config.timeframe,
             leverage      = self.config.leverage,
-            stake_usd     = FIXED_STAKE_USD,
+            stake_usd     = stake_usd,
             demo          = self.config.demo,
             stop_loss_usd = self.config.stop_loss_usd,
             direction     = direction,

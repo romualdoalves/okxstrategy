@@ -26,6 +26,12 @@ class RiskLimitsUpdate(BaseModel):
     max_account_daily_loss_usd: Optional[float] = None
     max_drawdown_pct: Optional[float] = None
     capital_base_usd: Optional[float] = None
+    max_correlated_positions: Optional[int] = None
+    correlation_threshold: Optional[float] = None
+    sizing_mode: Optional[str] = None
+    risk_per_trade_pct: Optional[float] = None
+    min_stake_usd: Optional[float] = None
+    max_stake_usd: Optional[float] = None
     max_auto_bots: Optional[int] = None
 
 @router.get("/api/risk")

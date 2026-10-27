@@ -36,6 +36,7 @@ class FakeExchange(BaseExchange):
         self.entry_rejected = False
         self.sl_accepts = lambda price: True   # decide se o SL nesse preço é aceito
         self.reduce_only_works = True
+        self.balance = 1000.0
         self.last_order_error = None
         self._n = 0
 
@@ -48,7 +49,7 @@ class FakeExchange(BaseExchange):
 
     async def fetch_candles(self, symbol, timeframe, limit=100): return []
     async def get_ticker(self, symbol): return {"last": PRICE}
-    async def get_balance(self, currency="USDT"): return 1000.0
+    async def get_balance(self, currency="USDT"): return self.balance
 
     async def get_position(self, symbol):
         self.calls.append(("get_position", symbol))
@@ -300,6 +301,45 @@ class TestGlobalRiskGate(OrderPathBase):
         with mock.patch.object(bot_manager.manager, "_instances", {1: bot}):
             self.enter(bot)
         self.assertEqual(len(self.ex.names("market_order")), 1)
+
+
+class TestRiskBasedSizing(OrderPathBase):
+    def use_risk_sizing(self):
+        with self.db() as db:
+            limits = risk.load_limits(db)
+            limits.sizing_mode = "risk"                      # US$10 de risco, teto de US$250 por ordem
+            risk.save_limits(db, limits)
+
+    def test_default_mode_keeps_the_fixed_stake(self):
+        bot = self.make_bot()
+        self.enter(bot)
+        self.assertAlmostEqual(self.ex.names("market_order")[0][2], SIZE)          # US$100 / 50k
+
+    def test_risk_mode_sizes_the_order_by_the_stop_distance(self):
+        self.use_risk_sizing()
+        bot = self.make_bot()
+        self.enter(bot)                                      # SL a 2%: $10 / 0,02 = $500 -> teto $250
+
+        self.assertAlmostEqual(self.ex.names("market_order")[0][2], 0.005)           # US$250 / 50k
+        self.assertAlmostEqual(bot._sz, 0.005)
+        self.assertAlmostEqual(bot._planned_stake_usd, 250.0)
+
+    def test_risk_mode_never_spends_more_than_the_balance(self):
+        self.use_risk_sizing()
+        self.ex.balance = 100.0
+        bot = self.make_bot()
+        self.enter(bot)
+        self.assertAlmostEqual(self.ex.names("market_order")[0][2], 0.0019)          # 95% de US$100 / 50k
+
+    def test_risk_mode_blocks_when_the_balance_is_below_the_minimum_stake(self):
+        self.use_risk_sizing()
+        self.ex.balance = 10.0
+        bot = self.make_bot()
+        self.enter(bot)
+
+        self.assertEqual(self.ex.names("market_order"), [])
+        self.assertIn("Saldo insuficiente", bot._hold_reason)
+        self.assertFalse(bot._entry_inflight)
 
 
 class TestExitAndCircuitBreaker(OrderPathBase):

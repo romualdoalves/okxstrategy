@@ -8,6 +8,7 @@ const BREACH_LABEL = {
   exposure: 'Exposição máxima',
   daily_loss: 'Perda diária da conta',
   drawdown: 'Drawdown (liberação manual)',
+  correlation: 'Ativos correlacionados',
 }
 
 const FIELDS = [
@@ -15,7 +16,12 @@ const FIELDS = [
   ['max_exposure_usd', 'Exposição (US$)', 10],
   ['max_account_daily_loss_usd', 'Perda diária (US$)', 5],
   ['max_drawdown_pct', 'Drawdown (%)', 0.5],
-  ['capital_base_usd', 'Base do drawdown (US$)', 100],
+  ['capital_base_usd', 'Base do drawdown e do risco (US$)', 100],
+  ['max_correlated_positions', 'Posições correlacionadas (máx.)', 1],
+  ['correlation_threshold', 'Correlação mínima (0,3–0,99)', 0.05],
+  ['risk_per_trade_pct', 'Risco por trade (% da base)', 0.1],
+  ['min_stake_usd', 'Stake mínimo (US$)', 5],
+  ['max_stake_usd', 'Stake máximo (US$)', 25],
 ]
 
 function Meter({ label, value, max, text, danger }) {
@@ -50,6 +56,7 @@ export default function RiskCard() {
       const body = {}
       for (const [k] of FIELDS) if (form[k] !== undefined && form[k] !== '') body[k] = Number(form[k])
       if (form.enabled !== undefined) body.enabled = form.enabled
+      if (form.sizing_mode !== undefined) body.sizing_mode = form.sizing_mode
       qc.setQueryData(['risk'], await updateRisk(body))
       setEditing(false)
       setForm({})
@@ -86,7 +93,7 @@ export default function RiskCard() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <Meter label="Posições abertas" value={usage.open_positions} max={limits.max_open_positions}
           text={`${usage.open_positions} / ${limits.max_open_positions}`} danger={breaches.includes('positions')} />
         <Meter label="Exposição" value={usage.exposure_usd} max={limits.max_exposure_usd}
@@ -94,6 +101,8 @@ export default function RiskCard() {
         <Meter label="Perda do dia" value={loss} max={limits.max_account_daily_loss_usd}
           text={`${usage.daily_pnl_usd >= 0 ? '+' : '−'}$${Math.abs(usage.daily_pnl_usd)} / −$${limits.max_account_daily_loss_usd}`}
           danger={breaches.includes('daily_loss')} />
+        <Meter label="Grupo correlacionado" value={usage.correlated_group ?? 0} max={limits.max_correlated_positions}
+          text={`${usage.correlated_group ?? 0} / ${limits.max_correlated_positions}`} danger={breaches.includes('correlation')} />
         <Meter label="Drawdown" value={usage.drawdown_pct} max={limits.max_drawdown_pct}
           text={`${usage.drawdown_pct}% / ${limits.max_drawdown_pct}%`} danger={breaches.includes('drawdown')} />
       </div>
@@ -110,6 +119,14 @@ export default function RiskCard() {
               </label>
             ))}
           </div>
+          <label className="text-xs text-muted space-y-1 block max-w-md">
+            <span>Dimensionamento da ordem</span>
+            <select className="w-full bg-black/30 border border-white/10 rounded px-2 py-1 text-white"
+              defaultValue={limits.sizing_mode} onChange={(e) => setForm({ ...form, sizing_mode: e.target.value })}>
+              <option value="fixed">Stake fixo de US$100 por bot (padrão)</option>
+              <option value="risk">Por risco: arrisca X% da base até o Stop Loss (entre o stake mínimo e máximo)</option>
+            </select>
+          </label>
           <label className="flex items-center gap-2 text-xs text-muted">
             <input type="checkbox" defaultChecked={limits.enabled} onChange={(e) => setForm({ ...form, enabled: e.target.checked })} />
             Limites ativos
