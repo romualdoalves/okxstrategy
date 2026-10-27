@@ -10,6 +10,7 @@ import json
 import logging
 import math
 import os
+import time
 from urllib.parse import urlencode
 from datetime import datetime, timezone
 from typing import AsyncIterator, Optional
@@ -908,9 +909,11 @@ class OKXExchange(BaseExchange):
 class OKXStream:
     """Polling-based public stream para OKX (candles via REST)."""
 
+    # Intervalo curto: o fechamento do candle é detectado no máximo `poll` s depois (o backtest entra no
+    # fechamento). A consulta é de só 3 candles; o limite público da OKX é 20 req/2 s.
     _POLL_SECONDS = {
-        "1m": 60, "5m": 60, "15m": 60,
-        "1H": 120, "4H": 300, "1D": 300,
+        "1m": 20, "5m": 30, "15m": 30,
+        "1H": 60, "4H": 60, "1D": 60,
     }
 
     def __init__(self, channel: str, symbol: str, demo: bool = True):
@@ -920,16 +923,31 @@ class OKXStream:
         # canal OKX → timeframe interno
         self._tf_internal = _TF_MAP_INV.get(channel, "15m")
 
+    # Folga após o fechamento nominal do candle: o relógio local pode adiantar-se à OKX e o candle só
+    # recebe o OHLCV final alguns instantes depois.
+    _CLOSE_GRACE_MS = 5_000
+
     async def iter(self) -> AsyncIterator[tuple[CandleBar, bool]]:
+        """
+        Entrega (candle, fechado). `True` SÓ para candles já FECHADOS, cada um uma única vez e em ordem;
+        o candle em formação sai com `False` a cada consulta (preço em tempo quase real).
+        Antes, todo candle era entregue como fechado no instante em que ABRIA (com OHLCV de 1 tick) e o
+        candle recém-fechado, já com os dados finais, nunca era reavaliado.
+        """
+        from ..candle_store import drop_open_candle
         last_epoch: Optional[int] = None
         while True:
             try:
                 ex = OKXExchange()
                 candles = await ex.fetch_candles(self._symbol, self._tf_internal, limit=3)
-                for candle in candles:
+                now_ms = int(time.time() * 1000)
+                closed = drop_open_candle(candles, self._tf_internal, now_ms=now_ms - self._CLOSE_GRACE_MS)
+                for candle in closed:
                     if last_epoch is None or candle.epoch > last_epoch:
                         last_epoch = candle.epoch
                         yield candle, True
+                for candle in candles[len(closed):]:
+                    yield candle, False
             except asyncio.CancelledError:
                 raise
             except Exception:

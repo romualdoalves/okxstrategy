@@ -552,6 +552,10 @@ class BotInstance(OrderGateMixin, EntryMixin, PositionMixin, AccountingMixin, St
 
     async def _on_candle(self, bar, closed: bool, exchange: BaseExchange,
                          session=None):
+        # Candle fechado já conhecido (o stream reentrega os últimos candles no início): ignora, sem
+        # reprocessar nem duplicar o histórico fora de ordem.
+        if closed and self._candles and int(bar.epoch) <= int(self._candles[-1].epoch):
+            return
         # Sincronização Dinâmica Automática: Apenas no fechamento do candle para economizar API
         if closed and self._direction != 0:
             await self.force_sync_trailing(exchange)
