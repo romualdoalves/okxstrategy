@@ -118,6 +118,42 @@ function isSuitableToStart(r) {
   return rec?.verdict === 'INICIAR' && !!rec?.robust_gate?.applied && !!rec?.robust_gate?.passed
 }
 
+// Contagem por faixa de resultado (usada na barra de progresso, enquanto o scan roda).
+const EMPTY_TALLY = { INICIAR: 0, CUIDADO: 0, 'NÃO INICIAR': 0, 'N/A': 0, suitable: 0 }
+function tallyVerdicts(rows) {
+  const t = { ...EMPTY_TALLY }
+  for (const r of rows || []) {
+    const v = VERDICT_CFG[r.recommendation?.verdict] ? r.recommendation.verdict : 'N/A'
+    t[v] += 1
+    if (isSuitableToStart(r)) t.suitable += 1
+  }
+  return t
+}
+function sumTallies(items) {
+  return items.reduce((acc, it) => {
+    for (const k of Object.keys(EMPTY_TALLY)) acc[k] += it.tally?.[k] || 0
+    return acc
+  }, { ...EMPTY_TALLY })
+}
+
+function TallyChips({ tally, size = 'text-[10px]' }) {
+  const chips = [
+    ['INICIAR', 'bg-green-500/15 text-green-400 border-green-500/30'],
+    ['CUIDADO', 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30'],
+    ['NÃO INICIAR', 'bg-red-500/15 text-red-400 border-red-500/30'],
+    ['N/A', 'bg-white/5 text-gray-400 border-white/10'],
+  ]
+  return (
+    <span className="flex flex-wrap items-center gap-1.5">
+      {chips.map(([k, cls]) => (
+        <span key={k} className={`px-2 py-0.5 rounded-full ${size} font-bold border ${cls} ${tally[k] ? '' : 'opacity-40'}`}>{tally[k]} {k}</span>
+      ))}
+      <span className={`px-2 py-0.5 rounded-full ${size} font-bold border bg-accent/15 text-accent border-accent/30 ${tally.suitable ? '' : 'opacity-40'}`}
+        title="INICIAR com robustez aprovada (mínimo de trades por timeframe e fora da amostra positivo)">{tally.suitable} adequadas</span>
+    </span>
+  )
+}
+
 function median(values) {
   if (!values.length) return 0
   const v = [...values].sort((a, b) => a - b)
@@ -516,7 +552,7 @@ export default function BatchBacktest() {
           throw new Error(message)
         }
         const data = scan.data
-        setCategoryProgress(unit, 'done', { resultCount: (data.results || []).length })
+        setCategoryProgress(unit, 'done', { resultCount: (data.results || []).length, tally: tallyVerdicts(data.results) })
         merged.push(...(data.results || []).map(r => ({ ...r, category: cat, symbol: sym })))
         if (stopWhenSuitable) {
           const hit = (data.results || []).filter(isSuitableToStart)
@@ -870,6 +906,10 @@ export default function BatchBacktest() {
                     style={{ width: `${Math.round((scanProgress.completed / Math.max(1, scanProgress.total)) * 100)}%` }}
                   />
                 </div>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <span className="text-[10px] text-muted">Resultados até agora:</span>
+                  <TallyChips tally={sumTallies(scanProgress.items)} size="text-xs" />
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -898,6 +938,9 @@ export default function BatchBacktest() {
                           style={{ width: isDone || isFailed || isSkipped ? '100%' : isRunning ? '55%' : '0%' }}
                         />
                       </div>
+                      {isDone && item.tally && (
+                        <div className="mt-1.5"><TallyChips tally={item.tally} /></div>
+                      )}
                       {isFailed && item.error && (
                         <div className="text-[10px] text-red-300/90 mt-1 truncate" title={item.error}>{item.error}</div>
                       )}
