@@ -6,6 +6,16 @@
 # =============================================================================
 set -euo pipefail
 
+# `comando | grep -q` é frágil com `set -o pipefail`: o grep fecha o pipe assim que acha o texto, o comando
+# recebe SIGPIPE e o pipeline "falha" de forma intermitente (ex.: tentava recriar uma rede que já existia).
+# Aqui a saída é capturada primeiro e só depois filtrada.
+has_line() {
+    local pattern="$1"; shift
+    local out
+    out="$("$@" 2>/dev/null || true)"
+    grep -q -- "$pattern" <<<"$out"
+}
+
 DEPLOY_DIR="/opt/okx-strategy"
 REPO_URL="https://github.com/romualdoalves/okxstrategy.git"
 DOMAIN="okx.tradixio.com"
@@ -34,7 +44,7 @@ if ! docker compose version &>/dev/null; then
 fi
 
 # ── 2. Ensure Traefik network exists ─────────────────────────────────────────
-if ! docker network ls | grep -q "traefik-public"; then
+if ! has_line "traefik-public" docker network ls; then
     echo "[INFO] Creating traefik-public network..."
     docker network create traefik-public
 else
@@ -42,9 +52,9 @@ else
 fi
 
 # ── 3. Ensure Traefik is running ─────────────────────────────────────────────
-if ! docker ps --format '{{.Names}}' | grep -q "^traefik$"; then
+if ! has_line "^traefik$" docker ps --format '{{.Names}}'; then
     # Container existe mas está parado? Start ele.
-    if docker ps -a --format '{{.Names}}' | grep -q "^traefik$"; then
+    if has_line "^traefik$" docker ps -a --format '{{.Names}}'; then
         echo "[INFO] Traefik container exists but stopped. Starting..."
         docker start traefik
     else
@@ -127,7 +137,7 @@ ENV_EOF
 fi
 
 # ── 6. Ensure Docker volumes exist ───────────────────────────────────────────
-if ! docker volume ls | grep -q "okx_strategy_pgdata"; then
+if ! has_line "okx_strategy_pgdata" docker volume ls; then
     echo "[INFO] Creating Docker volume okx_strategy_pgdata..."
     docker volume create okx_strategy_pgdata
 else
@@ -136,7 +146,7 @@ fi
 
 # ── 6.1. Backup e restauração de estratégias da Fábrica ──────────────────────
 FACTORY_BACKUP="${DEPLOY_DIR}/.factory_backup"
-if docker ps | grep -q "okx_strategy"; then
+if has_line "okx_strategy" docker ps; then
     echo "[INFO] Fazendo backup das estratégias da Fábrica..."
     mkdir -p "${FACTORY_BACKUP}"
     docker cp okx_strategy:/app/backend/strategies/factory/. "${FACTORY_BACKUP}/" 2>/dev/null || true
@@ -148,7 +158,7 @@ if [ -f "${DEPLOY_DIR}/pre-deploy-check.sh" ]; then
 fi
 
 # Verificação inline: alerta se há posições abertas no bot
-if docker ps | grep -q "okx_strategy"; then
+if has_line "okx_strategy" docker ps; then
     echo "[INFO] Checking for open positions in running bot..."
     OPEN_POS=$(docker exec okx_strategy python -c \
         "from backend.bot_manager import manager; \
@@ -218,7 +228,7 @@ fi
 # ── 9. Wait for healthcheck ──────────────────────────────────────────────────
 echo "[INFO] Waiting for app healthcheck..."
 for i in {1..30}; do
-    if docker inspect --format='{{.State.Health.Status}}' okx_strategy 2>/dev/null | grep -q "healthy"; then
+    if has_line "^healthy$" docker inspect --format='{{.State.Health.Status}}' okx_strategy; then
         echo "[OK] App is healthy!"
         break
     fi

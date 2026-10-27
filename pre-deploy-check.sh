@@ -15,6 +15,16 @@
 
 set -euo pipefail
 
+# `comando | grep -q` é frágil com `set -o pipefail`: o grep fecha o pipe assim que acha o texto, o comando
+# recebe SIGPIPE e o pipeline "falha" de forma intermitente (ex.: tentava recriar uma rede que já existia).
+# Aqui a saída é capturada primeiro e só depois filtrada.
+has_line() {
+    local pattern="$1"; shift
+    local out
+    out="$("$@" 2>/dev/null || true)"
+    grep -q -- "$pattern" <<<"$out"
+}
+
 DOMAIN="${DOMAIN:-okx.tradixio.com}"
 APP_URL="https://${DOMAIN}"
 FORCE="${FORCE:-false}"
@@ -36,7 +46,7 @@ echo -e "${BOLD}═════════════════════�
 echo ""
 
 # ── Verifica se o container está rodando ────────────────────────────────────
-if ! docker ps --format "{{.Names}}" 2>/dev/null | grep -q "^okx_strategy$"; then
+if ! has_line "^okx_strategy$" docker ps --format "{{.Names}}"; then
     log_info "Container okx_strategy não está rodando — primeiro deploy ou container parado."
     log_ok "Nenhuma verificação necessária. Prosseguindo com o deploy."
     echo ""
