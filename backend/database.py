@@ -170,7 +170,7 @@ class StrategyModel(Base):
     description      = Column(Text,     nullable=True)
     source_text      = Column(Text,     nullable=True)   # texto original do usuário
     plan_json        = Column(JSON,     default={})      # plano aprovado
-    code_py          = Column(Text,     nullable=True)   # código gerado e validado
+    code_py          = Column(Text,     nullable=True)   # LEGADO: o código vive em backend/strategies/factory/*.py (git). Não é mais gravado.
     status           = Column(String,   default="deployed")  # draft|deployed|disabled
     created_at       = Column(DateTime, default=datetime.datetime.utcnow)
     deployed_at      = Column(DateTime, nullable=True)

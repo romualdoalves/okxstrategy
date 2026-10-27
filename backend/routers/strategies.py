@@ -173,7 +173,6 @@ def factory_deploy(req: FactoryDeployRequest, db: Session = Depends(get_db)):
         existing.description = plan.get("description", "")
         existing.source_text = req.source_text
         existing.plan_json   = plan
-        existing.code_py     = req.code
         existing.status      = "deployed"
         existing.deployed_at = datetime.now(timezone.utc).replace(tzinfo=None)
         existing.validation_report = report.summary()
@@ -184,7 +183,6 @@ def factory_deploy(req: FactoryDeployRequest, db: Session = Depends(get_db)):
             description      = plan.get("description", ""),
             source_text      = req.source_text,
             plan_json        = plan,
-            code_py          = req.code,
             status           = "deployed",
             deployed_at      = datetime.now(timezone.utc).replace(tzinfo=None),
             validation_report = report.summary(),
@@ -192,7 +190,13 @@ def factory_deploy(req: FactoryDeployRequest, db: Session = Depends(get_db)):
     db.commit()
 
     log.info("Fábrica: estratégia %s implantada (%s).", strategy_id, class_name)
-    return {"strategy_id": strategy_id, "class_name": class_name, "status": "deployed"}
+    return {
+        "strategy_id": strategy_id, "class_name": class_name, "status": "deployed",
+        # O código vive só em arquivo (git é a fonte única). Enquanto não estiver no repositório, o deploy
+        # do VPS é abortado para não perdê-lo: rode scripts/migrate_factory_to_git.sh.
+        "versioned": False,
+        "next_step": "bash scripts/migrate_factory_to_git.sh (no VPS) para levar o arquivo ao git",
+    }
 
 @router.get("/api/strategy-factory/strategies")
 def factory_list(db: Session = Depends(get_db)):
@@ -213,11 +217,13 @@ def factory_list(db: Session = Depends(get_db)):
 
 @router.get("/api/strategy-factory/strategies/{strategy_id}/code")
 def factory_get_code(strategy_id: str, db: Session = Depends(get_db)):
-    """Retorna o código Python de uma estratégia de fábrica."""
+    """Retorna o código Python de uma estratégia de fábrica (lido do arquivo; code_py é legado)."""
+    from ..strategy_factory.deployer import get_factory_file
     row = db.query(FactoryStrategyModel).filter_by(strategy_id=strategy_id.upper()).first()
     if not row:
         raise HTTPException(404, "Estratégia não encontrada")
-    return {"strategy_id": row.strategy_id, "code": row.code_py, "plan": row.plan_json}
+    code = get_factory_file(row.strategy_id) or row.code_py
+    return {"strategy_id": row.strategy_id, "code": code, "plan": row.plan_json}
 
 @router.delete("/api/strategy-factory/strategies/{strategy_id}/permanent")
 def factory_delete_permanent(strategy_id: str, db: Session = Depends(get_db)):

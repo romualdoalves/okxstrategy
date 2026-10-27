@@ -144,12 +144,22 @@ else
     echo "[INFO] Docker volume okx_strategy_pgdata already exists."
 fi
 
-# ── 6.1. Backup e restauração de estratégias da Fábrica ──────────────────────
-FACTORY_BACKUP="${DEPLOY_DIR}/.factory_backup"
+# ── 6.1. Estratégias da Fábrica só no container? (git é a fonte única do código) ─
+# Toda estratégia precisa estar no repositório: a imagem é reconstruída e o container recriado, e o que
+# existir só no disco do container se perderia. Para trazer essas estratégias para o git:
+#   bash scripts/migrate_factory_to_git.sh
 if has_line "okx_strategy" docker ps; then
-    echo "[INFO] Fazendo backup das estratégias da Fábrica..."
-    mkdir -p "${FACTORY_BACKUP}"
-    docker cp okx_strategy:/app/backend/strategies/factory/. "${FACTORY_BACKUP}/" 2>/dev/null || true
+    ONLY_IN_CONTAINER=""
+    for f in $(docker exec okx_strategy sh -c 'ls /app/backend/strategies/factory' 2>/dev/null | grep -E '^([a-z]{2}[0-9]{3}|t000)\.py$' || true); do
+        [ -f "${DEPLOY_DIR}/backend/strategies/factory/${f}" ] || ONLY_IN_CONTAINER="${ONLY_IN_CONTAINER} ${f}"
+    done
+    if [ -n "${ONLY_IN_CONTAINER}" ]; then
+        echo ""
+        echo "[ERRO] Estratégias que existem só no container (fora do git):${ONLY_IN_CONTAINER}"
+        echo "       Deploy ABORTADO para não perdê-las. Rode antes:"
+        echo "         bash ${DEPLOY_DIR}/scripts/migrate_factory_to_git.sh"
+        exit 1
+    fi
 fi
 
 # ── 7. Pré-deploy: verificar posições abertas ────────────────────────────────
@@ -197,33 +207,6 @@ echo "[INFO] Building and starting containers..."
 ${COMPOSE_CMD} -f "${DEPLOY_DIR}/docker-compose.prod.yml" pull 2>/dev/null || true
 ${COMPOSE_CMD} -f "${DEPLOY_DIR}/docker-compose.prod.yml" build --no-cache
 ${COMPOSE_CMD} -f "${DEPLOY_DIR}/docker-compose.prod.yml" up -d
-
-# ── 8.5. Restaurar estratégias da Fábrica ────────────────────────────────────
-STRATEGIES_CHANGED=false
-if [ -d "${FACTORY_BACKUP}" ] && [ "$(ls -A "${FACTORY_BACKUP}"/*.py 2>/dev/null)" ]; then
-    echo "[INFO] Restaurando estratégias da Fábrica no novo container..."
-    sleep 5
-    docker cp "${FACTORY_BACKUP}/." okx_strategy:/app/backend/strategies/factory/
-    rm -rf "${FACTORY_BACKUP}"
-    STRATEGIES_CHANGED=true
-    echo "[OK] Estratégias da Fábrica restauradas."
-fi
-
-# ── 8.6. Sincronizar estratégias do código-fonte (nativas migradas) ───────────
-# Garante que estratégias nativas adicionadas ao repo também estejam presentes
-# caso a restauração acima tenha sobrescrito alguma versão no container.
-FACTORY_SRC="${DEPLOY_DIR}/backend/strategies/factory"
-if [ -d "${FACTORY_SRC}" ]; then
-    echo "[INFO] Sincronizando estratégias do código-fonte..."
-    docker cp "${FACTORY_SRC}/." okx_strategy:/app/backend/strategies/factory/
-    STRATEGIES_CHANGED=true
-    echo "[OK] Estratégias sincronizadas."
-fi
-
-if [ "${STRATEGIES_CHANGED}" = true ]; then
-    echo "[INFO] Reiniciando app para recarregar registry de estratégias..."
-    docker restart okx_strategy >/dev/null
-fi
 
 # ── 9. Wait for healthcheck ──────────────────────────────────────────────────
 echo "[INFO] Waiting for app healthcheck..."

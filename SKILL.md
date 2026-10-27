@@ -259,7 +259,7 @@ OKXStrategy/
 │   ├── strategies/
 │   │   ├── registry.py            # REGISTRY + auto-descoberta factory/
 │   │   ├── base.py                # StrategyBase, StrategyResult, StrategyInfo
-│   │   └── factory/               # Estratégias da Fábrica IA (volume Docker)
+│   │   └── factory/               # TODAS as estratégias (git é a fonte única; sem volume)
 │   ├── strategy_factory/          # kimi_client, planner, generator, validator, deployer
 │   ├── feeds/                     # gex_feed, okx_market_players, onchain_monitor…
 │   └── notifications/             # Telegram message_builder
@@ -382,7 +382,8 @@ Migrations adicionais são executadas via lista `migrations` em `database.py` us
 
 - Prefixos F, FX, B, A, S, I, M **não existem mais**.
 - Arquivos: `backend/strategies/factory/[a-z]{2}[0-9]{3}.py`
-- Volume Docker `okx_strategy_factory` → `/app/backend/strategies/factory`
+- O código de TODAS as estratégias vive em `backend/strategies/factory/*.py`, versionado no git (fonte única). Não há volume Docker nem cópia do código no banco (`strategies.code_py` é legado e não é mais gravado).
+- A Fábrica grava o arquivo no container para uso imediato; para levá-lo ao git: `bash scripts/migrate_factory_to_git.sh` (no VPS). O `deploy.sh` ABORTA se houver estratégia só no container.
 
 ### Contrato das estratégias (spot long-only)
 - **BUY** = entrada; **SELL** = **sair** da posição long (nunca abre short; flat ignora). O bot executa a saída
@@ -465,7 +466,6 @@ docker logs -f okx_strategy
 git clone https://github.com/romualdoalves/okxstrategy.git /opt/okx-strategy
 docker network create traefik-public 2>/dev/null || true
 docker volume create okx_strategy_pgdata 2>/dev/null || true
-docker volume create okx_strategy_factory 2>/dev/null || true
 cp /opt/okx-strategy/.env.production.example /opt/okx-strategy/.env
 nano /opt/okx-strategy/.env
 docker compose -f /opt/okx-strategy/docker-compose.prod.yml build --no-cache

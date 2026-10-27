@@ -28,18 +28,13 @@ def populate() -> None:
             skipped += 1
             continue
 
-        # Lê o código do arquivo factory
-        factory_dir = Path(__file__).resolve().parent.parent / "backend" / "strategies" / "factory"
-        code_file = factory_dir / f"{strategy_id.lower()}.py"
-        code_py = code_file.read_text(encoding="utf-8") if code_file.exists() else None
-
         db.add(StrategyModel(
             strategy_id=strategy_id,
             name=info.name,
             description=info.description,
             source_text=None,  # nativas não têm texto fonte
             plan_json={"category": _guess_category(strategy_id)},
-            code_py=code_py,
+            code_py=None,  # o código vive em backend/strategies/factory/*.py
             status="deployed",
             deployed_at=None,
             validation_report={},
