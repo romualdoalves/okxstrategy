@@ -84,14 +84,13 @@ class AdaptiveSupertrendStrategy(BaseStrategy):
         factors = pd.Series(self.supertrend_factor, index=df.index)
         if self.adaptive_distance:
             # Compara volatilidade atual com a média histórica recente para inferir o regime do mercado
-            for i in range(self.atr_period, len(df)):
-                recent_mean_atr = atr_series.iloc[max(0, i - (self.atr_period * 2)):i].mean()
-                if recent_mean_atr > 0:
-                    vol_ratio = atr_series.iloc[i] / recent_mean_atr
-                    if vol_ratio < 0.8:  # Mercado em compressão / Lateral (Chop) -> Alarga a banda para evitar violino
-                        factors.iloc[i] = self.supertrend_factor * 1.3
-                    elif vol_ratio > 1.2:  # Explosão de volatilidade / Transição inicial -> Contrai a banda para timing fino
-                        factors.iloc[i] = self.supertrend_factor * 0.8
+            # Vetorizado (equivalente ao laço por candle): média do ATR dos 2*período candles ANTERIORES a i.
+            recent_mean = atr_series.shift(1).rolling(self.atr_period * 2, min_periods=1).mean()
+            vol_ratio = atr_series / recent_mean
+            eligible = (recent_mean > 0) & (pd.Series(df.index, index=df.index) >= self.atr_period)
+            # vol_ratio < 0.8: compressão/lateral -> alarga a banda; > 1.2: explosão -> contrai a banda
+            factors = factors.mask(eligible & (vol_ratio < 0.8), self.supertrend_factor * 1.3)
+            factors = factors.mask(eligible & (vol_ratio >= 0.8) & (vol_ratio > 1.2), self.supertrend_factor * 0.8)
 
         # 3. Cálculo das Bandas Clássicas Matemáticas Baseadas no ATR
         hl2 = (df["high"] + df["low"]) / 2
@@ -107,29 +106,33 @@ class AdaptiveSupertrendStrategy(BaseStrategy):
         st_band[start_idx] = basic_upper.iloc[start_idx]
         st_dir[start_idx] = 1.0
 
+        close_np = df["close"].to_numpy(dtype=float)
+        atr_np = atr_series.to_numpy(dtype=float)
+        upper_np = basic_upper.to_numpy(dtype=float)
+        lower_np = basic_lower.to_numpy(dtype=float)
         for i in range(start_idx + 1, len(df)):
             prev_dir = st_dir[i - 1]
             prev_band = st_band[i - 1]
-            curr_close = df["close"].iloc[i]
-            curr_atr = atr_series.iloc[i]
+            curr_close = close_np[i]
+            curr_atr = atr_np[i]
             buffer = self.commit_buffer * curr_atr
 
             if prev_dir == 1.0:
                 # Vira para Baixa apenas se o Fechamento quebrar a banda inferior com a margem do commit buffer
                 if curr_close < prev_band - buffer:
                     st_dir[i] = -1.0
-                    st_band[i] = basic_upper.iloc[i]
+                    st_band[i] = upper_np[i]
                 else:
                     st_dir[i] = 1.0
-                    st_band[i] = max(basic_lower.iloc[i], prev_band)
+                    st_band[i] = max(lower_np[i], prev_band)
             else:
                 # Vira para Alta apenas se o Fechamento quebrar a banda superior com a margem do commit buffer
                 if curr_close > prev_band + buffer:
                     st_dir[i] = 1.0
-                    st_band[i] = basic_lower.iloc[i]
+                    st_band[i] = lower_np[i]
                 else:
                     st_dir[i] = -1.0
-                    st_band[i] = min(basic_upper.iloc[i], prev_band)
+                    st_band[i] = min(upper_np[i], prev_band)
 
         # Captura de variáveis finais do último candle
         close = float(df["close"].iloc[-1])

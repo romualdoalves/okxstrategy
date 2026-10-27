@@ -1,0 +1,494 @@
+{
+"TF004|1|200": {
+"hold": "",
+"ind": {
+"atr": 2.2093,
+"close": 134.46,
+"direction": -1,
+"rsi": 34.11,
+"rsi_prev": 33.34,
+"supertrend": 141.0
+},
+"met": 0,
+"meta": {
+"sl_pct": 0.04108,
+"sl_price": 139.98,
+"tp1_pct": 0.025,
+"tp1_price": 131.1,
+"ts_pct": 0.03286
+},
+"signal": "hold",
+"tot": 3
+},
+"TF004|1|330": {
+"hold": "",
+"ind": {
+"atr": 1.8795,
+"close": 118.8,
+"direction": 1,
+"rsi": 54.26,
+"rsi_prev": 59.78,
+"supertrend": 115.79
+},
+"met": 0,
+"meta": {
+"sl_pct": 0.03955,
+"sl_price": 123.5,
+"tp1_pct": 0.025,
+"tp1_price": 115.83,
+"ts_pct": 0.03164
+},
+"signal": "hold",
+"tot": 3
+},
+"TF004|1|420": {
+"hold": "",
+"ind": {
+"atr": 1.891,
+"close": 105.58,
+"direction": -1,
+"rsi": 41.56,
+"rsi_prev": 40.81,
+"supertrend": 110.75
+},
+"met": 0,
+"meta": {
+"sl_pct": 0.04478,
+"sl_price": 110.31,
+"tp1_pct": 0.025,
+"tp1_price": 102.94,
+"ts_pct": 0.03582
+},
+"signal": "hold",
+"tot": 3
+},
+"TF004|1|500": {
+"hold": "",
+"ind": {
+"atr": 1.7109,
+"close": 95.95,
+"direction": -1,
+"rsi": 46.53,
+"rsi_prev": 48.9,
+"supertrend": 99.49
+},
+"met": 0,
+"meta": {
+"sl_pct": 0.04458,
+"sl_price": 100.23,
+"tp1_pct": 0.025,
+"tp1_price": 93.56,
+"ts_pct": 0.03566
+},
+"signal": "hold",
+"tot": 3
+},
+"TF004|2|200": {
+"hold": "",
+"ind": {
+"atr": 1.5862,
+"close": 89.9,
+"direction": -1,
+"rsi": 29.45,
+"rsi_prev": 33.55,
+"supertrend": 95.38
+},
+"met": 0,
+"meta": {
+"sl_pct": 0.04411,
+"sl_price": 93.87,
+"tp1_pct": 0.025,
+"tp1_price": 87.65,
+"ts_pct": 0.03529
+},
+"signal": "hold",
+"tot": 3
+},
+"TF004|2|330": {
+"hold": "",
+"ind": {
+"atr": 1.5978,
+"close": 93.8,
+"direction": 1,
+"rsi": 60.84,
+"rsi_prev": 60.18,
+"supertrend": 88.91
+},
+"met": 0,
+"meta": {
+"sl_pct": 0.04259,
+"sl_price": 97.79,
+"tp1_pct": 0.025,
+"tp1_price": 91.45,
+"ts_pct": 0.03407
+},
+"signal": "hold",
+"tot": 3
+},
+"TF004|2|420": {
+"hold": "",
+"ind": {
+"atr": 1.9606,
+"close": 99.21,
+"direction": 1,
+"rsi": 55.21,
+"rsi_prev": 49.53,
+"supertrend": 95.03
+},
+"met": 0,
+"meta": {
+"sl_pct": 0.04941,
+"sl_price": 104.11,
+"tp1_pct": 0.025,
+"tp1_price": 96.73,
+"ts_pct": 0.03952
+},
+"signal": "hold",
+"tot": 3
+},
+"TF004|2|500": {
+"hold": "",
+"ind": {
+"atr": 1.9218,
+"close": 102.29,
+"direction": 1,
+"rsi": 64.17,
+"rsi_prev": 60.78,
+"supertrend": 95.88
+},
+"met": 3,
+"meta": {
+"sl_pct": 0.04697,
+"sl_price": 97.48,
+"tp1_pct": 0.025,
+"tp1_price": 104.84,
+"ts_pct": 0.03758
+},
+"signal": "buy",
+"tot": 3
+},
+"TF004|3|200": {
+"hold": "",
+"ind": {
+"atr": 1.6751,
+"close": 101.18,
+"direction": -1,
+"rsi": 43.47,
+"rsi_prev": 42.54,
+"supertrend": 105.9
+},
+"met": 0,
+"meta": {
+"sl_pct": 0.04139,
+"sl_price": 105.37,
+"tp1_pct": 0.025,
+"tp1_price": 98.65,
+"ts_pct": 0.03311
+},
+"signal": "hold",
+"tot": 3
+},
+"TF004|3|330": {
+"hold": "",
+"ind": {
+"atr": 1.3231,
+"close": 90.05,
+"direction": -1,
+"rsi": 52.38,
+"rsi_prev": 53.16,
+"supertrend": 90.96
+},
+"met": 0,
+"meta": {
+"sl_pct": 0.03673,
+"sl_price": 93.36,
+"tp1_pct": 0.025,
+"tp1_price": 87.8,
+"ts_pct": 0.02939
+},
+"signal": "hold",
+"tot": 3
+},
+"TF004|3|420": {
+"hold": "",
+"ind": {
+"atr": 1.5,
+"close": 96.59,
+"direction": 1,
+"rsi": 56.93,
+"rsi_prev": 57.04,
+"supertrend": 93.01
+},
+"met": 0,
+"meta": {
+"sl_pct": 0.03883,
+"sl_price": 100.34,
+"tp1_pct": 0.025,
+"tp1_price": 94.17,
+"ts_pct": 0.03106
+},
+"signal": "hold",
+"tot": 3
+},
+"TF004|3|500": {
+"hold": "",
+"ind": {
+"atr": 1.8416,
+"close": 88.98,
+"direction": -1,
+"rsi": 46.13,
+"rsi_prev": 47.55,
+"supertrend": 93.6
+},
+"met": 0,
+"meta": {
+"sl_pct": 0.05174,
+"sl_price": 93.58,
+"tp1_pct": 0.025,
+"tp1_price": 86.75,
+"ts_pct": 0.0414
+},
+"signal": "hold",
+"tot": 3
+},
+"TF017|1|200": {
+"hold": "Supertrend n\u00e3o flipou",
+"ind": {
+"atr": 2.220723,
+"close": 134.4595,
+"commit_confirmed": 1.0,
+"supertrend_band": 141.0322,
+"supertrend_direction": -1.0
+},
+"met": 1,
+"meta": {
+"sl_pct": 0.03303,
+"sl_price": 138.9009,
+"tp1_pct": 0.06606,
+"tp1_price": 125.5766,
+"ts_pct": 0.04955
+},
+"signal": "hold",
+"tot": 2
+},
+"TF017|1|330": {
+"hold": "Supertrend n\u00e3o flipou",
+"ind": {
+"atr": 1.891923,
+"close": 118.8046,
+"commit_confirmed": 1.0,
+"supertrend_band": 115.7804,
+"supertrend_direction": 1.0
+},
+"met": 1,
+"meta": {
+"sl_pct": 0.03185,
+"sl_price": 115.0208,
+"tp1_pct": 0.0637,
+"tp1_price": 126.3723,
+"ts_pct": 0.04777
+},
+"signal": "hold",
+"tot": 2
+},
+"TF017|1|420": {
+"hold": "Supertrend n\u00e3o flipou",
+"ind": {
+"atr": 1.926854,
+"close": 105.5778,
+"commit_confirmed": 1.0,
+"supertrend_band": 110.7733,
+"supertrend_direction": -1.0
+},
+"met": 1,
+"meta": {
+"sl_pct": 0.0365,
+"sl_price": 109.4315,
+"tp1_pct": 0.073,
+"tp1_price": 97.8704,
+"ts_pct": 0.05475
+},
+"signal": "hold",
+"tot": 2
+},
+"TF017|1|500": {
+"hold": "Supertrend n\u00e3o flipou",
+"ind": {
+"atr": 1.775103,
+"close": 95.9544,
+"commit_confirmed": 1.0,
+"supertrend_band": 99.5746,
+"supertrend_direction": -1.0
+},
+"met": 1,
+"meta": {
+"sl_pct": 0.037,
+"sl_price": 99.5046,
+"tp1_pct": 0.074,
+"tp1_price": 88.8539,
+"ts_pct": 0.0555
+},
+"signal": "hold",
+"tot": 2
+},
+"TF017|2|200": {
+"hold": "Supertrend n\u00e3o flipou",
+"ind": {
+"atr": 1.601237,
+"close": 89.9001,
+"commit_confirmed": 1.0,
+"supertrend_band": 95.4288,
+"supertrend_direction": -1.0
+},
+"met": 1,
+"meta": {
+"sl_pct": 0.03562,
+"sl_price": 93.1026,
+"tp1_pct": 0.07125,
+"tp1_price": 83.4951,
+"ts_pct": 0.05343
+},
+"signal": "hold",
+"tot": 2
+},
+"TF017|2|330": {
+"hold": "",
+"ind": {
+"atr": 1.591685,
+"close": 93.798,
+"commit_confirmed": 1.0,
+"supertrend_band": 88.9239,
+"supertrend_direction": 1.0
+},
+"met": 2,
+"meta": {
+"sl_pct": 0.03394,
+"sl_price": 90.6146,
+"tp1_pct": 0.06788,
+"tp1_price": 100.1647,
+"ts_pct": 0.05091
+},
+"signal": "buy",
+"tot": 2
+},
+"TF017|2|420": {
+"hold": "Supertrend n\u00e3o flipou",
+"ind": {
+"atr": 1.88288,
+"close": 99.2104,
+"commit_confirmed": 1.0,
+"supertrend_band": 95.1254,
+"supertrend_direction": 1.0
+},
+"met": 1,
+"meta": {
+"sl_pct": 0.03796,
+"sl_price": 95.4446,
+"tp1_pct": 0.07591,
+"tp1_price": 106.7419,
+"ts_pct": 0.05694
+},
+"signal": "hold",
+"tot": 2
+},
+"TF017|2|500": {
+"hold": "Supertrend n\u00e3o flipou",
+"ind": {
+"atr": 1.855163,
+"close": 102.2866,
+"commit_confirmed": 1.0,
+"supertrend_band": 96.0752,
+"supertrend_direction": 1.0
+},
+"met": 1,
+"meta": {
+"sl_pct": 0.03627,
+"sl_price": 98.5763,
+"tp1_pct": 0.07255,
+"tp1_price": 109.7073,
+"ts_pct": 0.05441
+},
+"signal": "hold",
+"tot": 2
+},
+"TF017|3|200": {
+"hold": "Supertrend n\u00e3o flipou",
+"ind": {
+"atr": 1.694246,
+"close": 101.1788,
+"commit_confirmed": 1.0,
+"supertrend_band": 105.874,
+"supertrend_direction": -1.0
+},
+"met": 1,
+"meta": {
+"sl_pct": 0.03349,
+"sl_price": 104.5673,
+"tp1_pct": 0.06698,
+"tp1_price": 94.4018,
+"ts_pct": 0.05024
+},
+"signal": "hold",
+"tot": 2
+},
+"TF017|3|330": {
+"hold": "Supertrend n\u00e3o flipou",
+"ind": {
+"atr": 1.368996,
+"close": 90.0505,
+"commit_confirmed": 1.0,
+"supertrend_band": 90.8595,
+"supertrend_direction": -1.0
+},
+"met": 1,
+"meta": {
+"sl_pct": 0.03041,
+"sl_price": 92.7885,
+"tp1_pct": 0.06081,
+"tp1_price": 84.5745,
+"ts_pct": 0.04561
+},
+"signal": "hold",
+"tot": 2
+},
+"TF017|3|420": {
+"hold": "Supertrend n\u00e3o flipou",
+"ind": {
+"atr": 1.562837,
+"close": 96.587,
+"commit_confirmed": 1.0,
+"supertrend_band": 93.2192,
+"supertrend_direction": 1.0
+},
+"met": 1,
+"meta": {
+"sl_pct": 0.03236,
+"sl_price": 93.4613,
+"tp1_pct": 0.06472,
+"tp1_price": 102.8383,
+"ts_pct": 0.04854
+},
+"signal": "hold",
+"tot": 2
+},
+"TF017|3|500": {
+"hold": "Supertrend n\u00e3o flipou",
+"ind": {
+"atr": 1.791165,
+"close": 88.9759,
+"commit_confirmed": 1.0,
+"supertrend_band": 87.8703,
+"supertrend_direction": 1.0
+},
+"met": 1,
+"meta": {
+"sl_pct": 0.04026,
+"sl_price": 85.3936,
+"tp1_pct": 0.08052,
+"tp1_price": 96.1406,
+"ts_pct": 0.06039
+},
+"signal": "hold",
+"tot": 2
+}
+}

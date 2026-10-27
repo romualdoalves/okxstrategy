@@ -222,11 +222,14 @@ class SuperTrendStrategy(BaseStrategy):
         st     = [float("nan")] * n
         direc  = [1] * n  # começa como alta
 
-        hl2 = [(high.iloc[i] + low.iloc[i]) / 2.0 for i in range(n)]
+        # Arrays numpy: .iloc por candle custava ~100 µs e esta função roda a cada candle do backtest.
+        hl2 = ((high.to_numpy(dtype=float) + low.to_numpy(dtype=float)) / 2.0).tolist()
+        close_l = close.to_numpy(dtype=float).tolist()
+        atr_l = atr_series.to_numpy(dtype=float).tolist()
 
         for i in range(n):
-            atr_i = atr_series.iloc[i]
-            if pd.isna(atr_i):
+            atr_i = atr_l[i]
+            if atr_i != atr_i:      # NaN
                 continue
 
             # Bandas básicas
@@ -240,7 +243,7 @@ class SuperTrendStrategy(BaseStrategy):
                 # Upper band só sobe se estávamos em tendência de baixa
                 upper[i] = (
                     basic_upper
-                    if basic_upper < upper[i - 1] or close.iloc[i - 1] > upper[i - 1]
+                    if basic_upper < upper[i - 1] or close_l[i - 1] > upper[i - 1]
                     else upper[i - 1]
                 )
 
@@ -251,7 +254,7 @@ class SuperTrendStrategy(BaseStrategy):
                 # Lower band só desce se estávamos em tendência de alta
                 lower[i] = (
                     basic_lower
-                    if basic_lower > lower[i - 1] or close.iloc[i - 1] < lower[i - 1]
+                    if basic_lower > lower[i - 1] or close_l[i - 1] < lower[i - 1]
                     else lower[i - 1]
                 )
 
@@ -260,10 +263,10 @@ class SuperTrendStrategy(BaseStrategy):
                 direc[i] = 1
             elif st[i - 1] == upper[i - 1]:
                 # Estávamos usando upper como stop
-                direc[i] = -1 if close.iloc[i] <= upper[i] else 1
+                direc[i] = -1 if close_l[i] <= upper[i] else 1
             else:
                 # Estávamos usando lower como stop
-                direc[i] =  1 if close.iloc[i] >= lower[i] else -1
+                direc[i] =  1 if close_l[i] >= lower[i] else -1
 
             # Linha SuperTrend
             st[i] = lower[i] if direc[i] == 1 else upper[i]
