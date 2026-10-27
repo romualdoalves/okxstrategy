@@ -421,6 +421,12 @@ export default function BatchBacktest() {
   const { data: strategies = [] } = useQuery({ queryKey: ['strategies'], queryFn: getStrategies })
   const { data: bots = [] }       = useQuery({ queryKey: ['bots'],       queryFn: getBots       })
 
+  const strategyCounts = strategies.reduce((acc, s) => {
+    const prefix = (s.id || '').match(/^([A-Z]+)/i)?.[1]?.toUpperCase()
+    if (prefix) acc[prefix] = (acc[prefix] || 0) + 1
+    return acc
+  }, {})
+
   const usedSymbols = new Set(bots.map(b => b.symbol))
   const isAllAssets = symbol === ALL_ASSETS
   const freeAssets = SYMBOLS.filter(s => !usedSymbols.has(s))          // ativos sem bot (os únicos que dá para operar)
@@ -430,11 +436,6 @@ export default function BatchBacktest() {
     : null
   const selectedList = Object.values(selectedRows)
 
-  const strategyCounts = strategies.reduce((acc, s) => {
-    const prefix = (s.id || '').match(/^([A-Z]+)/i)?.[1]?.toUpperCase()
-    if (prefix) acc[prefix] = (acc[prefix] || 0) + 1
-    return acc
-  }, {})
 
   useEffect(() => {
     if (!loading) return undefined
