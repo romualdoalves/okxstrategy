@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 import aiohttp
+from sqlalchemy import func
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -11,6 +12,12 @@ from .database import HistoricCandleModel, SessionLocal, TrackedSymbolModel
 from .exchanges.factory import build_exchange, map_timeframe_for_history
 
 log = logging.getLogger("market_data")
+
+# Histórico alvo por série (símbolo/timeframe), usado pelo backtest. O 1º sync busca isso tudo via
+# history-candles; depois só os candles recentes (o /market/candles entrega ~1440, mas a cada 5 min
+# repetir 1500 por série era carga desnecessária).
+HISTORY_TARGET_CANDLES = 3000
+_RECENT_CANDLES = 300
 
 _ALLOWED_TIMEFRAMES = {"1m", "3m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "12h", "1D", "1W"}
 
@@ -25,6 +32,7 @@ class MarketDataService:
         self._task: Optional[asyncio.Task] = None
         self._running = False
         self.loop_interval = 300
+        self._history_exhausted: set[tuple[str, str]] = set()   # séries com menos histórico que o alvo
 
     async def start(self):
         if self._running:
@@ -80,9 +88,21 @@ class MarketDataService:
             return
 
         bar = map_timeframe_for_history(tf)
+        stored = (
+            db.query(func.count(HistoricCandleModel.epoch))
+            .filter(HistoricCandleModel.symbol == symbol, HistoricCandleModel.timeframe == tf)
+            .scalar()
+            or 0
+        )
+        deep = stored < HISTORY_TARGET_CANDLES * 0.95 and (symbol, tf) not in self._history_exhausted
         async with aiohttp.ClientSession() as http_session:
             ex = build_exchange(http_session)
-            candles = await ex.fetch_candles(symbol, bar, limit=1500)
+            if deep:
+                candles = await ex.fetch_history_candles(symbol, bar, limit=HISTORY_TARGET_CANDLES)
+                if len(candles) < HISTORY_TARGET_CANDLES * 0.95:
+                    self._history_exhausted.add((symbol, tf))   # a OKX não tem mais histórico: não insistir
+            else:
+                candles = await ex.fetch_candles(symbol, bar, limit=_RECENT_CANDLES)
 
         if not candles:
             return

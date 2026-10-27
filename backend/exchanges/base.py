@@ -46,6 +46,13 @@ class BaseExchange(ABC):
     ) -> list[CandleBar]:
         """Retorna candles históricos em ordem cronológica."""
 
+    async def fetch_history_candles(
+        self, symbol: str, timeframe: str, limit: int = 3000
+    ) -> list[CandleBar]:
+        """Histórico profundo (mais antigo que o endpoint de candles recentes). Por padrão usa
+        fetch_candles; exchanges com endpoint de histórico sobrescrevem."""
+        return await self.fetch_candles(symbol, timeframe, limit=limit)
+
     @abstractmethod
     async def get_ticker(self, symbol: str) -> dict:
         """Retorna last, bid, ask, 24h vol."""

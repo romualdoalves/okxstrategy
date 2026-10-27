@@ -330,6 +330,30 @@ class OKXExchange(BaseExchange):
         # OKX retorna do mais recente para o mais antigo — invertemos para ordem cronológica
         return [_parse_candle(r) for r in reversed(all_rows)]
 
+    async def fetch_history_candles(self, symbol: str, timeframe: str, limit: int = 3000) -> list[CandleBar]:
+        """Histórico profundo via /market/history-candles (o /market/candles só entrega ~1440
+        candles recentes). Endpoint público, 100 candles por página, limite de 20 req/2s."""
+        bar = _tf_to_okx(timeframe)
+        rows: list = []
+        after = ""
+        async with aiohttp.ClientSession() as s:
+            while len(rows) < limit:
+                path = f"/api/v5/market/history-candles?instId={symbol}&bar={bar}&limit=100"
+                if after:
+                    path += f"&after={after}"
+                async with s.get(f"{OKX_BASE}{path}") as resp:
+                    data = await resp.json()
+                _check(data, "fetch_history_candles")
+                chunk = data.get("data", [])
+                if not chunk:
+                    break
+                rows.extend(chunk)
+                after = chunk[-1][0]                      # ts do candle mais antigo da página
+                if len(chunk) < 100:
+                    break
+                await asyncio.sleep(0.11)
+        return [_parse_candle(r) for r in reversed(rows[:limit])]
+
     async def get_ticker(self, symbol: str) -> dict:
         path = f"/api/v5/market/ticker?instId={symbol}"
         async with aiohttp.ClientSession() as s:

@@ -1,5 +1,7 @@
 import logging
+from bisect import bisect_right
 
+from .backtest_stats import robust_summary
 from .strategies.base import Signal
 from .strategies.registry import get_strategy
 
@@ -9,6 +11,9 @@ FIXED_STAKE_USD = 100.0
 INITIAL_BALANCE = 1000.0
 STRICT_FEE_RATE = 0.001
 STRICT_SLIPPAGE_RATE = 0.0005
+# Janela máxima de candles entregue à estratégia a cada passo. Mantém o custo linear no tamanho do
+# histórico (antes a janela crescia até 500 candles, que era o próprio limite de dados do scan).
+STRICT_WINDOW = 500
 
 
 class BacktestEngine:
@@ -86,7 +91,12 @@ class BacktestEngine:
             ts_pct = max(0.005, min(0.05, (atr * 1.5) / entry if entry > 0 else 0.01))
         return sl_price, tp1_price, ts_pct
 
-    async def run_strict(
+    async def run_strict(self, candles: list, **kwargs):
+        """Versão assíncrona de run_strict_sync (mesma API). Atenção: continua CPU-bound; no
+        servidor, prefira executar run_strict_sync fora do event loop (ver routers/backtest.py)."""
+        return self.run_strict_sync(candles, **kwargs)
+
+    def run_strict_sync(
         self,
         candles: list,
         *,
@@ -140,6 +150,21 @@ class BacktestEngine:
         position: dict | None = None
         warmup = 100
 
+        # Epochs dos timeframes extras ordenados: corte por bisect em vez de varrer a lista a cada passo.
+        extra_sorted: dict[str, tuple[list, list[int]]] = {}
+        for tf, extra in (extra_candles or {}).items():
+            ordered = sorted(extra, key=lambda c: int(getattr(c, "epoch", 0) or 0))
+            extra_sorted[tf] = (ordered, [int(getattr(c, "epoch", 0) or 0) for c in ordered])
+
+        def context_until(epoch: int) -> dict:
+            if not extra_sorted:
+                return {}
+            out = {}
+            for tf, (ordered, epochs) in extra_sorted.items():
+                end = bisect_right(epochs, epoch)
+                out[tf] = ordered[max(0, end - STRICT_WINDOW):end]
+            return {"extra_candles": out}
+
         def close_position(exit_price: float, idx: int, reason: str, exit_type: str):
             nonlocal position, signal_exits, stop_exits, trailing_exits
             if not position:
@@ -184,7 +209,7 @@ class BacktestEngine:
 
         for i in range(warmup, len(candles)):
             bar = candles[i]
-            current_slice = candles[: i + 1]
+            current_slice = candles[max(0, i + 1 - STRICT_WINDOW): i + 1]
             current_price = float(bar.close or 0.0)
             if current_price <= 0:
                 continue
@@ -224,7 +249,7 @@ class BacktestEngine:
                             close_position(exit_px, i, "Trailing Stop simulado", "trailing")
 
             try:
-                ctx = self._context_until(extra_candles, int(getattr(bar, "epoch", 0) or 0))
+                ctx = context_until(int(getattr(bar, "epoch", 0) or 0))
                 result = self.strategy.compute_with_context(current_slice, ctx)
                 if not result:
                     continue
@@ -318,6 +343,7 @@ class BacktestEngine:
             "signal_exits": signal_exits,
             "tp1_hits": tp1_hits,
             "open_position": open_position,
+            "robust": robust_summary(self.closed_trades, len(candles), warmup),
             "coverage": coverage,
             "assumptions": [
                 "OKX spot-only: sinais SELL com posição flat são ignorados, não viram short.",
