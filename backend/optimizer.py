@@ -102,6 +102,13 @@ class StrategyOptimizer:
                 "sl_mult": [1.5, 2.0, 2.5],
                 "tp1_rr": [1.5, 2.0, 3.0],
             },
+            "TF016": {
+                "dominance_threshold": [100.0, 120.0, 150.0],
+                "ema_fast": [9, 13],
+                "ema_slow": [21, 34],
+                "sl_mult": [1.5, 2.0, 2.5],
+                "tp1_rr": [1.5, 2.0, 3.0],
+            },
             "MR001": {
                 "ema_period": [55, 80, 120],
                 "signal_period": [3, 5, 8],
