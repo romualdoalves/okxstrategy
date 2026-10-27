@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ScanSearch, Play, HelpCircle, ChevronDown, ChevronUp, PlusCircle, CheckSquare, Square, ShieldCheck, AlertTriangle, Clock } from 'lucide-react'
@@ -92,6 +92,17 @@ function RobustnessBlock({ robust }) {
       )}
     </div>
   )
+}
+
+// mm:ss (ou h:mm:ss) a partir de milissegundos
+function formatElapsed(ms) {
+  const total = Math.max(0, Math.floor((ms || 0) / 1000))
+  const h = Math.floor(total / 3600)
+  const m = Math.floor((total % 3600) / 60)
+  const sec = total % 60
+  const mm = String(m).padStart(h ? 2 : 1, '0')
+  const ss = String(sec).padStart(2, '0')
+  return h ? `${h}:${mm}:${ss}` : `${mm}:${ss}`
 }
 
 function resultKey(r, fallbackSymbol = '') {
@@ -321,6 +332,8 @@ export default function BatchBacktest() {
   const [bulkCreating, setBulkCreating] = useState(false)
   const [bulkMessage, setBulkMessage] = useState(null)
   const [scanProgress, setScanProgress] = useState(null)
+  const [now, setNow] = useState(Date.now())   // relógio do temporizador (atualiza 1x/s durante o scan)
+  const [lastScanMs, setLastScanMs] = useState(null)
 
   const { data: strategies = [] } = useQuery({ queryKey: ['strategies'], queryFn: getStrategies })
   const { data: bots = [] }       = useQuery({ queryKey: ['bots'],       queryFn: getBots       })
@@ -336,11 +349,25 @@ export default function BatchBacktest() {
     return acc
   }, {})
 
+  useEffect(() => {
+    if (!loading) return undefined
+    setNow(Date.now())
+    const id = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [loading])
+
   function setCategoryProgress(catId, status, extra = {}) {
     setScanProgress(prev => {
       if (!prev) return prev
+      const stamp = Date.now()
       const items = prev.items.map(item =>
-        item.id === catId ? { ...item, status, ...extra } : item
+        item.id === catId
+          ? {
+              ...item, status, ...extra,
+              ...(status === 'running' ? { startedAt: stamp, finishedAt: null } : {}),
+              ...(status === 'done' || status === 'failed' ? { finishedAt: stamp } : {}),
+            }
+          : item
       )
       const completed = items.filter(item => item.status === 'done' || item.status === 'failed').length
       const current = items.find(item => item.status === 'running')?.id || null
@@ -349,7 +376,9 @@ export default function BatchBacktest() {
   }
 
   const run = async () => {
+    const scanStartedAt = Date.now()
     setLoading(true)
+    setLastScanMs(null)
     setScanProgress(null)
     setResults(null)
     setSelectedRows({})
@@ -366,7 +395,8 @@ export default function BatchBacktest() {
         total: categoriesToScan.length,
         completed: 0,
         current: null,
-        items: categoriesToScan.map(cat => ({ id: cat, status: 'pending', resultCount: 0, error: '' })),
+        startedAt: scanStartedAt,
+        items: categoriesToScan.map(cat => ({ id: cat, status: 'pending', resultCount: 0, error: '', startedAt: null, finishedAt: null })),
       })
       const merged = []
       const failedCategories = []
@@ -412,7 +442,7 @@ export default function BatchBacktest() {
         if (!prev) return prev
         const items = prev.items.map(item => {
           if (item.status === 'pending' || item.status === 'running') {
-            return { ...item, status: 'failed', error: item.error || e.message }
+            return { ...item, status: 'failed', error: item.error || e.message, finishedAt: Date.now() }
           }
           return item
         })
@@ -421,6 +451,7 @@ export default function BatchBacktest() {
       })
       setError(e.message)
     } finally {
+      setLastScanMs(Date.now() - scanStartedAt)
       setLoading(false)
     }
   }
@@ -661,7 +692,13 @@ export default function BatchBacktest() {
               <div>
                 <div className="flex items-center justify-between text-xs text-muted mb-1.5">
                   <span>Progresso geral</span>
-                  <span>{scanProgress.completed}/{scanProgress.total}</span>
+                  <span className="flex items-center gap-3">
+                    <span className="flex items-center gap-1 font-mono text-white" title="Tempo decorrido desde o início do scan">
+                      <Clock size={12} className="text-accent" />
+                      {formatElapsed(now - scanProgress.startedAt)}
+                    </span>
+                    <span>{scanProgress.completed}/{scanProgress.total}</span>
+                  </span>
                 </div>
                 <div className="h-2 rounded-full bg-white/10 overflow-hidden">
                   <div
@@ -681,8 +718,13 @@ export default function BatchBacktest() {
                     <div key={item.id} className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
                       <div className="flex items-center justify-between gap-2 mb-1">
                         <div className="text-xs font-bold text-white">{item.id} {meta ? `- ${meta.label}` : ''}</div>
-                        <div className={`text-[10px] font-bold ${isDone ? 'text-green-400' : isFailed ? 'text-red-400' : isRunning ? 'text-accent' : 'text-muted'}`}>
-                          {isDone ? `Concluida (${item.resultCount})` : isFailed ? 'Falhou' : isRunning ? 'Executando' : 'Pendente'}
+                        <div className={`flex items-center gap-2 text-[10px] font-bold ${isDone ? 'text-green-400' : isFailed ? 'text-red-400' : isRunning ? 'text-accent' : 'text-muted'}`}>
+                          {item.startedAt && (
+                            <span className="font-mono font-normal text-white/70">
+                              {formatElapsed((item.finishedAt || now) - item.startedAt)}
+                            </span>
+                          )}
+                          <span>{isDone ? `Concluida (${item.resultCount})` : isFailed ? 'Falhou' : isRunning ? 'Executando' : 'Pendente'}</span>
                         </div>
                       </div>
                       <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
@@ -714,6 +756,11 @@ export default function BatchBacktest() {
 
           <div className="flex flex-wrap items-center gap-3 mb-4">
             <span className="text-sm text-muted">{results.total} estratégias · {results.symbol}</span>
+            {lastScanMs != null && (
+              <span className="flex items-center gap-1 text-xs text-muted" title="Duração total do último scan">
+                <Clock size={12} /> {formatElapsed(lastScanMs)}
+              </span>
+            )}
             {coverageCounts && (
               <>
                 <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-green-500/10 text-green-300 border border-green-500/25">
