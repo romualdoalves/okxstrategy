@@ -320,6 +320,28 @@ def get_bot(bot_id: int, db: Session = Depends(get_db)):
 
     return {**bot.__dict__, "runtime": status}
 
+def _assert_flat_before_symbol_change(db: Session, bot: BotModel, new_symbol: str) -> None:
+    """
+    Trocar o ativo de um bot com posição aberta deixaria a posição (e o Stop Loss) órfãos no ativo antigo e o
+    bot, ao reiniciar, adotaria o trade de entrada antigo para o ativo novo (tamanho e stop errados).
+    Só permite a troca com o bot flat: sem posição em memória e sem trade de entrada em aberto no banco.
+    """
+    if _norm_symbol(new_symbol) == _norm_symbol(bot.symbol):
+        return
+    inst = manager._instances.get(bot.id)
+    open_trade = (
+        db.query(TradeModel)
+        .filter(TradeModel.bot_id == bot.id, TradeModel.type == "entry", TradeModel.exit_price.is_(None))
+        .first()
+    )
+    if (inst is not None and getattr(inst, "_direction", 0) != 0) or open_trade is not None:
+        raise HTTPException(
+            400,
+            f"Não é possível trocar o ativo de '{bot.name}' com posição aberta em {bot.symbol}. "
+            "Feche ou liquide a posição primeiro (e aguarde o fechamento ser registrado).",
+        )
+
+
 @router.patch("/api/bots/{bot_id}")
 async def update_bot(bot_id: int, payload: BotUpdate, db: Session = Depends(get_db)):
     bot = db.get(BotModel, bot_id)
@@ -332,6 +354,7 @@ async def update_bot(bot_id: int, payload: BotUpdate, db: Session = Depends(get_
         payload.symbol = _norm_symbol(payload.symbol)
         await _assert_symbol_tradable(payload.symbol, demo=bool(bot.demo))
     if payload.symbol and payload.symbol != _norm_symbol(bot.symbol):
+        _assert_flat_before_symbol_change(db, bot, payload.symbol)
         _assert_symbol_available(db, payload.symbol, exclude_bot_id=bot_id)
     update_data = payload.model_dump(exclude_none=True)
     update_data["leverage"] = 1
@@ -438,6 +461,7 @@ async def switch_bot_symbol(
     _assert_spot_only(payload.symbol)
     payload.symbol = _norm_symbol(payload.symbol)
     await _assert_symbol_tradable(payload.symbol, demo=bool(bot.demo))
+    _assert_flat_before_symbol_change(db, bot, payload.symbol)
     _assert_symbol_available(db, payload.symbol, exclude_bot_id=bot_id)
 
     was_active = bool(bot.active)

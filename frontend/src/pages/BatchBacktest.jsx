@@ -424,11 +424,9 @@ export default function BatchBacktest() {
   const estimateMin = isAllAssets && category !== 'ALL'
     ? Math.max(1, Math.round(((strategyCounts[category] || 0) * freeAssets.length * SECONDS_PER_STRATEGY) / 60))
     : null
-  const usedStrategies = Array.from(new Set(bots.map(b => b.strategy_id)))
   const selectedList = Object.values(selectedRows)
 
   const strategyCounts = strategies.reduce((acc, s) => {
-    if (usedStrategies.includes(s.id)) return acc
     const prefix = (s.id || '').match(/^([A-Z]+)/i)?.[1]?.toUpperCase()
     if (prefix) acc[prefix] = (acc[prefix] || 0) + 1
     return acc
@@ -500,7 +498,7 @@ export default function BatchBacktest() {
         const sym = assetMode ? unit : symbol          // ativo da requisição
         setCategoryProgress(unit, 'running', { error: '' })
         const scan = await requestCategoryScan(
-          { category: cat, symbol: sym, exclude_strategies: usedStrategies, strict: true, ...(stopWhenSuitable ? { stop_when_suitable: true } : {}) },
+          { category: cat, symbol: sym, strict: true, ...(stopWhenSuitable ? { stop_when_suitable: true } : {}) },
           3,
         )
         if (!scan.ok) {
@@ -572,7 +570,6 @@ export default function BatchBacktest() {
 
   function selectionBlockReason(row, rowSymbol) {
     if (usedSymbols.has(rowSymbol)) return 'Já existe um bot usando este ativo'
-    if (usedStrategies.includes(row.strategy_id)) return 'Já existe um bot usando esta estratégia'
     const duplicateSymbol = selectedList.some(item => item.symbol === rowSymbol && item.key !== resultKey(row, rowSymbol))
     if (duplicateSymbol) return 'Só é permitido um bot por ativo'
     return ''
@@ -602,7 +599,7 @@ export default function BatchBacktest() {
       const rowSymbol = row.symbol || fallbackSymbol
       const rec = row.recommendation || {}
       if (!rowSymbol || rec.verdict === 'N/A') continue
-      if (usedSymbols.has(rowSymbol) || usedStrategies.includes(row.strategy_id) || symbols.has(rowSymbol)) continue
+      if (usedSymbols.has(rowSymbol) || symbols.has(rowSymbol)) continue
       symbols.add(rowSymbol)
       next[resultKey(row, rowSymbol)] = { key: resultKey(row, rowSymbol), ...row, symbol: rowSymbol }
     }
