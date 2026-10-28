@@ -3,8 +3,7 @@
     "verdict": "candidate",
     "reason": "Único com ganho consistente fora da amostra nos 3 ativos e que ficou fora da queda de 2022 (0 a 1 trade). Lucra em 2019, 2020, 2021 e 2024.",
     "applied_params": {"ema_period": 13, "sl_mult": 3.0},
-    "note": "Padrões alterados de 21/2,5 para 13/3,0 depois do walk-forward. O baseline com os novos padrões confirmou (PF 3,54 / 2,32 / 4,36 no período todo; fora da amostra 1,73 / 1,10 / 1,81), mas as tabelas de walk-forward e por ano abaixo foram medidas com 21/2,5.",
-    "studied_rev": "347ad8a~1"
+    "note": "Padrões alterados de 21/2,5 para 13/3,0 depois do walk-forward. O baseline e a tabela por ano foram medidos com 13/3,0; a tabela de walk-forward compara os padrões antigos (21/2,5) com o candidato 13/3,0."
   },
   "TF009": {
     "verdict": "candidate",
@@ -47,9 +46,11 @@
     "applied_params": {}
   },
   "RG005": {
-    "verdict": "watch",
-    "reason": "Baseline 1D promissor (PF fora da amostra 1,60 no BTC e 1,10 na ETH, 37 a 38 trades), mas a SOL teve só 4 trades fora da amostra e a fraqueza na ETH pede confirmação. Walk-forward e análise por ano ainda não foram feitos.",
-    "applied_params": {}
+    "verdict": "candidate",
+    "reason": "Walk-forward positivo nos 3 ativos (PF fora da amostra 1,81 / 2,42 / 1,36 com 23 a 32 trades, amostra maior que a da TF008). Ganha em 2020, 2021 e 2023, mas perde em 2022 (-21 a -41): não protege no mercado de baixa.",
+    "applied_params": {"sl_mult": 3.0},
+    "note": "O stop passou de 2,0 para 3,0 ATR depois do estudo (único parâmetro em que os 3 ativos convergiram). Os números do quadro foram medidos com 2,0: rodar o baseline de novo para renovar.",
+    "studied_rev": "93f6761"
   },
   "RG001": {
     "verdict": "retired",

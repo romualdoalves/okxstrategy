@@ -32,7 +32,7 @@ def test_every_report_is_consistent():
 
 def test_parsers():
     wf = R.parse_walkforward((R._SRC / "walkforward_1d.txt").read_text(encoding="utf-8"))
-    assert set(wf) == {"TF006", "TF008", "TF009", "TF014", "TF015", "TF017", "TF018"}
+    assert set(wf) == {"RG005", "TF006", "TF008", "TF009", "TF014", "TF015", "TF017", "TF018"}
     assert wf["TF008"]["SOL-USDT"]["oos_pf"] == 3.055 and wf["TF008"]["SOL-USDT"]["folds_positive"] == 3
     per, bh = R.parse_yearly((R._SRC / "yearly_1d.txt").read_text(encoding="utf-8"))
     assert bh["BTC-USDT"][2022] == -65 and per["TF008"]["BTC-USDT"][2022] == [0, 0]

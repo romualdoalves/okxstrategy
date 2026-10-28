@@ -31,7 +31,7 @@ class MarkovRegimeTransitionStrategy(BaseStrategy):
                 "bull_threshold": ParamDef(type="float", default=5.0, min=1.0, max=20.0, step=0.5, description="Retorno percentual mínimo para classificar como Bull"),
                 "bear_threshold": ParamDef(type="float", default=-5.0, min=-20.0, max=-1.0, step=0.5, description="Retorno percentual máximo para classificar como Bear"),
                 "atr_period": ParamDef(type="int", default=14, min=7, max=30, step=1, description="Período do ATR para gestão de risco"),
-                "sl_mult": ParamDef(type="float", default=2.0, min=1.0, max=5.0, step=0.5, description="Multiplicador ATR para Stop Loss"),
+                "sl_mult": ParamDef(type="float", default=3.0, min=1.0, max=5.0, step=0.5, description="Multiplicador ATR para Stop Loss"),
                 "tp1_rr": ParamDef(type="float", default=2.0, min=1.0, max=5.0, step=0.5, description="Relação risco-retorno do TP1"),
                 "ts_mult": ParamDef(type="float", default=3.0, min=1.0, max=5.0, step=0.5, description="Multiplicador ATR para Trailing Stop após TP1"),
             },

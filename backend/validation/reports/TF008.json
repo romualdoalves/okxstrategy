@@ -9,8 +9,8 @@
   "ema_period": 13,
   "sl_mult": 3.0
  },
- "note": "Padrões alterados de 21/2,5 para 13/3,0 depois do walk-forward. O baseline com os novos padrões confirmou (PF 3,54 / 2,32 / 4,36 no período todo; fora da amostra 1,73 / 1,10 / 1,81), mas as tabelas de walk-forward e por ano abaixo foram medidas com 21/2,5.",
- "file_sha256": "352dbe76eddb50093e7ead20b12d39073af8889efefe3c28af4ee66b3b136661",
+ "note": "Padrões alterados de 21/2,5 para 13/3,0 depois do walk-forward. O baseline e a tabela por ano foram medidos com 13/3,0; a tabela de walk-forward compara os padrões antigos (21/2,5) com o candidato 13/3,0.",
+ "file_sha256": "c91d29cbc6ae7a7b0410b69624620db0e5e9592e383727f70be1badca748fe19",
  "walkforward": {
   "BTC-USDT": {
    "trials": 80,
@@ -80,36 +80,36 @@
     0
    ],
    "2019": [
-    59,
-    6
+    74,
+    4
    ],
    "2020": [
-    128,
+    146,
     5
    ],
    "2021": [
-    -19,
-    8
+    -17,
+    3
    ],
    "2022": [
     0,
     0
    ],
    "2023": [
-    -13,
-    8
+    4,
+    5
    ],
    "2024": [
-    52,
-    6
+    77,
+    5
    ],
    "2025": [
-    4,
-    1
+    -16,
+    3
    ],
    "2026": [
-    0,
-    0
+    -6,
+    1
    ]
   },
   "ETH-USDT": {
@@ -118,41 +118,41 @@
     0
    ],
    "2019": [
-    43,
-    3
+    42,
+    2
    ],
    "2020": [
-    175,
-    9
+    127,
+    6
    ],
    "2021": [
-    80,
-    8
+    193,
+    9
    ],
    "2022": [
     -6,
     1
    ],
    "2023": [
-    12,
+    23,
     5
    ],
    "2024": [
-    -36,
-    8
-   ],
-   "2025": [
-    -24,
+    -12,
     3
    ],
+   "2025": [
+    9,
+    4
+   ],
    "2026": [
-    0,
-    0
+    -4,
+    1
    ]
   },
   "SOL-USDT": {
    "2021": [
-    211,
+    351,
     7
    ],
    "2022": [
@@ -160,16 +160,16 @@
     0
    ],
    "2023": [
-    124,
-    7
+    174,
+    6
    ],
    "2024": [
-    38,
-    9
+    10,
+    6
    ],
    "2025": [
-    2,
-    3
+    8,
+    2
    ],
    "2026": [
     0,

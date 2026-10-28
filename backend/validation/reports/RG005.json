@@ -2,14 +2,177 @@
  "strategy_id": "RG005",
  "timeframe": "1D",
  "generated_at": "2026-10-28",
- "verdict": "watch",
- "verdict_label": "Em observação",
- "reason": "Baseline 1D promissor (PF fora da amostra 1,60 no BTC e 1,10 na ETH, 37 a 38 trades), mas a SOL teve só 4 trades fora da amostra e a fraqueza na ETH pede confirmação. Walk-forward e análise por ano ainda não foram feitos.",
- "applied_params": {},
- "note": null,
+ "verdict": "candidate",
+ "verdict_label": "Candidata",
+ "reason": "Walk-forward positivo nos 3 ativos (PF fora da amostra 1,81 / 2,42 / 1,36 com 23 a 32 trades, amostra maior que a da TF008). Ganha em 2020, 2021 e 2023, mas perde em 2022 (-21 a -41): não protege no mercado de baixa.",
+ "applied_params": {
+  "sl_mult": 3.0
+ },
+ "note": "O stop passou de 2,0 para 3,0 ATR depois do estudo (único parâmetro em que os 3 ativos convergiram). Os números do quadro foram medidos com 2,0: rodar o baseline de novo para renovar.",
  "file_sha256": "dfc9f79f53ab680a1a6d42cc25e13da4704cafe5099dfd935e41d2003479da29",
- "walkforward": {},
- "yearly": {},
+ "walkforward": {
+  "BTC-USDT": {
+   "trials": 80,
+   "oos_trades": 32,
+   "oos_pf": 1.805,
+   "oos_p5": 0.79,
+   "oos_profit": 122.11,
+   "current_trades": 32,
+   "current_pf": 1.116,
+   "current_profit": 18.0,
+   "folds_positive": 2,
+   "folds_total": 3,
+   "plateau": true,
+   "candidate": {
+    "lookback": 14,
+    "bull_threshold": 3.0,
+    "bear_threshold": -3.0,
+    "sl_mult": 3.0
+   }
+  },
+  "ETH-USDT": {
+   "trials": 80,
+   "oos_trades": 27,
+   "oos_pf": 2.422,
+   "oos_p5": 1.054,
+   "oos_profit": 185.46,
+   "current_trades": 33,
+   "current_pf": 1.728,
+   "current_profit": 112.37,
+   "folds_positive": 3,
+   "folds_total": 3,
+   "plateau": false,
+   "candidate": {
+    "lookback": 20,
+    "bull_threshold": 8.0,
+    "bear_threshold": -3.0,
+    "sl_mult": 3.0
+   }
+  },
+  "SOL-USDT": {
+   "trials": 80,
+   "oos_trades": 23,
+   "oos_pf": 1.364,
+   "oos_p5": 0.522,
+   "oos_profit": 69.59,
+   "current_trades": 19,
+   "current_pf": 1.54,
+   "current_profit": 70.65,
+   "folds_positive": 2,
+   "folds_total": 3,
+   "plateau": true,
+   "candidate": {
+    "lookback": 14,
+    "bull_threshold": 3.0,
+    "bear_threshold": -5.0,
+    "sl_mult": 3.0
+   }
+  }
+ },
+ "yearly": {
+  "BTC-USDT": {
+   "2018": [
+    0,
+    0
+   ],
+   "2019": [
+    -21,
+    3
+   ],
+   "2020": [
+    398,
+    3
+   ],
+   "2021": [
+    -15,
+    6
+   ],
+   "2022": [
+    -41,
+    4
+   ],
+   "2023": [
+    32,
+    8
+   ],
+   "2024": [
+    47,
+    6
+   ],
+   "2025": [
+    -9,
+    4
+   ],
+   "2026": [
+    4,
+    4
+   ]
+  },
+  "ETH-USDT": {
+   "2018": [
+    0,
+    0
+   ],
+   "2019": [
+    0,
+    0
+   ],
+   "2020": [
+    230,
+    5
+   ],
+   "2021": [
+    95,
+    6
+   ],
+   "2022": [
+    -41,
+    4
+   ],
+   "2023": [
+    -9,
+    5
+   ],
+   "2024": [
+    5,
+    7
+   ],
+   "2025": [
+    -32,
+    6
+   ],
+   "2026": [
+    23,
+    4
+   ]
+  },
+  "SOL-USDT": {
+   "2021": [
+    130,
+    7
+   ],
+   "2022": [
+    -21,
+    3
+   ],
+   "2023": [
+    131,
+    3
+   ],
+   "2024": [
+    6,
+    8
+   ],
+   "2025": [
+    -42,
+    3
+   ],
+   "2026": [
+    -18,
+    3
+   ]
+  }
+ },
  "buy_hold": {
   "BTC-USDT": {
    "2018": -29,
