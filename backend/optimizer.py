@@ -110,6 +110,24 @@ class StrategyOptimizer:
                 "sl_mult": [1.5, 2.0, 2.5],
                 "tp1_rr": [1.5, 2.0, 3.0],
             },
+            "TF017": {
+                "supertrend_factor": [2.0, 3.0, 4.0],
+                "commit_buffer": [0.25, 0.5, 0.75],
+                "sl_mult": [1.5, 2.0, 3.0],
+                "tp1_rr": [1.5, 2.0, 3.0],
+            },
+            "TF018": {
+                "rsi_oversold": [5, 10, 20],
+                "keltner_mult": [2.0, 2.5, 3.0],
+                "regime_threshold": [20.0, 25.0, 30.0],
+                "tp1_rr": [1.5, 2.0, 3.0],
+            },
+            "TF015": {
+                "ema_period": [5, 9, 13],
+                "confirm_candles": [1, 2, 3],
+                "sl_mult": [1.5, 2.0, 3.0],
+                "tp1_rr": [1.0, 2.0, 3.0],
+            },
             "MR001": {
                 "ema_period": [55, 80, 120],
                 "signal_period": [3, 5, 8],
