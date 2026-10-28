@@ -4,12 +4,53 @@
  "generated_at": "2026-10-28",
  "verdict": "watch",
  "verdict_label": "Em observação",
- "reason": "Corrigida: lia um atributo de tempo inexistente e nunca operava (0 trades em 8 anos). A lei de potência é calibrada para o BTC, então só faz sentido para BTC; precisa de novo baseline.",
- "applied_params": {},
- "note": null,
- "file_sha256": "f98961025dccf2bfdc87f35b49890ff57f328d2dbdf6ee6703eec78b810c7707",
+ "reason": "Só vale para o BTC (a lei de potência é calibrada para ele). Em 8 anos: 17 trades, PF 5,03, lucro de US$ 682, mas cerca de 70% do lucro vem de 2020 e fora da amostra são só 4 trades (PF 0,51). Compra os fundos de 2018 e 2020 e perde em 2022 (-33). Fica 70% do tempo comprada, então se parece com segurar o BTC: amostra pequena demais para concluir.",
+ "applied_params": {
+  "power_law_a": -17.01
+ },
+ "note": "O intercepto -17,584 era o piso do canal e a estratégia só vendia (0 trades); corrigido para o valor central -17,01 pelo valor publicado, sem ajuste aos dados.",
+ "file_sha256": "713acaf3d3f79379434d3b26b7f3fb816cd079586c1d7995f27aec1c85fb4baf",
  "walkforward": {},
- "yearly": {},
+ "yearly": {
+  "BTC-USDT": {
+   "2018": [
+    126,
+    2
+   ],
+   "2019": [
+    -23,
+    1
+   ],
+   "2020": [
+    475,
+    2
+   ],
+   "2021": [
+    0,
+    0
+   ],
+   "2022": [
+    -33,
+    3
+   ],
+   "2023": [
+    73,
+    3
+   ],
+   "2024": [
+    86,
+    2
+   ],
+   "2025": [
+    -7,
+    3
+   ],
+   "2026": [
+    -15,
+    1
+   ]
+  }
+ },
  "buy_hold": {
   "BTC-USDT": {
    "2018": -29,
