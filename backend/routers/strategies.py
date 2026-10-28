@@ -47,6 +47,13 @@ class FactoryDeployRequest(BaseModel):
     source_text: str = ""
     approved: bool = False   # confirmação explícita de que o código foi revisado
 
+@router.get("/api/strategies/{strategy_id}/study")
+def strategy_study(strategy_id: str):
+    """Relatório do estudo (baseline, walk-forward, por ano) exibido no (i) do bot."""
+    from ..validation.reports import load_study
+    return load_study(strategy_id)
+
+
 @router.get("/api/strategy-factory/status")
 def factory_status():
     """Verifica se a KIMI está configurada."""

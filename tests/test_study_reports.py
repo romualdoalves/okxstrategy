@@ -1,0 +1,62 @@
+"""Relatórios de estudo (quadro (i) do bot): gerados a partir das fontes, íntegros e com carimbo de validade."""
+import json
+
+from backend.validation import reports as R
+
+_VALID = {"candidate", "watch", "retired"}
+
+
+def test_reports_are_up_to_date_with_sources(tmp_path, monkeypatch):
+    """Os JSON versionados são exatamente o que o gerador produz hoje (ninguém editou à mão)."""
+    before = {p.name: json.loads(p.read_text(encoding="utf-8")) for p in R._DIR.glob("TF*.json")}
+    assert before, "nenhum relatório versionado"
+    monkeypatch.setattr(R, "_DIR", tmp_path)
+    monkeypatch.setattr(R, "_studied_hash", lambda sid, rev: "x")  # o hash depende do git; aqui só o conteúdo
+    R.build_reports()
+    for name, old in before.items():
+        new = json.loads((tmp_path / name).read_text(encoding="utf-8"))
+        for d in (old, new):
+            d.pop("generated_at"), d.pop("file_sha256")
+        assert new == old, f"{name} desatualizado: rode python -m backend.validation.reports"
+
+
+def test_every_report_is_consistent():
+    for p in R._DIR.glob("TF*.json"):
+        r = json.loads(p.read_text(encoding="utf-8"))
+        assert r["strategy_id"] == p.stem and r["verdict"] in _VALID and r["reason"] and r["caveats"]
+        assert r["verdict_label"] == R.VERDICT_LABELS[r["verdict"]]
+        assert r["file_sha256"], f"{p.stem}: sem hash do código estudado"
+        if r["verdict"] != "retired" or r["yearly"]:
+            assert r["yearly"], f"{p.stem}: sem detalhamento por ano"
+
+
+def test_parsers():
+    wf = R.parse_walkforward((R._SRC / "walkforward_1d.txt").read_text(encoding="utf-8"))
+    assert set(wf) == {"TF006", "TF008", "TF009", "TF014", "TF015", "TF017", "TF018"}
+    assert wf["TF008"]["SOL-USDT"]["oos_pf"] == 3.055 and wf["TF008"]["SOL-USDT"]["folds_positive"] == 3
+    per, bh = R.parse_yearly((R._SRC / "yearly_1d.txt").read_text(encoding="utf-8"))
+    assert bh["BTC-USDT"][2022] == -65 and per["TF008"]["BTC-USDT"][2022] == [0, 0]
+    assert per["TF018"]["SOL-USDT"][2022] == [-166, 7]
+
+
+def test_unknown_strategy_has_no_study():
+    r = R.load_study("RG005")
+    assert r["verdict"] == "none" and r["stale"] is False
+
+
+def test_stale_flag_follows_code_hash(tmp_path, monkeypatch):
+    fresh = R.load_study("TF009")
+    assert fresh["stale"] is False  # estudado com o código atual
+    monkeypatch.setattr(R, "strategy_hash", lambda sid: "outro-hash")
+    assert R.load_study("TF009")["stale"] is True
+
+
+def test_study_endpoint():
+    from fastapi.testclient import TestClient
+    from backend.routers import strategies
+    from fastapi import FastAPI
+    app = FastAPI()
+    app.include_router(strategies.router)
+    c = TestClient(app)
+    assert c.get("/api/strategies/tf009/study").json()["verdict"] == "candidate"
+    assert c.get("/api/strategies/XX999/study").json()["verdict"] == "none"

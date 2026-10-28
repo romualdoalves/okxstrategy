@@ -1,0 +1,74 @@
+{
+  "TF008": {
+    "verdict": "candidate",
+    "reason": "Único com ganho consistente fora da amostra nos 3 ativos e que ficou fora da queda de 2022 (0 a 1 trade). Lucra em 2019, 2020, 2021 e 2024.",
+    "applied_params": {"ema_period": 13, "sl_mult": 3.0},
+    "note": "Padrões alterados de 21/2,5 para 13/3,0 depois do estudo (convergência nos 3 ativos). Os números do quadro foram medidos com 21/2,5: rodar o baseline de novo para renovar.",
+    "studied_rev": "347ad8a~1"
+  },
+  "TF009": {
+    "verdict": "candidate",
+    "reason": "Baseline 1D mais robusto (PF fora da amostra 1,53 / 3,94 / 2,45). A otimização piorou fora da amostra, então o padrão foi mantido. Perde em 2022 (-31 a -41).",
+    "applied_params": {}
+  },
+  "TF014": {
+    "verdict": "candidate",
+    "reason": "Ganha em anos de alta e perde em 2022 (-26 a -56). A otimização só melhora o BTC, então o padrão foi mantido.",
+    "applied_params": {}
+  },
+  "TF017": {
+    "verdict": "candidate",
+    "reason": "Padrão com PF 2,07 no BTC fora da amostra. Os candidatos de otimização são inconsistentes (sem planalto), então o padrão foi mantido. Perde pouco em 2022.",
+    "applied_params": {}
+  },
+  "TF015": {
+    "verdict": "watch",
+    "reason": "Lucro da SOL em 2021 (+789 com 3 trades) distorce o total, e a otimização piora a SOL fora da amostra. Em observação.",
+    "applied_params": {}
+  },
+  "TF006": {
+    "verdict": "watch",
+    "reason": "Poucos trades (0 a 7 por ano) e a SOL sem nenhum trade fora da amostra. Amostra insuficiente para concluir.",
+    "applied_params": {}
+  },
+  "TF007": {
+    "verdict": "watch",
+    "reason": "Sem trades até 2023 em 1D; só opera de 2024 em diante. Não é testável nesta janela.",
+    "applied_params": {}
+  },
+  "TF001": {
+    "verdict": "retired",
+    "reason": "Perde em quase todos os anos, com 50 a 150 trades por ano: excesso de operações sem vantagem.",
+    "applied_params": {}
+  },
+  "TF003": {
+    "verdict": "retired",
+    "reason": "Perde na maioria dos anos, com 40 a 120 trades por ano: excesso de operações sem vantagem.",
+    "applied_params": {}
+  },
+  "TF018": {
+    "verdict": "retired",
+    "reason": "Perde na ETH com qualquer parâmetro (PF 0,53 a 0,74) e teve -166 na SOL em 2022: compra a queda em mercado de baixa.",
+    "applied_params": {}
+  },
+  "TF004": {
+    "verdict": "retired",
+    "reason": "Reprovada no baseline 1D. Sem walk-forward.",
+    "applied_params": {}
+  },
+  "TF005": {
+    "verdict": "retired",
+    "reason": "Reprovada no baseline 1D (BTC e ETH). Sem walk-forward.",
+    "applied_params": {}
+  },
+  "TF011": {
+    "verdict": "retired",
+    "reason": "Reprovada no baseline 1D. Sem walk-forward.",
+    "applied_params": {}
+  },
+  "TF012": {
+    "verdict": "retired",
+    "reason": "Reprovada no baseline 1D. Sem walk-forward.",
+    "applied_params": {}
+  }
+}

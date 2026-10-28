@@ -1,11 +1,12 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Play, Square, ChevronRight, Activity, AlertTriangle, TrendingUp, Star, Zap, Clock, Bookmark, RefreshCw } from 'lucide-react'
+import { Play, Square, ChevronRight, Activity, AlertTriangle, TrendingUp, Star, Zap, Clock, Bookmark, RefreshCw, Info } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { startBot, stopBot, switchBotSymbol, liquidateBot, recaptureBaseline } from '../api'
 import { useLanguage } from '../i18n/LanguageContext'
 import StrategyChecklist, { getCriteriaCount } from './StrategyChecklist'
 import AssetPriceCard from './AssetPriceCard'
+import StudyModal from './StudyModal'
 import { useMarketStatus } from '../hooks/useMarketStatus'
 
 const FIXED_STAKE_USD = 100
@@ -103,6 +104,7 @@ export default function BotCard({ bot, liveStatus }) {
     qc.invalidateQueries({ queryKey: ['bots'] })
   }
 
+  const [showStudy, setShowStudy] = useState(false)
   const [capturingBaseline, setCapturingBaseline] = useState(false)
   async function handleRecaptureBaseline(e) {
     e.stopPropagation()
@@ -130,6 +132,15 @@ export default function BotCard({ bot, liveStatus }) {
             <span className={`w-2 h-2 rounded-full shrink-0 ${
               isRunning ? 'bg-bull animate-pulse' : isPositioned ? 'bg-yellow-400' : 'bg-border'
             }`} />
+            <button
+              type="button"
+              title="Resultados do estudo desta estratégia"
+              aria-label="Resultados do estudo desta estratégia"
+              onClick={(e) => { e.stopPropagation(); setShowStudy(true) }}
+              className="shrink-0 text-muted hover:text-accent transition-colors"
+            >
+              <Info size={14} />
+            </button>
           </div>
           <p className="text-xs text-muted truncate">
             {bot.symbol} · {bot.timeframe}
@@ -151,6 +162,8 @@ export default function BotCard({ bot, liveStatus }) {
           </span>
         </div>
       </div>
+
+      {showStudy && <StudyModal strategyId={bot.strategy_id} onClose={() => setShowStudy(false)} />}
 
       {/* Market Data */}
       <AssetPriceCard symbol={bot.symbol} livePrice={lastPrice} className="mb-5" />

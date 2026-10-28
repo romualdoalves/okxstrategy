@@ -1,0 +1,212 @@
+{
+ "strategy_id": "TF018",
+ "timeframe": "1D",
+ "generated_at": "2026-10-28",
+ "verdict": "retired",
+ "verdict_label": "Aposentada",
+ "reason": "Perde na ETH com qualquer parâmetro (PF 0,53 a 0,74) e teve -166 na SOL em 2022: compra a queda em mercado de baixa.",
+ "applied_params": {},
+ "note": null,
+ "file_sha256": "89ba00cf8df4162737d464f72f57e1f0d55e0a7b31b44500e9c8998020c23753",
+ "walkforward": {
+  "BTC-USDT": {
+   "trials": 80,
+   "oos_trades": 23,
+   "oos_pf": 1.425,
+   "oos_p5": 0.535,
+   "oos_profit": 56.96,
+   "current_trades": 25,
+   "current_pf": 1.73,
+   "current_profit": 91.53,
+   "folds_positive": 2,
+   "folds_total": 3,
+   "plateau": true,
+   "candidate": {
+    "rsi_oversold": 20,
+    "keltner_mult": 2.5,
+    "regime_threshold": 20.0,
+    "tp1_rr": 3.0
+   }
+  },
+  "ETH-USDT": {
+   "trials": 80,
+   "oos_trades": 26,
+   "oos_pf": 0.529,
+   "oos_p5": 0.158,
+   "oos_profit": -109.85,
+   "current_trades": 18,
+   "current_pf": 0.743,
+   "current_profit": -48.31,
+   "folds_positive": 0,
+   "folds_total": 3,
+   "plateau": true,
+   "candidate": {
+    "rsi_oversold": 20,
+    "keltner_mult": 2.0,
+    "regime_threshold": 20.0,
+    "tp1_rr": 2.0
+   }
+  },
+  "SOL-USDT": {
+   "trials": 80,
+   "oos_trades": 13,
+   "oos_pf": 2.969,
+   "oos_p5": 0.882,
+   "oos_profit": 184.6,
+   "current_trades": 11,
+   "current_pf": 1.662,
+   "current_profit": 87.9,
+   "folds_positive": 2,
+   "folds_total": 3,
+   "plateau": true,
+   "candidate": {
+    "rsi_oversold": 20,
+    "keltner_mult": 3.0,
+    "regime_threshold": 20.0,
+    "tp1_rr": 3.0
+   }
+  }
+ },
+ "yearly": {
+  "BTC-USDT": {
+   "2018": [
+    0,
+    0
+   ],
+   "2019": [
+    14,
+    7
+   ],
+   "2020": [
+    72,
+    5
+   ],
+   "2021": [
+    87,
+    3
+   ],
+   "2022": [
+    -30,
+    6
+   ],
+   "2023": [
+    28,
+    4
+   ],
+   "2024": [
+    18,
+    4
+   ],
+   "2025": [
+    -19,
+    2
+   ],
+   "2026": [
+    -35,
+    4
+   ]
+  },
+  "ETH-USDT": {
+   "2018": [
+    0,
+    0
+   ],
+   "2019": [
+    5,
+    4
+   ],
+   "2020": [
+    85,
+    2
+   ],
+   "2021": [
+    3,
+    3
+   ],
+   "2022": [
+    -33,
+    7
+   ],
+   "2023": [
+    -11,
+    2
+   ],
+   "2024": [
+    19,
+    1
+   ],
+   "2025": [
+    -27,
+    2
+   ],
+   "2026": [
+    0,
+    3
+   ]
+  },
+  "SOL-USDT": {
+   "2021": [
+    -3,
+    2
+   ],
+   "2022": [
+    -166,
+    7
+   ],
+   "2023": [
+    159,
+    2
+   ],
+   "2024": [
+    5,
+    2
+   ],
+   "2025": [
+    -22,
+    1
+   ],
+   "2026": [
+    -7,
+    5
+   ]
+  }
+ },
+ "buy_hold": {
+  "BTC-USDT": {
+   "2018": -29,
+   "2019": 90,
+   "2020": 309,
+   "2021": 49,
+   "2022": -65,
+   "2023": 156,
+   "2024": 109,
+   "2025": -9,
+   "2026": -10
+  },
+  "ETH-USDT": {
+   "2018": -16,
+   "2019": -11,
+   "2020": 468,
+   "2021": 385,
+   "2022": -68,
+   "2023": 90,
+   "2024": 42,
+   "2025": -14,
+   "2026": -24
+  },
+  "SOL-USDT": {
+   "2021": 5136,
+   "2022": -94,
+   "2023": 853,
+   "2024": 75,
+   "2025": -40,
+   "2026": -22
+  }
+ },
+ "caveats": [
+  "Só o timeframe 1D foi estudado (BTC e ETH desde 2018, SOL desde 2021).",
+  "A janela contém um único mercado de baixa de verdade (2022); 2018 fica no período de aquecimento.",
+  "Amostras pequenas (poucas dezenas de trades fora da amostra): os resultados são indícios, não prova.",
+  "Valores em US$ do backtest (taxa 0,1% por lado e slippage 0,05%); não garantem resultado futuro."
+ ]
+}

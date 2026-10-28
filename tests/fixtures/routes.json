@@ -37,6 +37,7 @@
  "GET /api/risk",
  "GET /api/settings/okx-status",
  "GET /api/strategies",
+ "GET /api/strategies/{strategy_id}/study",
  "GET /api/strategy-factory/status",
  "GET /api/strategy-factory/strategies",
  "GET /api/strategy-factory/strategies/{strategy_id}/code",
