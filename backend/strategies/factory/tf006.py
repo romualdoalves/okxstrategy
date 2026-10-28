@@ -71,6 +71,10 @@ class LindaRaschkeStrategy(BaseStrategy):
                     type="float", default=2.0, min=1.0, max=4.0, step=0.5,
                     description="Múltiplo da amplitude do candle de sinal para o Take Profit.",
                 ),
+                "breakout_weeks": ParamDef(
+                    type="int", default=8, min=1, max=26, step=1,
+                    description="O rompimento do canal de Donchian vale por quantas semanas depois de ocorrer (o recuo à EMA 21 acontece dias depois).",
+                ),
             },
             criteria=[{"id": "c1", "label": "— ADX", "description": "— ADX"}, {"id": "c2", "label": "— Donchian break", "description": "— Donchian break"}, {"id": "c3", "label": "— Recuo à EMA 21", "description": "— Recuo à EMA 21"}, {"id": "c4", "label": "— Gatilho de entrada", "description": "— Gatilho de entrada"}],
         )
@@ -84,6 +88,7 @@ class LindaRaschkeStrategy(BaseStrategy):
         self.ema_slow        = p["ema_slow"].default
         self.ema_touch_bars  = p["ema_touch_bars"].default
         self.tp_multiplier   = p["tp_multiplier"].default
+        self.breakout_weeks  = p["breakout_weeks"].default
 
     def set_params(self, params: dict) -> None:
         self.adx_period      = int(params.get("adx_period",      self.adx_period))
@@ -93,6 +98,7 @@ class LindaRaschkeStrategy(BaseStrategy):
         self.ema_slow        = int(params.get("ema_slow",         self.ema_slow))
         self.ema_touch_bars  = int(params.get("ema_touch_bars",   self.ema_touch_bars))
         self.tp_multiplier   = float(params.get("tp_multiplier",  self.tp_multiplier))
+        self.breakout_weeks  = int(params.get("breakout_weeks",   self.breakout_weeks))
 
     def compute(self, candles: list) -> Optional[StrategyResult]:
         return self.compute_with_context(candles, None)
@@ -217,12 +223,10 @@ class LindaRaschkeStrategy(BaseStrategy):
         adx_rising = 1 if adx_val > adx_prev else 0
 
         # ── C2: Canal de Donchian 52 semanas ─────────────────────────────────
-        don = ta.donchian(
-            df_w["high"], df_w["low"],
-            lower_length=self.donchian_period,
-            upper_length=self.donchian_period,
-        )
-        if don is None or don.empty:
+        # Rompimento = fechamento semanal ACIMA da máxima (ABAIXO da mínima) das `donchian_period` semanas
+        # ANTERIORES. O canal calculado com a própria semana (como antes) só era rompido se a semana fechasse
+        # exatamente na máxima do ano — a estratégia praticamente nunca operava.
+        if len(df_w) < self.donchian_period + 2:
             inds = self._build_indicators(
                 ema8_val, ema21_val, atr_val, ema8_slope,
                 touched_ema21, dist_ema21_pct,
@@ -234,21 +238,27 @@ class LindaRaschkeStrategy(BaseStrategy):
                 indicators=inds,
             )
 
-        upper_col = [c for c in don.columns if "DCU" in c or "upper" in c.lower()]
-        lower_col = [c for c in don.columns if "DCL" in c or "lower" in c.lower()]
+        prior_upper = df_w["high"].rolling(self.donchian_period).max().shift(1)
+        prior_lower = df_w["low"].rolling(self.donchian_period).min().shift(1)
+        broke_up = (df_w["close"] > prior_upper).fillna(False)
+        broke_down = (df_w["close"] < prior_lower).fillna(False)
 
-        don_upper = float(don[upper_col[0]].iloc[-1]) if upper_col else 0.0
-        don_lower = float(don[lower_col[0]].iloc[-1]) if lower_col else 0.0
+        don_upper = float(prior_upper.iloc[-1]) if pd.notna(prior_upper.iloc[-1]) else 0.0
+        don_lower = float(prior_lower.iloc[-1]) if pd.notna(prior_lower.iloc[-1]) else 0.0
 
         weekly_close = float(df_w["close"].iloc[-1])
-        # Semana anterior (índice -2 — a última está em formação)
         prev_week_high = float(df_w["high"].iloc[-2]) if len(candles_w) >= 2 else 0.0
         prev_week_low  = float(df_w["low"].iloc[-2])  if len(candles_w) >= 2 else 0.0
 
-        # Break: +1 = renovando máxima 52s, -1 = renovando mínima, 0 = dentro
-        if don_upper > 0 and weekly_close >= don_upper:
+        # +1 = rompeu a máxima nas últimas `breakout_weeks` semanas (e não rompeu a mínima depois); -1 = inverso.
+        n = max(1, int(self.breakout_weeks))
+        last_up = broke_up.iloc[-n:]
+        last_down = broke_down.iloc[-n:]
+        up_idx = int(last_up.values.nonzero()[0].max()) if last_up.any() else -1
+        down_idx = int(last_down.values.nonzero()[0].max()) if last_down.any() else -1
+        if up_idx > down_idx and up_idx >= 0:
             donchian_break = 1
-        elif don_lower > 0 and weekly_close <= don_lower:
+        elif down_idx > up_idx and down_idx >= 0:
             donchian_break = -1
         else:
             donchian_break = 0

@@ -48,6 +48,7 @@ class StrategyOptimizer:
             },
             "TF006": {
                 "adx_threshold": [20, 25, 30],
+                "breakout_weeks": [1, 4, 8, 13],
                 "ema_fast": [5, 8, 13],
                 "ema_slow": [21, 34],
                 "tp_multiplier": [1.5, 2.0, 3.0],

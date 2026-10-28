@@ -155,6 +155,11 @@ def _metrics(r: dict, candles: list) -> dict:
     oos = summarize([t["p"] for t in trades if t["e"] >= split])
     years = max((candles[-1].epoch - candles[WARMUP].epoch) / YEAR_MS, 1e-9) if n > WARMUP else 0.0
     bh = (candles[-1].close / candles[WARMUP].close - 1) * 100 if n > WARMUP else 0.0
+    # Queda máxima de quem apenas comprou e segurou na mesma janela (referência para o mdd da estratégia).
+    bh_mdd, peak = 0.0, 0.0
+    for c in candles[WARMUP:]:
+        peak = max(peak, c.close)
+        bh_mdd = max(bh_mdd, (peak - c.close) / peak * 100 if peak else 0.0)
     held = sum(t["b"] for t in trades)
     kinds: dict[str, int] = {}
     for t in trades:
@@ -167,7 +172,8 @@ def _metrics(r: dict, candles: list) -> dict:
         "avg_trade_pct": round(s["profit"] / s["trades"], 2) if s["trades"] else 0.0,   # stake fixa de US$100
         "oos_trades": oos["trades"], "oos_pf": oos["profit_factor"], "oos_profit": oos["profit"],
         "mdd_usd": r["mdd"], "exposure_pct": round(held / max(n - WARMUP, 1) * 100, 1),
-        "buy_hold_pct": round(bh, 1), "exits": kinds, "error": r["error"],
+        "profit_usd": s["profit"], "buy_hold_pct": round(bh, 1), "bh_mdd_pct": round(bh_mdd, 1),
+        "exits": kinds, "error": r["error"],
     }
 
 
@@ -321,7 +327,7 @@ def _emit(rows: list[dict], out: str, name: str, secs: float) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / f"{name}.json").write_text(json.dumps(rows, indent=1))
     cols = ["sid", "symbol", "tf", "years", "trades", "trades_per_year", "win_rate", "pf", "pf_p5", "prob_pf_gt_1",
-            "avg_trade_pct", "oos_trades", "oos_pf", "mdd_usd", "exposure_pct", "buy_hold_pct"]
+            "avg_trade_pct", "profit_usd", "oos_trades", "oos_pf", "mdd_usd", "exposure_pct", "buy_hold_pct", "bh_mdd_pct"]
     with open(out_dir / f"{name}.csv", "w", newline="") as fh:
         w = csv.writer(fh)
         w.writerow(cols + ["error"])
