@@ -232,6 +232,12 @@ class StrategyOptimizer:
                 "min_train": [120, 180, 252],
                 "tp1_pct": [2.0, 3.0, 5.0],
             },
+            "RG005": {
+                "lookback": [14, 20, 30],
+                "bull_threshold": [3.0, 5.0, 8.0],
+                "bear_threshold": [-3.0, -5.0, -8.0],
+                "sl_mult": [1.5, 2.0, 3.0],
+            },
             "RG004": {
                 "location_z": [0.25, 0.35, 0.5],
                 "expansion_threshold": [1.2, 1.5, 2.0],

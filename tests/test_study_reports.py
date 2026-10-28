@@ -40,7 +40,7 @@ def test_parsers():
 
 
 def test_unknown_strategy_has_no_study():
-    r = R.load_study("RG005")
+    r = R.load_study("PA001")
     assert r["verdict"] == "none" and r["stale"] is False
 
 
@@ -70,7 +70,7 @@ def test_strategy_list_carries_verdict():
     app.include_router(strategies.router)
     by_id = {s["id"]: s for s in TestClient(app).get("/api/strategies").json()}
     assert by_id["TF001"]["study_verdict"] == "retired" and by_id["TF009"]["study_verdict"] == "candidate"
-    assert by_id["RG005"]["study_verdict"] == "none"
+    assert by_id["PA001"]["study_verdict"] == "none"
 
 
 def test_creating_bot_with_retired_strategy_is_blocked_unless_forced():

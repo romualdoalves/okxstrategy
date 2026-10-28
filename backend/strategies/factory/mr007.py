@@ -73,22 +73,11 @@ class PowerLawDcaDinâmicoStrategy(BaseStrategy):
                 indicators={"close": float(candles[-1].close), "z_score": 0.0, "fair_price": 0.0, "atr": 0.0, "days_alive": 0.0},
             )
 
-        # Verificar integridade temporal do candle de cauda
-        if not hasattr(candles[-1], 'time') or candles[-1].time is None:
-            return StrategyResult(
-                signal=Signal.HOLD,
-                hold_reason="Erro: Atributo de tempo ausente nos objetos de candle.",
-                indicators={"close": float(candles[-1].close), "z_score": 0.0, "fair_price": 0.0, "atr": 0.0, "days_alive": 0.0},
-            )
-
-        # Calcular dias desde o bloco gênesis (2009-01-03)
+        # Dias desde o bloco gênesis (2009-01-03). CandleBar.epoch é o início do candle em ms
+        # (o atributo `.time` não existe: a estratégia ficava eternamente em "atributo de tempo ausente").
         genesis_timestamp = 1230940800  # 2009-01-03 00:00:00 UTC
-        current_time = candles[-1].time
-        if hasattr(current_time, 'timestamp'):
-            current_ts = current_time.timestamp()
-        else:
-            current_ts = float(current_time)
-        
+        current_ts = float(candles[-1].epoch) / 1000.0
+
         if current_ts < genesis_timestamp:
             return StrategyResult(
                 signal=Signal.HOLD,

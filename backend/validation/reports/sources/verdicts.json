@@ -3,7 +3,7 @@
     "verdict": "candidate",
     "reason": "Único com ganho consistente fora da amostra nos 3 ativos e que ficou fora da queda de 2022 (0 a 1 trade). Lucra em 2019, 2020, 2021 e 2024.",
     "applied_params": {"ema_period": 13, "sl_mult": 3.0},
-    "note": "Padrões alterados de 21/2,5 para 13/3,0 depois do estudo (convergência nos 3 ativos). Os números do quadro foram medidos com 21/2,5: rodar o baseline de novo para renovar.",
+    "note": "Padrões alterados de 21/2,5 para 13/3,0 depois do walk-forward. O baseline com os novos padrões confirmou (PF 3,54 / 2,32 / 4,36 no período todo; fora da amostra 1,73 / 1,10 / 1,81), mas as tabelas de walk-forward e por ano abaixo foram medidas com 21/2,5.",
     "studied_rev": "347ad8a~1"
   },
   "TF009": {
@@ -44,6 +44,21 @@
   "TF003": {
     "verdict": "retired",
     "reason": "Perde na maioria dos anos, com 40 a 120 trades por ano: excesso de operações sem vantagem.",
+    "applied_params": {}
+  },
+  "RG005": {
+    "verdict": "watch",
+    "reason": "Baseline 1D promissor (PF fora da amostra 1,60 no BTC e 1,10 na ETH, 37 a 38 trades), mas a SOL teve só 4 trades fora da amostra e a fraqueza na ETH pede confirmação. Walk-forward e análise por ano ainda não foram feitos.",
+    "applied_params": {}
+  },
+  "RG001": {
+    "verdict": "retired",
+    "reason": "Perde em todos os ativos (PF 0,07 a 0,36; só 5 a 14% de acertos, cerca de 13 trades por ano): excesso de operações sem vantagem.",
+    "applied_params": {}
+  },
+  "MR007": {
+    "verdict": "watch",
+    "reason": "Corrigida: lia um atributo de tempo inexistente e nunca operava (0 trades em 8 anos). A lei de potência é calibrada para o BTC, então só faz sentido para BTC; precisa de novo baseline.",
     "applied_params": {}
   },
   "TF018": {

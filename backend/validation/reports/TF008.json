@@ -9,7 +9,7 @@
   "ema_period": 13,
   "sl_mult": 3.0
  },
- "note": "Padrões alterados de 21/2,5 para 13/3,0 depois do estudo (convergência nos 3 ativos). Os números do quadro foram medidos com 21/2,5: rodar o baseline de novo para renovar.",
+ "note": "Padrões alterados de 21/2,5 para 13/3,0 depois do walk-forward. O baseline com os novos padrões confirmou (PF 3,54 / 2,32 / 4,36 no período todo; fora da amostra 1,73 / 1,10 / 1,81), mas as tabelas de walk-forward e por ano abaixo foram medidas com 21/2,5.",
  "file_sha256": "352dbe76eddb50093e7ead20b12d39073af8889efefe3c28af4ee66b3b136661",
  "walkforward": {
   "BTC-USDT": {
