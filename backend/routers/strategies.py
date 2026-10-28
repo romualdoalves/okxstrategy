@@ -22,7 +22,8 @@ log = logging.getLogger("main")
 @router.get("/api/strategies")
 def get_strategies():
     """Lista todas as estratégias disponíveis com metadados e parâmetros."""
-    return list_strategies()
+    from ..validation.reports import study_summary
+    return [{**s, **study_summary(s["id"])} for s in list_strategies()]
 
 
 # ── Rotas: Fábrica de Estratégias ─────────────────────────────────────────────

@@ -35,6 +35,7 @@ class BotCreate(BaseModel):
     leverage:        int    = 1
     stop_loss_usd:   float  = -50.0
     strategy_params: dict   = {}
+    force_retired:   bool   = False   # confirma criar bot com estratégia aposentada pelo estudo
 
 class BotUpdate(BaseModel):
     name:            Optional[str]   = None
@@ -270,6 +271,12 @@ async def create_bot(payload: BotCreate, db: Session = Depends(get_db)):
     except ValueError as e:
         raise HTTPException(400, str(e))
 
+    from ..validation.reports import study_summary
+    study = study_summary(payload.strategy_id)
+    if study["study_verdict"] == "retired" and not payload.force_retired:
+        raise HTTPException(409, f"Estratégia {payload.strategy_id.upper()} aposentada pelo estudo: "
+                                 f"{study['study_reason']} Confirme para criar mesmo assim.")
+
     _assert_spot_only(payload.symbol)
     payload.symbol = _norm_symbol(payload.symbol)
     await _assert_symbol_tradable(payload.symbol, demo=payload.demo)
@@ -277,7 +284,7 @@ async def create_bot(payload: BotCreate, db: Session = Depends(get_db)):
     payload.stake_usd = FIXED_STAKE_USD
     _assert_symbol_available(db, payload.symbol)
 
-    bot = BotModel(**payload.model_dump())
+    bot = BotModel(**payload.model_dump(exclude={"force_retired"}))
     db.add(bot)
     db.commit()
     db.refresh(bot)

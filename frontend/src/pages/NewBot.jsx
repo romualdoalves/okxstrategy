@@ -5,6 +5,9 @@ import { getStrategies, createBot, rankAssets, getBots, getMarketClock, getSymbo
 import { ArrowLeft, Sparkles, List, Loader2, AlertTriangle, CheckCircle2, Clock } from 'lucide-react'
 import { useLanguage } from '../i18n/LanguageContext'
 import AiUsageNotice from '../components/AiUsageNotice'
+import StudyBadge from '../components/StudyBadge'
+
+const STUDY_ORDER = { candidate: 0, watch: 1, none: 2, retired: 3 }
 
 const SYMBOLS    = [
   'BTC-USDT', 'ETH-USDT', 'SOL-USDT', 'XRP-USDT', 'BNB-USDT',
@@ -152,6 +155,7 @@ export default function NewBot() {
   }
   const isBlockedSymbol = sym => Boolean(blockedReasonFor(sym))
   const [customParams, setCustomParams] = useState({})
+  const [forceRetired, setForceRetired] = useState(false)
   const [error, setError]     = useState('')
   const [loading, setLoading] = useState(false)
   // Rastreia o último nome auto-preenchido para não sobrescrever edição manual
@@ -203,6 +207,8 @@ export default function NewBot() {
     setRanking(null)
   }, [form.strategy_id, form.timeframe])
 
+  useEffect(() => { setForceRetired(false) }, [form.strategy_id])
+
   async function fetchRanking() {
     if (!form.strategy_id) return
     setRankLoading(true)
@@ -228,9 +234,12 @@ export default function NewBot() {
     setError('')
     if (!form.name.trim()) return setError(t('nb.err_name'))
     if (!form.strategy_id) return setError(t('nb.err_strategy'))
+    if (selectedStrategy?.study_verdict === 'retired' && !forceRetired) {
+      return setError(`Estratégia aposentada pelo estudo. Marque "Criar mesmo assim" para confirmar.`)
+    }
     setLoading(true)
     try {
-      const bot = await createBot({ ...form, stake_usd: FIXED_STAKE_USD, strategy_params: customParams })
+      const bot = await createBot({ ...form, stake_usd: FIXED_STAKE_USD, strategy_params: customParams, force_retired: forceRetired })
       qc.invalidateQueries({ queryKey: ['bots'] })
       nav(`/bots/${bot.id}`)
     } catch (err) {
@@ -293,8 +302,10 @@ export default function NewBot() {
                   if (!group.length) return null
                   return (
                     <optgroup key={prefix} label={label}>
-                      {group.map(s => (
-                        <option key={s.id} value={s.id}>{s.name}</option>
+                      {[...group].sort((a, b) => (STUDY_ORDER[a.study_verdict] ?? 9) - (STUDY_ORDER[b.study_verdict] ?? 9)).map(s => (
+                        <option key={s.id} value={s.id}>
+                          {s.study_verdict && s.study_verdict !== 'none' ? `[${s.study_label}] ` : ''}{s.name}
+                        </option>
                       ))}
                     </optgroup>
                   )
@@ -303,6 +314,26 @@ export default function NewBot() {
             </select>
             {selectedStrategy && (
               <p className="text-xs text-muted mt-1.5">{selectedStrategy.description}</p>
+            )}
+            {selectedStrategy && (
+              <div className="mt-2 space-y-2">
+                <StudyBadge
+                  strategyId={selectedStrategy.id}
+                  verdict={selectedStrategy.study_verdict}
+                  label={selectedStrategy.study_label}
+                  stale={selectedStrategy.study_stale}
+                />
+                {selectedStrategy.study_verdict === 'retired' && (
+                  <div className="rounded-lg border border-bear/30 bg-bear/10 p-3">
+                    <p className="text-xs font-semibold text-bear">Estratégia aposentada pelo estudo</p>
+                    <p className="mt-1 text-[11px] text-white/75">{selectedStrategy.study_reason}</p>
+                    <label className="mt-2 flex items-center gap-2 text-[11px] text-white/80 cursor-pointer">
+                      <input type="checkbox" checked={forceRetired} onChange={e => setForceRetired(e.target.checked)} />
+                      Criar mesmo assim
+                    </label>
+                  </div>
+                )}
+              </div>
             )}
           </div>
 

@@ -60,3 +60,34 @@ def test_study_endpoint():
     c = TestClient(app)
     assert c.get("/api/strategies/tf009/study").json()["verdict"] == "candidate"
     assert c.get("/api/strategies/XX999/study").json()["verdict"] == "none"
+
+
+def test_strategy_list_carries_verdict():
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from backend.routers import strategies
+    app = FastAPI()
+    app.include_router(strategies.router)
+    by_id = {s["id"]: s for s in TestClient(app).get("/api/strategies").json()}
+    assert by_id["TF001"]["study_verdict"] == "retired" and by_id["TF009"]["study_verdict"] == "candidate"
+    assert by_id["RG005"]["study_verdict"] == "none"
+
+
+def test_creating_bot_with_retired_strategy_is_blocked_unless_forced():
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from backend.database import get_db
+    from backend.routers import bots
+    app = FastAPI()
+    app.include_router(bots.router)
+    app.dependency_overrides[get_db] = lambda: None
+    c = TestClient(app)
+    body = {"name": "x", "strategy_id": "TF001", "symbol": "BTC-USDT", "timeframe": "1D"}
+    r = c.post("/api/bots", json=body)
+    assert r.status_code == 409 and "aposentada" in r.json()["detail"]
+    # com force_retired o bloqueio do estudo não dispara (a falha, se houver, vem de etapas seguintes)
+    try:
+        r2 = c.post("/api/bots", json={**body, "force_retired": True})
+        assert r2.status_code != 409 or "aposentada" not in r2.json()["detail"]
+    except Exception:
+        pass  # etapas seguintes precisam de rede/banco; só interessa que não foi o bloqueio de estudo

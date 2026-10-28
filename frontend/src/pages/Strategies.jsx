@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getStrategies, getMarketRegime, deleteStrategy } from '../api'
 import { useNavigate } from 'react-router-dom'
 import { useLanguage } from '../i18n/LanguageContext'
+import StudyBadge from '../components/StudyBadge'
 import { Zap, ChevronDown, ChevronUp, Hash, TrendingUp, Loader2, Trash2 } from 'lucide-react'
 
 const tagColors = {
@@ -198,7 +199,15 @@ function StrategyCard({ strategy, sortBy, score, regime }) {
           </div>
           <div className="min-w-0">
             <p className="font-semibold truncate">{strategy.name}</p>
-            <p className="text-xs text-muted font-mono">{strategy.id}</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="text-xs text-muted font-mono">{strategy.id}</p>
+              <StudyBadge
+                strategyId={strategy.id}
+                verdict={strategy.study_verdict}
+                label={strategy.study_label}
+                stale={strategy.study_stale}
+              />
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">

@@ -128,5 +128,12 @@ def load_study(sid: str) -> dict:
     return report
 
 
+def study_summary(sid: str) -> dict:
+    """Veredito resumido (sem as tabelas) para listas de estratégias."""
+    r = load_study(sid)
+    return {"study_verdict": r["verdict"], "study_label": r["verdict_label"], "study_stale": r["stale"],
+            "study_reason": r["reason"]}
+
+
 if __name__ == "__main__":
     print("gerados:", ", ".join(build_reports()))
