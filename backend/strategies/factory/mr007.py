@@ -32,7 +32,7 @@ class PowerLawDcaDinâmicoStrategy(BaseStrategy):
                 "sl_mult": ParamDef(type="float", default=3.5, min=0.5, max=10.0, step=0.1, description="Multiplicador ATR para Stop Loss"),
                 "tp1_rr": ParamDef(type="float", default=2.5, min=0.5, max=10.0, step=0.1, description="Relação risco-retorno do TP1"),
                 "ts_mult": ParamDef(type="float", default=4.0, min=1.0, max=10.0, step=0.1, description="Multiplicador ATR para Trailing Stop"),
-                "power_law_a": ParamDef(type="float", default=-17.584, min=-30.0, max=-10.0, step=0.001, description="Intercepto da regressão log10 da Power Law"),
+                "power_law_a": ParamDef(type="float", default=-17.01, min=-30.0, max=-10.0, step=0.001, description="Intercepto central da regressão log10 da Power Law do BTC (-17,01; -17,58 seria o piso do canal e deixa o Z-Score sempre positivo)"),
                 "power_law_b": ParamDef(type="float", default=5.82, min=4.0, max=7.0, step=0.01, description="Expoente da Power Law (Base 10)"),
                 "std_dev": ParamDef(type="float", default=0.25, min=0.1, max=0.5, step=0.01, description="Desvio padrão do resíduo log10 para Z-Score"),
                 "buy_aggressive_z": ParamDef(type="float", default=-1.5, min=-3.0, max=0.0, step=0.1, description="Limiar Z-Score para compra agressiva (Over-DCA)"),
