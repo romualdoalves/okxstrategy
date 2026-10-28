@@ -1,7 +1,7 @@
 """
 strategies/cycle_shift.py — Cycle Shift (CJacob)
 
-Identifica transições de ciclo macro baseadas na EMA 21 Semanal.
+Identifica transições de ciclo macro baseadas na EMA Semanal (padrão 13).
 Inspirada pela análise de CJacob sobre o suporte de 82k.
 """
 
@@ -25,21 +25,21 @@ class CycleShiftStrategy(BaseStrategy):
             name="TF008 - Cycle Shift (CJacob)",
             description = (
                 "Estratégia macro baseada na tese de CJacob: "
-                "(1) Primeiro fechamento semanal completo acima da EMA 21; "
-                "(2) Confirmação da EMA 21 como suporte na semana seguinte; "
+                "(1) Primeiro fechamento semanal completo acima da EMA semanal; "
+                "(2) Confirmação da EMA semanal como suporte na semana seguinte; "
                 "(3) Início de um novo ciclo de alta pós-bear market curto."
             ),
             tags   = ["macro", "trend", "weekly", "cjacob", "ema"],
             recommended_timeframe = "1D",
             criteria=[
-                {"id": "c1_cycle", "label": "C1 Ciclo Macro", "description": "Fechamento semanal completo acima da EMA 21."},
-                {"id": "c2_support", "label": "C2 Suporte", "description": "EMA 21 semanal confirmada como suporte."},
+                {"id": "c1_cycle", "label": "C1 Ciclo Macro", "description": "Fechamento semanal completo acima da EMA semanal."},
+                {"id": "c2_support", "label": "C2 Suporte", "description": "EMA semanal confirmada como suporte."},
                 {"id": "c3_retest", "label": "C3 Proximidade", "description": "Preço próximo da EMA semanal para entrada de ciclo."},
             ],
             params = {
-                "ema_period": ParamDef("int", 21, "Média principal do ciclo", 10, 50, 1),
+                "ema_period": ParamDef("int", 13, "Média principal do ciclo", 10, 50, 1),
                 "atr_period": ParamDef("int", 14, "ATR para volatilidade", 7, 30, 1),
-                "sl_mult":    ParamDef("float", 2.5, "Stop Loss (x ATR)", 1.0, 5.0, 0.1),
+                "sl_mult":    ParamDef("float", 3.0, "Stop Loss (x ATR)", 1.0, 5.0, 0.1),
                 "tp_rr":      ParamDef("float", 4.0, "Alvo de ciclo (Risk:Reward)", 2.0, 10.0, 0.5),
                 "max_dist_pct": ParamDef("float", 0.0, "C3: distância máxima do fechamento à EMA semanal (%) para entrar; 0 = sem limite", 0.0, 50.0, 1.0),
                 "exit_on_cycle_loss": ParamDef("int", 1, "SELL (saída) quando o fechamento semanal perde a EMA (1=sim, 0=não)", 0, 1, 1),
@@ -48,9 +48,9 @@ class CycleShiftStrategy(BaseStrategy):
         )
 
     def __init__(self):
-        self.ema_period = 21
+        self.ema_period = 13
         self.atr_period = 14
-        self.sl_mult    = 2.5
+        self.sl_mult    = 3.0
         self.tp_rr      = 4.0
         self.max_dist_pct       = 0.0
         self.exit_on_cycle_loss = 1
@@ -102,7 +102,7 @@ class CycleShiftStrategy(BaseStrategy):
         prev_w = df_w.iloc[-2]
 
         # candles_w traz SÓ semanas fechadas (live: _update_extra_candles; backtest: context_until).
-        # C1: vela semanal anterior inteira acima da EMA 21 (Low > EMA)
+        # C1: vela semanal anterior inteira acima da EMA semanal (Low > EMA)
         c1_full_candle = bool(prev_w["low"] > ema_w_prev)
 
         # C2: suporte confirmado — última semana fechada acima da EMA, com low testando a média
