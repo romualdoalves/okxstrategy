@@ -307,6 +307,51 @@ def _plateau(chosen: dict, runs: list[dict], space: dict, edges: list[int]) -> d
             "stable": bool(neigh) and ok / len(neigh) >= 0.6}
 
 
+def cmd_yearly(a) -> None:
+    """Lucro da estratégia por ANO (pela data de entrada) ao lado da variação do ativo no mesmo ano. Mostra se a
+    estratégia ganha por tendência/bull market (anos de alta) ou se protege/ganha nos anos de baixa."""
+    from datetime import datetime, timezone
+    ids, symbols, tfs = _eligible_ids(a.ids), a.symbols.split(","), a.tfs.split(",") if a.tfs else []
+    jobs = []
+    for sid in ids:
+        cls = REGISTRY[sid]
+        extra = list(cls.extra_timeframes() or [])
+        for tf in (tfs or [cls.info().recommended_timeframe or "15m"]):
+            for sym in symbols:
+                if _series(sym, tf, a.source, a.csv_dir) and all(_series(sym, x, a.source, a.csv_dir) for x in extra):
+                    jobs.append({"sid": sid, "params": None, "symbol": sym, "tf": tf, "extra": extra,
+                                 "legacy": False, "max_bars": a.max_bars})
+    results = _run_many(jobs, a.workers, quiet=True)
+    year_of = lambda ms: datetime.fromtimestamp(ms / 1000, tz=timezone.utc).year
+    print("\nano: lucro_US$(trades) | variacao do ativo no ano")
+    seen_bh: set = set()
+    for r in results:
+        if r["error"] or not r["n"]:
+            print(f"{r['job']['sid']} {r['job']['symbol']} {r['job']['tf']}: ERRO {r['error']}")
+            continue
+        j = r["job"]
+        cs = _base(j["symbol"], j["tf"], a.max_bars)
+        by_year: dict[int, list] = {}
+        for t in r["trades"]:
+            by_year.setdefault(year_of(cs[t["e"]].epoch), []).append(t["p"])
+        closes: dict[int, tuple] = {}
+        for c in cs[WARMUP:]:
+            y = year_of(c.epoch)
+            first, _ = closes.get(y, (c.close, c.close))
+            closes[y] = (first, c.close)
+        years = sorted(set(by_year) | set(closes))
+        key = (j["symbol"], j["tf"])
+        if key not in seen_bh:
+            seen_bh.add(key)
+            print(f"\n== {j['symbol']} {j['tf']} (buy & hold por ano) ==")
+            print("   " + " | ".join(f"{y}: {(closes[y][1] / closes[y][0] - 1) * 100:+.0f}%" for y in years if y in closes))
+        cells = []
+        for y in years:
+            pr = by_year.get(y, [])
+            cells.append(f"{y}: {sum(pr):+.0f}({len(pr)})")
+        print(f"{j['sid']} {j['symbol']} {j['tf']:>3} | " + " | ".join(cells))
+
+
 def cmd_export(a) -> None:
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -353,7 +398,7 @@ def _emit_wf(summary: list[dict], out: str) -> None:
 
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("cmd", choices=["baseline", "walkforward", "export"])
+    p.add_argument("cmd", choices=["baseline", "walkforward", "yearly", "export"])
     p.add_argument("--ids", default="TF")
     p.add_argument("--symbols", default="BTC-USDT,ETH-USDT,SOL-USDT")
     p.add_argument("--tfs", default="")
@@ -367,7 +412,7 @@ def main() -> None:
     p.add_argument("--max-combos", type=int, default=120)
     p.add_argument("--min-train-trades", type=int, default=8)
     a = p.parse_args()
-    {"baseline": cmd_baseline, "walkforward": cmd_walkforward, "export": cmd_export}[a.cmd](a)
+    {"baseline": cmd_baseline, "walkforward": cmd_walkforward, "yearly": cmd_yearly, "export": cmd_export}[a.cmd](a)
 
 
 if __name__ == "__main__":
