@@ -4,6 +4,7 @@ from typing import Optional
 
 from .candle_store import observed_step_ms, timeframe_ms
 from .backtest_stats import robust_summary
+from .stop_policy import cap_initial_stop
 from .strategies.base import STRATEGY_WINDOW, Signal
 from .strategies.registry import get_strategy
 
@@ -77,15 +78,7 @@ class BacktestEngine:
                 sl_price = entry + min_sl_dist
                 tp1_price = entry - min_sl_dist * original_rr
 
-        # Teto do stop inicial, igual ao do bot (bot/entry.py): o mais apertado entre 4x ATR e 5% do preço.
-        # O alvo mantém a mesma relação risco-retorno.
-        max_sl_dist = min(atr * 4.0, entry * 0.05)
-        current_sl_dist = abs(entry - sl_price)
-        if current_sl_dist > max_sl_dist > 0:
-            original_rr = abs(tp1_price - entry) / current_sl_dist
-            sign = 1 if direction == 1 else -1
-            sl_price = entry - sign * max_sl_dist
-            tp1_price = entry + sign * max_sl_dist * original_rr
+        sl_price, tp1_price, _ = cap_initial_stop(entry, sl_price, tp1_price, atr, direction)  # mesmo teto do bot
 
         ts_pct = float(meta.get("ts_pct") or 0.0)
         if ts_pct <= 0:

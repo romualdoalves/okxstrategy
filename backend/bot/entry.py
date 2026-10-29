@@ -13,6 +13,7 @@ from ..strategies.base import Signal
 from ..notifications import build_entry_msg, build_order_failed_msg
 from ..feeds.economic_calendar import calendar_feed
 from ..risk import guard as risk_guard, compute_stake
+from ..stop_policy import cap_initial_stop
 from .common import log, manager
 
 
@@ -620,25 +621,11 @@ class EntryMixin:
         # volátil, ex.: DOGE) podia abrir com risco de vários % do preço, e nenhum ajuste de
         # trailing posterior resolve um risco que já nasceu grande. Teto adaptativo: o mais
         # apertado entre 4x o ATR atual e 5% do preço.
-        max_sl_dist_abs = min(atr * 4.0, price * 0.05)
-        current_sl_dist = abs(price - sl_px)
-
-        if current_sl_dist > max_sl_dist_abs:
-            log.warning(f"[Bot {self.config.id}] SL Original largo ({current_sl_dist/price*100:.2f}%). "
-                        f"Limitando ao teto de {max_sl_dist_abs/price*100:.2f}%.")
-            if direction == "long":
-                sl_px = price - max_sl_dist_abs
-            else:
-                sl_px = price + max_sl_dist_abs
-
-            original_tp_dist = abs(tp1_px - price)
-            original_rr = original_tp_dist / current_sl_dist if current_sl_dist > 0 else 2.0
-            new_tp_dist = max_sl_dist_abs * original_rr
-
-            if direction == "long":
-                tp1_px = price + new_tp_dist
-            else:
-                tp1_px = price - new_tp_dist
+        sl_cut, tp1_cut, capped = cap_initial_stop(price, sl_px, tp1_px, atr, 1 if direction == "long" else -1)
+        if capped:
+            log.warning(f"[Bot {self.config.id}] SL Original largo ({abs(price - sl_px)/price*100:.2f}%). "
+                        f"Limitando ao teto de {abs(price - sl_cut)/price*100:.2f}%.")
+            sl_px, tp1_px = sl_cut, tp1_cut
 
         sl_px = round(sl_px, 4)
         tp1_px = round(tp1_px, 4)

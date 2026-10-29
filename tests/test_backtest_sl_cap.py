@@ -23,3 +23,12 @@ def test_cap_by_four_atr_when_tighter_than_five_percent():
 def test_stop_inside_limits_is_untouched():
     sl, tp1, _ = E._risk_from_result(_r(97.0, 106.0), 100.0, 1, atr=1.5)
     assert (sl, tp1) == (97.0, 106.0)
+
+
+def test_env_override_disables_or_widens_the_percent_cap(monkeypatch):
+    monkeypatch.setenv("OKX_MAX_SL_PCT", "0")           # só o limite de 4 ATR
+    sl, _, _ = E._risk_from_result(_r(90.0, 130.0), 100.0, 1, atr=3.0)
+    assert round(sl, 6) == 90.0                          # 10% < 4 ATR (12%)
+    monkeypatch.setenv("OKX_MAX_SL_PCT", "0.08")
+    sl, _, _ = E._risk_from_result(_r(90.0, 130.0), 100.0, 1, atr=3.0)
+    assert round(sl, 6) == 92.0
