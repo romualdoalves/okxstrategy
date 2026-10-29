@@ -58,7 +58,7 @@ class AccountingMixin:
         self._direction = self._sz = self._sz_remaining = 0
         self._entry_price = self._tp1_price = self._sl_price = 0.0
         self._tp1_done = False
-        self._breakeven_done = False
+        self._ts_pct = 0.0
         self._sl_algo_id = self._ts_algo_id = None
         self._ts_callback_ratio = 0.0
         self._peak_price = 0.0

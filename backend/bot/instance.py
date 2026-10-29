@@ -50,7 +50,7 @@ class BotInstance(OrderGateMixin, EntryMixin, PositionMixin, AccountingMixin, St
         self._tp1_price   = 0.0
         self._sl_price    = 0.0
         self._tp1_done    = False
-        self._breakeven_done = False  # Trava de breakeven já aplicada nesta posição?
+        self._ts_pct      = 0.0       # distância do trailing definida pela estratégia (0 = ATR)
         self._sl_algo_id  : Optional[str] = None
         self._ts_algo_id  : Optional[str] = None
         self._entry_ord_id: Optional[str] = None # ID da ordem de entrada

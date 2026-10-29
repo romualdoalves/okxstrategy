@@ -15,90 +15,20 @@ from .common import log
 
 
 class PositionMixin:
-    # ── Gestão de risco pós-entrada (breakeven + trailing em camadas) ─────────
-    # Gatilho de breakeven: lucro mínimo a partir do qual o SL trava no zero-a-zero
-    # (mais o buffer de taxas), tornando a operação matematicamente impossível de perder.
-    BREAKEVEN_TRIGGER_PCT = 0.004   # +0.4% de lucro
+    # ── Saída: TP1 da estratégia arma o trailing ──────────────────────────────
+    # Espelha o backtest (backtest_engine.run_strict_sync): o trailing nativo é armado quando o preço chega ao
+    # TP1 da estratégia e usa o `ts_pct` dela. Antes o bot armava a +1% fixo, travava breakeven a +0,4% e
+    # limitava o callback a 1,5%, então os estudos não descreviam o que rodava ao vivo.
+    def _trailing_callback(self, price: float) -> float:
+        """Distância do trailing: `ts_pct` da estratégia; sem ele, 1,5 ATR limitado a 0,5%–5% (igual ao backtest)."""
+        if self._ts_pct > 0:
+            return self._ts_pct
+        atr_cb = (self._current_atr * 1.5) / price if price and self._current_atr else 0.0
+        return max(0.005, min(0.05, atr_cb))
 
-    BREAKEVEN_FEE_BUFFER  = 0.0015  # cobre taxas/slippage acima da entrada
-
-    # Gatilho da sombra dinâmica (trailing nativo baseado em ATR).
-    SHADOW_TRIGGER_PCT    = 0.01    # +1.0% de lucro
-
-    # Tetos de callback por faixa de lucro (chandelier exit): quanto mais a operação
-    # avança, mais apertada a sombra fica — evita que um ATR inflado pelo próprio rally
-    # devolva boa parte do lucro antes de sair (achado da Análise do Especialista).
-    _TRAILING_CALLBACK_TIERS = (
-        (0.04, 0.006),   # >= 4% de lucro   → callback máx. 0.6%
-        (0.02, 0.010),   # >= 2% de lucro   → callback máx. 1.0%
-        (0.0,  0.015),   # abaixo disso     → callback máx. 1.5%
-    )
-
-    _TRAILING_MIN_CALLBACK = 0.005
-
-    _TRAILING_RETIGHTEN_FACTOR = 0.85  # só reaperta a sombra se a melhora for >= 15%
-
-    # ── TP1 + Trailing ────────────────────────────────────────────────────────
-    def _trailing_callback_for_pnl(self, pnl_pct: float, price: float) -> float:
-        """
-        Callback do trailing stop baseado em ATR, mas com teto que se aperta conforme
-        o lucro avança (chandelier exit). Sem isso, um ATR inflado pelo próprio rally
-        (maior volatilidade = maior ATR = sombra mais larga) devolve boa parte do
-        lucro acumulado antes de sair — exatamente o achado da Análise do Especialista.
-        """
-        atr_cb = (self._current_atr * 1.5) / price if price else self._TRAILING_MIN_CALLBACK
-        cap = self._TRAILING_CALLBACK_TIERS[-1][1]
-        for threshold, tier_cap in self._TRAILING_CALLBACK_TIERS:
-            if pnl_pct >= threshold:
-                cap = tier_cap
-                break
-        return max(self._TRAILING_MIN_CALLBACK, min(atr_cb, cap))
-
-    async def _lock_breakeven(self, price: float, exchange: BaseExchange):
-        """
-        Move o Stop Loss para o breakeven (entrada + buffer de taxas) assim que a
-        operação atinge um lucro mínimo. A partir daqui o pior desfecho possível é
-        ~zero, nunca uma perda — independente de quando (ou se) a sombra dinâmica
-        de TP1 vier a ser ativada.
-        """
-        breakeven_px = (
-            self._entry_price * (1 + self.BREAKEVEN_FEE_BUFFER) if self._direction == 1
-            else self._entry_price * (1 - self.BREAKEVEN_FEE_BUFFER)
-        )
-        # Só avança o stop; nunca move contra o lucro já garantido (ex.: SL original
-        # já estava mais favorável que o breakeven).
-        already_better = (
-            (self._direction == 1 and self._sl_price >= breakeven_px)
-            or (self._direction == -1 and 0 < self._sl_price <= breakeven_px)
-        )
-        if already_better:
-            self._breakeven_done = True
-            return
-
-        close_side = "sell" if self._direction == 1 else "buy"
-        new_sl_id = await exchange.place_stop_loss(self.config.symbol, close_side, self._sz, breakeven_px)
-        if not new_sl_id:
-            log.warning("[Bot %d] Falha ao travar breakeven @ %.4f; tentará novamente no próximo tick.",
-                        self.config.id, breakeven_px)
-            return
-
-        old_sl_algo_id = self._sl_algo_id
-        self._sl_algo_id = new_sl_id
-        self._sl_price = breakeven_px
-        self._breakeven_done = True
-        if old_sl_algo_id:
-            try:
-                await exchange.cancel_algo(self.config.symbol, old_sl_algo_id)
-            except Exception as exc:
-                log.warning("[Bot %d] Falha ao cancelar SL original após travar breakeven: %s",
-                            self.config.id, exc)
-        self._persist_trailing_stop_level()
-        log.info("[Bot %d] BREAKEVEN TRAVADO @ %.4f (lucro mínimo de %.2f%% atingido).",
-                 self.config.id, breakeven_px, self.BREAKEVEN_TRIGGER_PCT * 100)
-        await self._broadcast({
-            "type": "trade", "bot_id": self.config.id,
-            "event": "breakeven_locked", "price": breakeven_px,
-        })
+    def _tp1_reached(self, price: float) -> bool:
+        tp1 = self._tp1_price or (self._entry_price * (1.02 if self._direction == 1 else 0.98))
+        return price >= tp1 if self._direction == 1 else price <= tp1
 
     async def _check_tp1(self, price: float, exchange: BaseExchange):
         if self._tp1_done: return
@@ -106,13 +36,7 @@ class PositionMixin:
         pnl_pct = (price - self._entry_price) / self._entry_price
         if self._direction == -1: pnl_pct = -pnl_pct
 
-        # Trava de breakeven: dispara bem antes da sombra dinâmica para que a operação
-        # já não possa mais virar prejuízo enquanto aguarda o gatilho de TP1.
-        if not self._breakeven_done and pnl_pct >= self.BREAKEVEN_TRIGGER_PCT:
-            await self._lock_breakeven(price, exchange)
-
-        # Gatilho de Ativação: +1.0% de PnL líquido
-        if pnl_pct >= self.SHADOW_TRIGGER_PCT:
+        if self._tp1_reached(price):
             close_side = "sell" if self._direction == 1 else "buy"
 
             # Proteção Dupla: Garante que trailing OU fallback SL seja criado ANTES de marcar tp1_done
@@ -123,7 +47,7 @@ class PositionMixin:
             # Ativa a Sombra Dinâmica (Trailing Stop 100% dinâmico) para toda a posição!
             # A distância é baseada no ATR (volatilidade real) mas limitada por faixa de
             # lucro: quanto mais a operação avança, mais apertada a sombra fica.
-            cb = self._trailing_callback_for_pnl(pnl_pct, price)
+            cb = self._trailing_callback(price)
 
             log.info("[Bot %d] DYNAMIC SHADOW TRIGGER ativado! Lucro: %.2f%%. Callback dinâmico: %.2f%%",
                      self.config.id, pnl_pct*100, cb*100)

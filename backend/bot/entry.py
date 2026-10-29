@@ -203,7 +203,7 @@ class EntryMixin:
             if self._tp1_done and not self._ts_algo_id and not self._sl_algo_id:
                 log.critical("[AUDITORIA Bot %d] ⚠️ TP1 ACIONADO MAS SEM PROTEÇÃO! Recuperando agressivamente...", self.config.id)
                 current_price = self._candles[-1].close if self._candles else self._entry_price
-                cb = max(0.005, (self._current_atr * 1.5) / current_price) if self._current_atr else 0.01
+                cb = self._trailing_callback(current_price)
                 
                 new_ts_id = await exchange.place_trailing_stop(
                     self.config.symbol,
@@ -281,41 +281,7 @@ class EntryMixin:
             # NÃO cancela com base em _sl_price local — evita loop de cancel/recriação.
                     is_unprotected = not order_confirmed_on_exchange
 
-                    # Sombra em Camadas (chandelier exit): mesmo com a ordem confirmada e
-                    # protegida, reaperta o callback conforme o lucro avança. Sem isso, um
-                    # callback largo definido lá no gatilho inicial (ATR inflado pelo rally)
-                    # persiste durante toda a operação e devolve boa parte do lucro no pico —
-                    # exatamente o padrão identificado na Análise do Especialista.
-                    if order_confirmed_on_exchange and self._ts_callback_ratio > 0:
-                        current_price = self._candles[-1].close if self._candles else self._entry_price
-                        ideal_cb = self._trailing_callback_for_pnl(pnl_pct, current_price)
-                        if ideal_cb <= self._ts_callback_ratio * self._TRAILING_RETIGHTEN_FACTOR:
-                            old_cb = self._ts_callback_ratio
-                            old_ts_algo_id = self._ts_algo_id
-                            tightened_id = await exchange.place_trailing_stop(
-                                self.config.symbol,
-                                "sell" if self._direction == 1 else "buy",
-                                self._sz, ideal_cb, current_price,
-                            )
-                            if tightened_id:
-                                try:
-                                    await exchange.cancel_algo(self.config.symbol, old_ts_algo_id)
-                                except Exception as exc:
-                                    log.warning("[AUDITORIA Bot %d] Falha ao cancelar sombra antiga após reapertar: %s",
-                                                self.config.id, exc)
-                                self._ts_algo_id = tightened_id
-                                self._ts_callback_ratio = ideal_cb
-                                self._persist_trailing_stop_level()
-                                log.info(
-                                    "[AUDITORIA Bot %d] SOMBRA REAPERTADA: %.2f%% -> %.2f%% (lucro %.2f%%)",
-                                    self.config.id, old_cb * 100, ideal_cb * 100, pnl_pct * 100,
-                                )
-                                await self._broadcast({
-                                    "type": "trade", "bot_id": self.config.id,
-                                    "event": "trailing_tightened", "price": current_price,
-                                })
-
-            if pnl_pct >= self.SHADOW_TRIGGER_PCT and is_unprotected:
+            if self._tp1_done and is_unprotected:
                 log.critical("[AUDITORIA Bot %d] PROTEÇÃO EXIGIDA! Lucro %.2f%% sem ordem ativa ou com stop travado.",
                              self.config.id, pnl_pct*100)
                 
@@ -332,7 +298,7 @@ class EntryMixin:
                 
                 # Cria a nova ordem de proteção
                 current_price = self._candles[-1].close if self._candles else self._entry_price
-                cb = 0.01 # 1% de callback para segurança manual
+                cb = self._trailing_callback(current_price)
                 
                 new_id = await exchange.place_trailing_stop(
                     self.config.symbol, "sell" if self._direction == 1 else "buy", 
@@ -906,7 +872,7 @@ class EntryMixin:
         self._tp1_price    = tp1_px
         self._sl_price     = sl_px
         self._tp1_done     = False
-        self._breakeven_done = False
+        self._ts_pct       = float(result.metadata.get("ts_pct") or 0.0)
         self._sl_algo_id   = sl_id
         self._entry_ord_id = ord_id # Armazenamos o ID de entrada
         self._entry_inflight = False
