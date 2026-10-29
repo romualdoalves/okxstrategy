@@ -218,8 +218,8 @@ por bot) e aparece no card do bot (Dashboard/Bots) e no header de BotDetail.
   mesmo `_resolve_desync_exit_fill` antes do fallback zerado.
 - **Teto do SL inicial:** só existia piso (nunca menor que 1.5×ATR). Achado real: TF004/DOGE
   abriu com stop a ~7% da entrada — nenhum ajuste de trailing resolve um risco que já nasce
-  grande. Adicionado teto adaptativo em `_process_strategy`: `min(4×ATR, 5% do preço)`,
-  o que for mais apertado — preserva a RR original recalculando o tp1, mesmo padrão do piso.
+  grande. Adicionado teto adaptativo em `_process_strategy` (hoje em `stop_policy.py`): 4×ATR; o teto fixo de 5% do preço foi removido por reprovar nos estudos 1D,
+  limitado a 4×ATR — preserva a RR original recalculando o tp1, mesmo padrão do piso.
 - **Contaminação de símbolo no check de P&L da Integridade corrigida:** antes fazia FIFO
   sobre TODOS os fills do símbolo na janela de 3 dias — se um bot antigo (deletado/recriado)
   usou o mesmo símbolo, os fills dele entravam no cálculo (achado real: PA001 puxou 32 fills
