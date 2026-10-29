@@ -91,7 +91,7 @@
  },
  "caveats": [
   "Só o baseline com os parâmetros padrão foi medido (sem walk-forward): estratégia reprovada ou sem trades suficientes.",
-  "Histórico disponível: 1H cerca de 4,5 anos, 15m cerca de 4,3 anos; inclui o mercado de baixa de 2022.",
+  "Histórico disponível: 1H cerca de 4,5 anos, 15m cerca de 4,3 anos e 5m cerca de 1,9 ano.",
   "Valores em US$ do backtest (taxa 0,1% por lado e slippage 0,05%); a taxa pesa muito em quem opera centenas de vezes por ano.",
   "Não garantem resultado futuro."
  ]

@@ -179,5 +179,35 @@
     "verdict": "watch",
     "applied_params": {},
     "reason": "Opera pouco (cerca de 6 trades por ano). PF 1,20 no BTC e 1,27 na SOL, mas com p5 abaixo de 0,35 e a ETH perde (PF 0,27): amostra pequena e sem consistência. Sem walk-forward."
+  },
+  "MR003": {
+    "verdict": "retired",
+    "reason": "Perde nos 3 ativos (PF 0,17 a 0,36) e fora da amostra (PF 0,13 a 0,28), com cerca de 100 trades por ano.",
+    "applied_params": {}
+  },
+  "PA010": {
+    "verdict": "retired",
+    "reason": "Perde de forma grave (PF 0,25 a 0,45) com cerca de 1700 trades por ano: sobretudo taxas.",
+    "applied_params": {}
+  },
+  "PA013": {
+    "verdict": "retired",
+    "reason": "Perde nos 3 ativos (PF 0,13 a 0,90, p5 abaixo de 0,11). O PF 0,90 da ETH são 24 trades.",
+    "applied_params": {}
+  },
+  "PA016": {
+    "verdict": "retired",
+    "reason": "Nunca opera (0 trades): só emite sinal de venda a descoberto (reversão de topo) e em spot SELL é saída de posição, então nunca há entrada. Precisa ser reescrita para o lado comprado.",
+    "applied_params": {}
+  },
+  "SC001": {
+    "verdict": "retired",
+    "reason": "Perde nos 3 ativos (PF 0,41 a 0,78) e fora da amostra (PF 0,32 a 0,69).",
+    "applied_params": {}
+  },
+  "SC004": {
+    "verdict": "retired",
+    "reason": "Perde de forma grave (PF 0,17 a 0,35) com mais de 1100 trades por ano: sobretudo taxas.",
+    "applied_params": {}
   }
 }

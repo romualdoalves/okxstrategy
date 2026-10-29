@@ -1,0 +1,98 @@
+{
+ "strategy_id": "SC001",
+ "timeframe": "5m",
+ "generated_at": "2026-10-29",
+ "verdict": "retired",
+ "verdict_label": "Aposentada",
+ "reason": "Perde nos 3 ativos (PF 0,41 a 0,78) e fora da amostra (PF 0,32 a 0,69).",
+ "applied_params": {},
+ "note": null,
+ "file_sha256": "eb2c177da2dd2739bf68b2a19ce1852907ae7a4383326706303ce3d96224c3a4",
+ "walkforward": {},
+ "yearly": {},
+ "buy_hold": {
+  "BTC-USDT": {
+   "2018": -29,
+   "2019": 90,
+   "2020": 309,
+   "2021": 49,
+   "2022": -65,
+   "2023": 156,
+   "2024": 109,
+   "2025": -9,
+   "2026": -10
+  },
+  "ETH-USDT": {
+   "2018": -16,
+   "2019": -11,
+   "2020": 468,
+   "2021": 385,
+   "2022": -68,
+   "2023": 90,
+   "2024": 42,
+   "2025": -14,
+   "2026": -24
+  },
+  "SOL-USDT": {
+   "2021": 5136,
+   "2022": -94,
+   "2023": 853,
+   "2024": 75,
+   "2025": -40,
+   "2026": -22
+  }
+ },
+ "baseline": {
+  "BTC-USDT": {
+   "tf": "5m",
+   "years": 1.9,
+   "trades": 125,
+   "trades_per_year": 65.7,
+   "win_rate": 21.6,
+   "pf": 0.405,
+   "pf_p5": 0.209,
+   "profit_usd": -47.87,
+   "oos_trades": 49,
+   "oos_pf": 0.321,
+   "mdd_usd": 59.82,
+   "exposure_pct": 9.1,
+   "buy_hold_pct": -16.5
+  },
+  "ETH-USDT": {
+   "tf": "5m",
+   "years": 1.9,
+   "trades": 133,
+   "trades_per_year": 69.9,
+   "win_rate": 26.32,
+   "pf": 0.532,
+   "pf_p5": 0.328,
+   "profit_usd": -54.79,
+   "oos_trades": 52,
+   "oos_pf": 0.689,
+   "mdd_usd": 57.34,
+   "exposure_pct": 8.2,
+   "buy_hold_pct": -35.9
+  },
+  "SOL-USDT": {
+   "tf": "5m",
+   "years": 1.9,
+   "trades": 98,
+   "trades_per_year": 51.5,
+   "win_rate": 21.43,
+   "pf": 0.777,
+   "pf_p5": 0.204,
+   "profit_usd": -22.38,
+   "oos_trades": 42,
+   "oos_pf": 0.517,
+   "mdd_usd": 75.19,
+   "exposure_pct": 5.7,
+   "buy_hold_pct": -57.4
+  }
+ },
+ "caveats": [
+  "Só o baseline com os parâmetros padrão foi medido (sem walk-forward): estratégia reprovada ou sem trades suficientes.",
+  "Histórico disponível: 1H cerca de 4,5 anos, 15m cerca de 4,3 anos e 5m cerca de 1,9 ano.",
+  "Valores em US$ do backtest (taxa 0,1% por lado e slippage 0,05%); a taxa pesa muito em quem opera centenas de vezes por ano.",
+  "Não garantem resultado futuro."
+ ]
+}

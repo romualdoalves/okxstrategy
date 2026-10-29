@@ -1,0 +1,98 @@
+{
+ "strategy_id": "PA010",
+ "timeframe": "5m",
+ "generated_at": "2026-10-29",
+ "verdict": "retired",
+ "verdict_label": "Aposentada",
+ "reason": "Perde de forma grave (PF 0,25 a 0,45) com cerca de 1700 trades por ano: sobretudo taxas.",
+ "applied_params": {},
+ "note": null,
+ "file_sha256": "f28f8e646267cd43138e391ebb242a0f9e3542d8281c8f0405403a001f737b24",
+ "walkforward": {},
+ "yearly": {},
+ "buy_hold": {
+  "BTC-USDT": {
+   "2018": -29,
+   "2019": 90,
+   "2020": 309,
+   "2021": 49,
+   "2022": -65,
+   "2023": 156,
+   "2024": 109,
+   "2025": -9,
+   "2026": -10
+  },
+  "ETH-USDT": {
+   "2018": -16,
+   "2019": -11,
+   "2020": 468,
+   "2021": 385,
+   "2022": -68,
+   "2023": 90,
+   "2024": 42,
+   "2025": -14,
+   "2026": -24
+  },
+  "SOL-USDT": {
+   "2021": 5136,
+   "2022": -94,
+   "2023": 853,
+   "2024": 75,
+   "2025": -40,
+   "2026": -22
+  }
+ },
+ "baseline": {
+  "BTC-USDT": {
+   "tf": "5m",
+   "years": 1.9,
+   "trades": 3268,
+   "trades_per_year": 1718.4,
+   "win_rate": 20.93,
+   "pf": 0.25,
+   "pf_p5": 0.226,
+   "profit_usd": -1041.1,
+   "oos_trades": 1011,
+   "oos_pf": 0.226,
+   "mdd_usd": 1042.47,
+   "exposure_pct": 44.5,
+   "buy_hold_pct": -16.5
+  },
+  "ETH-USDT": {
+   "tf": "5m",
+   "years": 1.9,
+   "trades": 3269,
+   "trades_per_year": 1718.9,
+   "win_rate": 27.32,
+   "pf": 0.365,
+   "pf_p5": 0.333,
+   "profit_usd": -1118.45,
+   "oos_trades": 1050,
+   "oos_pf": 0.272,
+   "mdd_usd": 1119.93,
+   "exposure_pct": 42.5,
+   "buy_hold_pct": -35.9
+  },
+  "SOL-USDT": {
+   "tf": "5m",
+   "years": 1.9,
+   "trades": 3151,
+   "trades_per_year": 1656.9,
+   "win_rate": 29.86,
+   "pf": 0.446,
+   "pf_p5": 0.406,
+   "profit_usd": -1044.13,
+   "oos_trades": 966,
+   "oos_pf": 0.34,
+   "mdd_usd": 1044.37,
+   "exposure_pct": 41.8,
+   "buy_hold_pct": -57.4
+  }
+ },
+ "caveats": [
+  "Só o baseline com os parâmetros padrão foi medido (sem walk-forward): estratégia reprovada ou sem trades suficientes.",
+  "Histórico disponível: 1H cerca de 4,5 anos, 15m cerca de 4,3 anos e 5m cerca de 1,9 ano.",
+  "Valores em US$ do backtest (taxa 0,1% por lado e slippage 0,05%); a taxa pesa muito em quem opera centenas de vezes por ano.",
+  "Não garantem resultado futuro."
+ ]
+}
