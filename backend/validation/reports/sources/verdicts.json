@@ -14,9 +14,9 @@
     "applied_params": {}
   },
   "TF014": {
-    "verdict": "candidate",
-    "reason": "Ganha em anos de alta e perde em 2022 (-26 a -56). A otimização só melhora o BTC, então o padrão foi mantido.",
-    "applied_params": {}
+    "verdict": "watch",
+    "applied_params": {},
+    "reason": "Sem consistência: PF 1,31 / 1,60 / 1,12 com p5 abaixo de 1 nos 3 ativos, e fora da amostra o BTC fica em 0,67 (13 trades). Perde em 2022 (-29 a -44) e a otimização só melhora o BTC, então o padrão foi mantido. Em observação até haver mais dados."
   },
   "TF017": {
     "verdict": "candidate",
