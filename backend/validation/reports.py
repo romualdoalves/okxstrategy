@@ -29,6 +29,13 @@ CAVEATS = [
     "Valores em US$ do backtest (taxa 0,1% por lado e slippage 0,05%); não garantem resultado futuro.",
 ]
 
+CAVEATS_INTRADAY = [
+    "Só o baseline com os parâmetros padrão foi medido (sem walk-forward): estratégia reprovada ou sem trades suficientes.",
+    "Histórico disponível: 1H cerca de 4,5 anos, 15m cerca de 4,3 anos; inclui o mercado de baixa de 2022.",
+    "Valores em US$ do backtest (taxa 0,1% por lado e slippage 0,05%); a taxa pesa muito em quem opera centenas de vezes por ano.",
+    "Não garantem resultado futuro.",
+]
+
 _WF_RE = re.compile(
     r"^(?P<sid>\w+) (?P<sym>\S+) (?P<tf>\S+): trials=(?P<trials>\d+) \| WF-OOS trades=(?P<t>\d+) PF=(?P<pf>[\d.]+) "
     r"p5=(?P<p5>[\d.]+) lucro=\$(?P<pr>-?[\d.]+) \| parâmetros atuais nas mesmas janelas: trades=(?P<ct>\d+) "
@@ -83,6 +90,25 @@ def parse_yearly(text: str) -> tuple[dict, dict]:
     return per, bh
 
 
+_BASELINE_KEYS = ("years", "trades", "trades_per_year", "win_rate", "pf", "pf_p5", "profit_usd", "oos_trades", "oos_pf",
+                  "mdd_usd", "exposure_pct", "buy_hold_pct")
+
+
+def parse_baseline(text: str) -> dict:
+    """Tabela do subcomando `baseline`: out[sid][ativo] = {tf, métricas}."""
+    out: dict[str, dict] = {}
+    header: list[str] = []
+    for line in text.splitlines():
+        cells = [c.strip() for c in line.split("|")]
+        if cells[0] == "sid":
+            header = cells
+        elif header and len(cells) == len(header) and re.fullmatch(r"[A-Z]{2}\d{3}", cells[0]):
+            row = dict(zip(header, cells))
+            out.setdefault(cells[0], {})[row["symbol"]] = {
+                "tf": row["tf"], **{k: float(row[k]) if "." in row[k] else int(row[k]) for k in _BASELINE_KEYS}}
+    return out
+
+
 def _studied_hash(sid: str, rev: str | None) -> str | None:
     if not rev:
         return strategy_hash(sid)
@@ -99,17 +125,20 @@ def _studied_hash(sid: str, rev: str | None) -> str | None:
 def build_reports() -> list[str]:
     wf = parse_walkforward((_SRC / "walkforward_1d.txt").read_text(encoding="utf-8"))
     yearly, bh = parse_yearly((_SRC / "yearly_1d.txt").read_text(encoding="utf-8"))
+    baseline = parse_baseline((_SRC / "baseline_intraday.txt").read_text(encoding="utf-8"))
     verdicts = json.loads((_SRC / "verdicts.json").read_text(encoding="utf-8"))
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     written = []
     for sid, v in verdicts.items():
+        base = baseline.get(sid, {})
+        tf = next(iter(base.values()))["tf"] if base else "1D"
         report = {
-            "strategy_id": sid, "timeframe": "1D", "generated_at": now,
+            "strategy_id": sid, "timeframe": tf, "generated_at": now,
             "verdict": v["verdict"], "verdict_label": VERDICT_LABELS[v["verdict"]], "reason": v["reason"],
             "applied_params": v.get("applied_params", {}), "note": v.get("note"),
             "file_sha256": _studied_hash(sid, v.get("studied_rev")),
             "walkforward": wf.get(sid, {}), "yearly": yearly.get(sid, {}), "buy_hold": bh,
-            "caveats": CAVEATS,
+            "baseline": base, "caveats": CAVEATS if tf == "1D" else CAVEATS_INTRADAY,
         }
         (_DIR / f"{sid}.json").write_text(json.dumps(report, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
         written.append(sid)

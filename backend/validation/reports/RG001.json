@@ -1,7 +1,7 @@
 {
  "strategy_id": "RG001",
  "timeframe": "1D",
- "generated_at": "2026-10-28",
+ "generated_at": "2026-10-29",
  "verdict": "retired",
  "verdict_label": "Aposentada",
  "reason": "Perde em todos os ativos (PF 0,07 a 0,36; só 5 a 14% de acertos, cerca de 13 trades por ano): excesso de operações sem vantagem.",
@@ -42,6 +42,7 @@
    "2026": -22
   }
  },
+ "baseline": {},
  "caveats": [
   "Só o timeframe 1D foi estudado (BTC e ETH desde 2018, SOL desde 2021).",
   "A janela contém um único mercado de baixa de verdade (2022); 2018 fica no período de aquecimento.",

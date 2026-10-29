@@ -8,7 +8,7 @@ _VALID = {"candidate", "watch", "retired"}
 
 def test_reports_are_up_to_date_with_sources(tmp_path, monkeypatch):
     """Os JSON versionados são exatamente o que o gerador produz hoje (ninguém editou à mão)."""
-    before = {p.name: json.loads(p.read_text(encoding="utf-8")) for p in R._DIR.glob("TF*.json")}
+    before = {p.name: json.loads(p.read_text(encoding="utf-8")) for p in R._DIR.glob("*.json")}
     assert before, "nenhum relatório versionado"
     monkeypatch.setattr(R, "_DIR", tmp_path)
     monkeypatch.setattr(R, "_studied_hash", lambda sid, rev: "x")  # o hash depende do git; aqui só o conteúdo
@@ -21,13 +21,13 @@ def test_reports_are_up_to_date_with_sources(tmp_path, monkeypatch):
 
 
 def test_every_report_is_consistent():
-    for p in R._DIR.glob("TF*.json"):
+    for p in R._DIR.glob("*.json"):
         r = json.loads(p.read_text(encoding="utf-8"))
         assert r["strategy_id"] == p.stem and r["verdict"] in _VALID and r["reason"] and r["caveats"]
         assert r["verdict_label"] == R.VERDICT_LABELS[r["verdict"]]
         assert r["file_sha256"], f"{p.stem}: sem hash do código estudado"
-        if r["verdict"] != "retired" or r["yearly"]:
-            assert r["yearly"], f"{p.stem}: sem detalhamento por ano"
+        if r["verdict"] != "retired":
+            assert r["yearly"] or r.get("baseline"), f"{p.stem}: sem detalhamento"
 
 
 def test_parsers():
@@ -39,8 +39,15 @@ def test_parsers():
     assert per["TF018"]["SOL-USDT"][2022] == [-166, 7]
 
 
+def test_parse_baseline():
+    b = R.parse_baseline((R._SRC / "baseline_intraday.txt").read_text(encoding="utf-8"))
+    assert b["MR004"]["BTC-USDT"]["trades"] == 1622 and b["MR004"]["BTC-USDT"]["tf"] == "1H"
+    assert b["PA008"]["SOL-USDT"]["trades"] == 0 and b["SC005"]["SOL-USDT"]["oos_pf"] == 0.528
+    assert json.loads((R._DIR / "PA008.json").read_text(encoding="utf-8"))["timeframe"] == "15m"
+
+
 def test_unknown_strategy_has_no_study():
-    r = R.load_study("PA001")
+    r = R.load_study("PA016")
     assert r["verdict"] == "none" and r["stale"] is False
 
 
@@ -70,7 +77,7 @@ def test_strategy_list_carries_verdict():
     app.include_router(strategies.router)
     by_id = {s["id"]: s for s in TestClient(app).get("/api/strategies").json()}
     assert by_id["TF001"]["study_verdict"] == "retired" and by_id["TF009"]["study_verdict"] == "candidate"
-    assert by_id["PA001"]["study_verdict"] == "none"
+    assert by_id["PA016"]["study_verdict"] == "none"
 
 
 def test_creating_bot_with_retired_strategy_is_blocked_unless_forced():

@@ -1,7 +1,7 @@
 {
  "strategy_id": "TF007",
  "timeframe": "1D",
- "generated_at": "2026-10-28",
+ "generated_at": "2026-10-29",
  "verdict": "watch",
  "verdict_label": "Em observação",
  "reason": "Sem trades até 2023 em 1D; só opera de 2024 em diante. Não é testável nesta janela.",
@@ -145,6 +145,7 @@
    "2026": -22
   }
  },
+ "baseline": {},
  "caveats": [
   "Só o timeframe 1D foi estudado (BTC e ETH desde 2018, SOL desde 2021).",
   "A janela contém um único mercado de baixa de verdade (2022); 2018 fica no período de aquecimento.",

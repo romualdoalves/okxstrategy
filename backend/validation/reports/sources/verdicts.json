@@ -2,7 +2,10 @@
   "TF008": {
     "verdict": "candidate",
     "reason": "Único com ganho consistente fora da amostra nos 3 ativos e que ficou fora da queda de 2022 (0 a 1 trade). Lucra em 2019, 2020, 2021 e 2024.",
-    "applied_params": {"ema_period": 13, "sl_mult": 3.0},
+    "applied_params": {
+      "ema_period": 13,
+      "sl_mult": 3.0
+    },
     "note": "Padrões alterados de 21/2,5 para 13/3,0 depois do walk-forward. O baseline e a tabela por ano foram medidos com 13/3,0; a tabela de walk-forward compara os padrões antigos (21/2,5) com o candidato 13/3,0."
   },
   "TF009": {
@@ -48,7 +51,9 @@
   "RG005": {
     "verdict": "candidate",
     "reason": "Walk-forward positivo nos 3 ativos (PF fora da amostra 1,81 / 2,42 / 1,36 com 23 a 32 trades, amostra maior que a da TF008). Ganha em 2020, 2021 e 2023, mas perde em 2022 (-21 a -41): não protege no mercado de baixa.",
-    "applied_params": {"sl_mult": 3.0},
+    "applied_params": {
+      "sl_mult": 3.0
+    },
     "note": "O stop passou de 2,0 para 3,0 ATR depois do estudo (único parâmetro em que os 3 ativos convergiram). Os números do quadro foram medidos com 2,0: rodar o baseline de novo para renovar.",
     "studied_rev": "93f6761"
   },
@@ -60,7 +65,9 @@
   "MR007": {
     "verdict": "watch",
     "reason": "Só vale para o BTC (a lei de potência é calibrada para ele). Em 8 anos: 17 trades, PF 5,03, lucro de US$ 682, mas cerca de 70% do lucro vem de 2020 e fora da amostra são só 4 trades (PF 0,51). Compra os fundos de 2018 e 2020 e perde em 2022 (-33). Fica 70% do tempo comprada, então se parece com segurar o BTC: amostra pequena demais para concluir.",
-    "applied_params": {"power_law_a": -17.01},
+    "applied_params": {
+      "power_law_a": -17.01
+    },
     "note": "O intercepto -17,584 era o piso do canal e a estratégia só vendia (0 trades); corrigido para o valor central -17,01 pelo valor publicado, sem ajuste aos dados."
   },
   "TF018": {
@@ -87,5 +94,90 @@
     "verdict": "retired",
     "reason": "Reprovada no baseline 1D. Sem walk-forward.",
     "applied_params": {}
+  },
+  "MR004": {
+    "verdict": "retired",
+    "reason": "Perde nos 3 ativos (PF 0,56 a 0,76) com cerca de 340 trades por ano: as taxas consomem qualquer vantagem. Fora da amostra também perde.",
+    "applied_params": {}
+  },
+  "PA011": {
+    "verdict": "retired",
+    "reason": "Perde nos 3 ativos (PF 0,67 a 0,73, probabilidade de PF acima de 1 de no máximo 4%) e também fora da amostra.",
+    "applied_params": {}
+  },
+  "MR001": {
+    "verdict": "retired",
+    "reason": "Quase não opera (4 a 30 trades em 4 anos) e perde no BTC e na ETH; o PF 1,10 da SOL não se repete fora da amostra (5 trades, nenhum ganho).",
+    "applied_params": {}
+  },
+  "MR005": {
+    "verdict": "retired",
+    "reason": "Perde de forma grave (PF 0,32 a 0,54) com mais de 900 trades por ano: sobretudo taxas.",
+    "applied_params": {}
+  },
+  "MR006": {
+    "verdict": "retired",
+    "reason": "Perde nos 3 ativos (PF 0,47 a 0,58) e fora da amostra (PF 0,25 a 0,61).",
+    "applied_params": {}
+  },
+  "MR008": {
+    "verdict": "retired",
+    "reason": "Perde nos 3 ativos (PF 0,47 a 0,72) e fora da amostra (PF 0,24 a 0,33).",
+    "applied_params": {}
+  },
+  "PA001": {
+    "verdict": "retired",
+    "reason": "Perde nos 3 ativos (PF 0,38 a 0,68) com cerca de 250 trades por ano: sem vantagem sobre as taxas.",
+    "applied_params": {}
+  },
+  "PA002": {
+    "verdict": "retired",
+    "reason": "Perde nos 3 ativos (PF 0,05 a 0,61) e quase não opera (3 a 7 trades por ano).",
+    "applied_params": {}
+  },
+  "PA003": {
+    "verdict": "retired",
+    "reason": "Perde nos 3 ativos (PF 0,55 a 0,63) com cerca de 270 a 350 trades por ano.",
+    "applied_params": {}
+  },
+  "PA004": {
+    "verdict": "retired",
+    "reason": "Perde nos 3 ativos (PF 0,23 a 0,55) com poucos trades; o PF 3,59 fora da amostra na SOL são só 6 trades.",
+    "applied_params": {}
+  },
+  "PA007": {
+    "verdict": "retired",
+    "reason": "Perde nos 3 ativos (PF 0,41 a 0,63) com cerca de 800 a 900 trades por ano: sobretudo taxas.",
+    "applied_params": {}
+  },
+  "PA014": {
+    "verdict": "retired",
+    "reason": "Perde nos 3 ativos (PF 0,38 a 0,59) com cerca de 600 trades por ano: sobretudo taxas.",
+    "applied_params": {}
+  },
+  "PA015": {
+    "verdict": "retired",
+    "reason": "Perde nos 3 ativos (PF 0,50 a 0,65) com cerca de 380 a 400 trades por ano.",
+    "applied_params": {}
+  },
+  "SC003": {
+    "verdict": "retired",
+    "reason": "Perde nos 3 ativos (PF 0,36 a 0,58) com cerca de 850 a 980 trades por ano: sobretudo taxas.",
+    "applied_params": {}
+  },
+  "SC005": {
+    "verdict": "retired",
+    "reason": "Perde nos 3 ativos (PF 0,44 a 0,75) e fora da amostra (PF 0,40 a 0,53).",
+    "applied_params": {}
+  },
+  "PA008": {
+    "verdict": "retired",
+    "reason": "Nunca opera (0 trades): o código define o range de abertura pelas primeiras velas da janela (não pelo horário de Nova York) e o reteste exige fechar acima e abaixo da mesma linha ao mesmo tempo, o que é impossível. Precisa ser reescrita.",
+    "applied_params": {}
+  },
+  "PA005": {
+    "verdict": "watch",
+    "applied_params": {},
+    "reason": "Opera pouco (cerca de 6 trades por ano). PF 1,20 no BTC e 1,27 na SOL, mas com p5 abaixo de 0,35 e a ETH perde (PF 0,27): amostra pequena e sem consistência. Sem walk-forward."
   }
 }

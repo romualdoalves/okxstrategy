@@ -1,0 +1,98 @@
+{
+ "strategy_id": "PA015",
+ "timeframe": "15m",
+ "generated_at": "2026-10-29",
+ "verdict": "retired",
+ "verdict_label": "Aposentada",
+ "reason": "Perde nos 3 ativos (PF 0,50 a 0,65) com cerca de 380 a 400 trades por ano.",
+ "applied_params": {},
+ "note": null,
+ "file_sha256": "7826abb349f8fd1925153d78046232d9a89de38d61a78333b9e9030f01331c94",
+ "walkforward": {},
+ "yearly": {},
+ "buy_hold": {
+  "BTC-USDT": {
+   "2018": -29,
+   "2019": 90,
+   "2020": 309,
+   "2021": 49,
+   "2022": -65,
+   "2023": 156,
+   "2024": 109,
+   "2025": -9,
+   "2026": -10
+  },
+  "ETH-USDT": {
+   "2018": -16,
+   "2019": -11,
+   "2020": 468,
+   "2021": 385,
+   "2022": -68,
+   "2023": 90,
+   "2024": 42,
+   "2025": -14,
+   "2026": -24
+  },
+  "SOL-USDT": {
+   "2021": 5136,
+   "2022": -94,
+   "2023": 853,
+   "2024": 75,
+   "2025": -40,
+   "2026": -22
+  }
+ },
+ "baseline": {
+  "BTC-USDT": {
+   "tf": "15m",
+   "years": 4.28,
+   "trades": 1626,
+   "trades_per_year": 380.2,
+   "win_rate": 27.49,
+   "pf": 0.497,
+   "pf_p5": 0.434,
+   "profit_usd": -551.64,
+   "oos_trades": 468,
+   "oos_pf": 0.425,
+   "mdd_usd": 557.29,
+   "exposure_pct": 42.8,
+   "buy_hold_pct": 235.0
+  },
+  "ETH-USDT": {
+   "tf": "15m",
+   "years": 4.28,
+   "trades": 1713,
+   "trades_per_year": 400.6,
+   "win_rate": 29.42,
+   "pf": 0.503,
+   "pf_p5": 0.441,
+   "profit_usd": -715.33,
+   "oos_trades": 544,
+   "oos_pf": 0.432,
+   "mdd_usd": 720.94,
+   "exposure_pct": 40.2,
+   "buy_hold_pct": 45.0
+  },
+  "SOL-USDT": {
+   "tf": "15m",
+   "years": 4.28,
+   "trades": 1621,
+   "trades_per_year": 379.1,
+   "win_rate": 31.34,
+   "pf": 0.653,
+   "pf_p5": 0.576,
+   "profit_usd": -632.71,
+   "oos_trades": 488,
+   "oos_pf": 0.518,
+   "mdd_usd": 641.3,
+   "exposure_pct": 39.2,
+   "buy_hold_pct": 122.6
+  }
+ },
+ "caveats": [
+  "Só o baseline com os parâmetros padrão foi medido (sem walk-forward): estratégia reprovada ou sem trades suficientes.",
+  "Histórico disponível: 1H cerca de 4,5 anos, 15m cerca de 4,3 anos; inclui o mercado de baixa de 2022.",
+  "Valores em US$ do backtest (taxa 0,1% por lado e slippage 0,05%); a taxa pesa muito em quem opera centenas de vezes por ano.",
+  "Não garantem resultado futuro."
+ ]
+}

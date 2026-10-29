@@ -1,7 +1,7 @@
 {
  "strategy_id": "RG005",
  "timeframe": "1D",
- "generated_at": "2026-10-28",
+ "generated_at": "2026-10-29",
  "verdict": "candidate",
  "verdict_label": "Candidata",
  "reason": "Walk-forward positivo nos 3 ativos (PF fora da amostra 1,81 / 2,42 / 1,36 com 23 a 32 trades, amostra maior que a da TF008). Ganha em 2020, 2021 e 2023, mas perde em 2022 (-21 a -41): não protege no mercado de baixa.",
@@ -205,6 +205,7 @@
    "2026": -22
   }
  },
+ "baseline": {},
  "caveats": [
   "Só o timeframe 1D foi estudado (BTC e ETH desde 2018, SOL desde 2021).",
   "A janela contém um único mercado de baixa de verdade (2022); 2018 fica no período de aquecimento.",

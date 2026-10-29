@@ -59,6 +59,42 @@ function WalkForward({ data }) {
   )
 }
 
+function Baseline({ data }) {
+  const rows = Object.entries(data || {})
+  if (rows.length === 0) return null
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-[11px]">
+        <thead>
+          <tr className="text-muted text-left">
+            <th className="py-1 pr-3 font-normal">Ativo</th>
+            <th className="pr-3 font-normal">Trades/ano</th>
+            <th className="pr-3 font-normal">PF</th>
+            <th className="pr-3 font-normal">PF fora da amostra</th>
+            <th className="pr-3 font-normal">Lucro (US$)</th>
+            <th className="font-normal">Ativo parado (%)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(([sym, r]) => (
+            <tr key={sym} className="border-t border-border/50">
+              <td className="py-1 pr-3 font-medium">{short(sym)}</td>
+              <td className="pr-3">{r.trades_per_year}</td>
+              <td className="pr-3">{r.pf.toFixed(2)}</td>
+              <td className="pr-3">{r.oos_pf.toFixed(2)} <span className="text-muted">({r.oos_trades})</span></td>
+              <td className={`pr-3 ${tone(r.profit_usd)}`}>{money(r.profit_usd)}</td>
+              <td className={tone(r.buy_hold_pct)}>{r.buy_hold_pct > 0 ? '+' : ''}{r.buy_hold_pct}%</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="mt-1 text-[10px] text-muted">
+        Baseline com os parâmetros padrão. PF = fator de lucro (acima de 1 ganha). Entre parênteses: trades fora da amostra.
+      </p>
+    </div>
+  )
+}
+
 function Yearly({ yearly, buyHold }) {
   const syms = Object.keys(yearly || {})
   if (syms.length === 0) return <p className="text-xs text-muted">Sem detalhamento por ano.</p>
@@ -146,12 +182,21 @@ export default function StudyModal({ strategyId, onClose }) {
 
             {data.verdict !== 'none' && (
               <>
-                <Section title="Walk-forward (fora da amostra)">
-                  <WalkForward data={data.walkforward} />
-                </Section>
-                <Section title="Resultado por ano contra o ativo">
-                  <Yearly yearly={data.yearly} buyHold={data.buy_hold} />
-                </Section>
+                {Object.keys(data.baseline || {}).length > 0 && (
+                  <Section title="Baseline no histórico completo">
+                    <Baseline data={data.baseline} />
+                  </Section>
+                )}
+                {Object.keys(data.baseline || {}).length === 0 && (
+                  <>
+                    <Section title="Walk-forward (fora da amostra)">
+                      <WalkForward data={data.walkforward} />
+                    </Section>
+                    <Section title="Resultado por ano contra o ativo">
+                      <Yearly yearly={data.yearly} buyHold={data.buy_hold} />
+                    </Section>
+                  </>
+                )}
                 {data.applied_params && Object.keys(data.applied_params).length > 0 && (
                   <Section title="Parâmetros aplicados após o estudo">
                     <p className="text-[12px] font-mono">

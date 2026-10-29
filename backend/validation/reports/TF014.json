@@ -1,7 +1,7 @@
 {
  "strategy_id": "TF014",
  "timeframe": "1D",
- "generated_at": "2026-10-28",
+ "generated_at": "2026-10-29",
  "verdict": "candidate",
  "verdict_label": "Candidata",
  "reason": "Ganha em anos de alta e perde em 2022 (-26 a -56). A otimização só melhora o BTC, então o padrão foi mantido.",
@@ -203,6 +203,7 @@
    "2026": -22
   }
  },
+ "baseline": {},
  "caveats": [
   "Só o timeframe 1D foi estudado (BTC e ETH desde 2018, SOL desde 2021).",
   "A janela contém um único mercado de baixa de verdade (2022); 2018 fica no período de aquecimento.",

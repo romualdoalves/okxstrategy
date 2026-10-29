@@ -1,7 +1,7 @@
 {
  "strategy_id": "TF015",
  "timeframe": "1D",
- "generated_at": "2026-10-28",
+ "generated_at": "2026-10-29",
  "verdict": "watch",
  "verdict_label": "Em observação",
  "reason": "Lucro da SOL em 2021 (+789 com 3 trades) distorce o total, e a otimização piora a SOL fora da amostra. Em observação.",
@@ -203,6 +203,7 @@
    "2026": -22
   }
  },
+ "baseline": {},
  "caveats": [
   "Só o timeframe 1D foi estudado (BTC e ETH desde 2018, SOL desde 2021).",
   "A janela contém um único mercado de baixa de verdade (2022); 2018 fica no período de aquecimento.",
