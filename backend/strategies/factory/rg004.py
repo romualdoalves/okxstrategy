@@ -417,40 +417,59 @@ class GrafosDeMarkovStrategy(BaseStrategy):
         )
 
     def _label_states(self, df: pd.DataFrame, atr_s: pd.Series) -> np.ndarray:
-        states = np.full(len(df), STATE_NEUTRAL, dtype=int)
-        for i in range(len(df)):
-            atr = self._safe_float(atr_s.iloc[i], 0.0)
-            if atr <= 0:
-                continue
-            window = df.iloc[:i + 1]
-            row = df.iloc[i]
-            location_score, day_open, macro_mid = self._location_score(window, atr)
-            candle_range = max(float(row["high"] - row["low"]), 0.0)
-            if candle_range <= 0:
-                continue
-            body_high = max(float(row["open"]), float(row["close"]))
-            body_low = min(float(row["open"]), float(row["close"]))
-            lower_wick_ratio = (body_low - float(row["low"])) / candle_range
-            upper_wick_ratio = (float(row["high"]) - body_high) / candle_range
-            vol_signature = candle_range / atr
-            prev = window.iloc[max(0, i - int(self.liquidity_lookback)):i]
-            prev_low = float(prev["low"].min()) if not prev.empty else float(row["low"])
-            prev_high = float(prev["high"].max()) if not prev.empty else float(row["high"])
+        """Rotula o estado de cada barra. Vetorizado: o laço barra a barra recortava `df.iloc[:i+1]` a cada passo
+        (quadrático, 73 ms por chamada) e tornava o backtest de 150 mil candles inviável."""
+        n = len(df)
+        o = df["open"].to_numpy(dtype=float)
+        h = df["high"].to_numpy(dtype=float)
+        l = df["low"].to_numpy(dtype=float)
+        c = df["close"].to_numpy(dtype=float)
+        atr = np.array([self._safe_float(v, 0.0) for v in atr_s.to_numpy()], dtype=float)
 
-            if lower_wick_ratio >= float(self.wick_ratio) and float(row["low"]) <= prev_low:
-                states[i] = STATE_LIQUIDITY_BUY
-            elif upper_wick_ratio >= float(self.wick_ratio) and float(row["high"]) >= prev_high:
-                states[i] = STATE_LIQUIDITY_SELL
-            elif vol_signature >= float(self.expansion_threshold):
-                states[i] = STATE_EXPANSION_UP if float(row["close"]) >= float(row["open"]) else STATE_EXPANSION_DOWN
-            elif vol_signature <= float(self.equilibrium_threshold):
-                states[i] = STATE_EQUILIBRIUM
-            elif location_score <= -float(self.location_z) or (float(row["close"]) < macro_mid and float(row["close"]) < day_open):
-                states[i] = STATE_CHEAP
-            elif location_score >= float(self.location_z) or (float(row["close"]) > macro_mid and float(row["close"]) > day_open):
-                states[i] = STATE_EXPENSIVE
-            else:
-                states[i] = STATE_NEUTRAL
+        bars_per_day = max(1, int(self.bars_per_day))
+        macro_len = max(1, int(self.macro_days) * bars_per_day)
+        idx = np.arange(n)
+        macro_hi = pd.Series(h).rolling(macro_len, min_periods=1).max().to_numpy()
+        macro_lo = pd.Series(l).rolling(macro_len, min_periods=1).min().to_numpy()
+        macro_mid = (macro_hi + macro_lo) / 2.0
+        day_open = o[idx // bars_per_day * bars_per_day]
+        denom = np.maximum(np.maximum(atr, c * 0.0001), 1e-9)
+        location_score = (c - macro_mid) / denom
+
+        lookback = int(self.liquidity_lookback)
+        prev_low = pd.Series(l).rolling(lookback, min_periods=1).min().shift(1).to_numpy(copy=True)
+        prev_high = pd.Series(h).rolling(lookback, min_periods=1).max().shift(1).to_numpy(copy=True)
+        prev_low[0], prev_high[0] = l[0], h[0]        # sem barras anteriores: usa a própria vela
+
+        candle_range = np.maximum(h - l, 0.0)
+        valid = (atr > 0) & (candle_range > 0)
+        safe_range = np.where(candle_range > 0, candle_range, 1.0)
+        body_high = np.maximum(o, c)
+        body_low = np.minimum(o, c)
+        lower_wick = (body_low - l) / safe_range
+        upper_wick = (h - body_high) / safe_range
+        vol_signature = candle_range / np.where(atr > 0, atr, 1.0)
+
+        wick = float(self.wick_ratio)
+        z = float(self.location_z)
+        conditions = [
+            (lower_wick >= wick) & (l <= prev_low),
+            (upper_wick >= wick) & (h >= prev_high),
+            vol_signature >= float(self.expansion_threshold),
+            vol_signature <= float(self.equilibrium_threshold),
+            (location_score <= -z) | ((c < macro_mid) & (c < day_open)),
+            (location_score >= z) | ((c > macro_mid) & (c > day_open)),
+        ]
+        choices = [
+            STATE_LIQUIDITY_BUY,
+            STATE_LIQUIDITY_SELL,
+            np.where(c >= o, STATE_EXPANSION_UP, STATE_EXPANSION_DOWN),
+            STATE_EQUILIBRIUM,
+            STATE_CHEAP,
+            STATE_EXPENSIVE,
+        ]
+        states = np.select(conditions, choices, default=STATE_NEUTRAL).astype(int)
+        states[~valid] = STATE_NEUTRAL
         return states
 
     def _build_transition_matrix(self, states: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
