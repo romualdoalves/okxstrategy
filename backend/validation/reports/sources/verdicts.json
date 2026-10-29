@@ -50,12 +50,11 @@
   },
   "RG005": {
     "verdict": "candidate",
-    "reason": "Walk-forward positivo nos 3 ativos (PF fora da amostra 1,81 / 2,42 / 1,36 com 23 a 32 trades, amostra maior que a da TF008). Ganha em 2020, 2021 e 2023, mas perde em 2022 (-21 a -41): não protege no mercado de baixa.",
+    "reason": "Walk-forward positivo nos 3 ativos (PF fora da amostra 1,81 / 2,42 / 1,36 com 23 a 32 trades). Com o stop de 3 ATR, o baseline tem PF 3,6 / 4,2 / 3,2 e fora da amostra 1,61 / 1,44 (BTC e ETH; a SOL tem só 4 trades). Ganha em 2020, 2021 e 2023, mas perde em 2022 (-29 a -50): não protege no mercado de baixa.",
     "applied_params": {
       "sl_mult": 3.0
     },
-    "note": "O stop passou de 2,0 para 3,0 ATR depois do estudo (único parâmetro em que os 3 ativos convergiram). Os números do quadro foram medidos com 2,0: rodar o baseline de novo para renovar.",
-    "studied_rev": "93f6761"
+    "note": "O stop passou de 2,0 para 3,0 ATR depois do walk-forward (único parâmetro em que os 3 ativos convergiram). Baseline e tabela por ano foram medidos com 3,0, com o limite de stop de 4 ATR que o bot usa."
   },
   "RG001": {
     "verdict": "retired",

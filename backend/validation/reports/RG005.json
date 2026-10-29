@@ -4,12 +4,12 @@
  "generated_at": "2026-10-29",
  "verdict": "candidate",
  "verdict_label": "Candidata",
- "reason": "Walk-forward positivo nos 3 ativos (PF fora da amostra 1,81 / 2,42 / 1,36 com 23 a 32 trades, amostra maior que a da TF008). Ganha em 2020, 2021 e 2023, mas perde em 2022 (-21 a -41): não protege no mercado de baixa.",
+ "reason": "Walk-forward positivo nos 3 ativos (PF fora da amostra 1,81 / 2,42 / 1,36 com 23 a 32 trades). Com o stop de 3 ATR, o baseline tem PF 3,6 / 4,2 / 3,2 e fora da amostra 1,61 / 1,44 (BTC e ETH; a SOL tem só 4 trades). Ganha em 2020, 2021 e 2023, mas perde em 2022 (-29 a -50): não protege no mercado de baixa.",
  "applied_params": {
   "sl_mult": 3.0
  },
- "note": "O stop passou de 2,0 para 3,0 ATR depois do estudo (único parâmetro em que os 3 ativos convergiram). Os números do quadro foram medidos com 2,0: rodar o baseline de novo para renovar.",
- "file_sha256": "dfc9f79f53ab680a1a6d42cc25e13da4704cafe5099dfd935e41d2003479da29",
+ "note": "O stop passou de 2,0 para 3,0 ATR depois do walk-forward (único parâmetro em que os 3 ativos convergiram). Baseline e tabela por ano foram medidos com 3,0, com o limite de stop de 4 ATR que o bot usa.",
+ "file_sha256": "6f7e57e47fae1c78733b54dccd0226c31c88f23619dfc40ee487caafeae59104",
  "walkforward": {
   "BTC-USDT": {
    "trials": 80,
@@ -76,35 +76,35 @@
     0
    ],
    "2019": [
-    -21,
-    3
+    -9,
+    2
    ],
    "2020": [
-    398,
+    381,
     3
    ],
    "2021": [
-    -15,
-    6
-   ],
-   "2022": [
-    -41,
+    22,
     4
    ],
+   "2022": [
+    -36,
+    3
+   ],
    "2023": [
-    32,
-    8
+    37,
+    7
    ],
    "2024": [
-    47,
+    40,
     6
    ],
    "2025": [
-    -9,
-    4
+    4,
+    3
    ],
    "2026": [
-    4,
+    3,
     4
    ]
   },
@@ -118,54 +118,54 @@
     0
    ],
    "2020": [
-    230,
-    5
+    246,
+    4
    ],
    "2021": [
-    95,
-    6
+    172,
+    4
    ],
    "2022": [
-    -41,
+    -50,
     4
    ],
    "2023": [
-    -9,
-    5
+    20,
+    4
    ],
    "2024": [
-    5,
-    7
+    24,
+    5
    ],
    "2025": [
-    -32,
-    6
+    -15,
+    3
    ],
    "2026": [
-    23,
+    19,
     4
    ]
   },
   "SOL-USDT": {
    "2021": [
-    130,
-    7
+    326,
+    2
    ],
    "2022": [
-    -21,
+    -29,
     3
    ],
    "2023": [
-    131,
+    155,
     3
    ],
    "2024": [
-    6,
-    8
+    -4,
+    7
    ],
    "2025": [
-    -42,
-    3
+    -35,
+    2
    ],
    "2026": [
     -18,
