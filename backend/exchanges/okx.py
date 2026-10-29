@@ -70,6 +70,17 @@ async def _fetch_inst_info(symbol: str) -> dict:
     _INST_CACHE[symbol] = default
     return default
 
+def _fmt_sz(symbol: str, size: float) -> str:
+    """Quantidade no formato aceito pela OKX: múltiplo de lotSz (arredondado para baixo) e sem notação científica.
+    O saldo spot (`eq`) e a subtração do baseline do usuário geram floats com casas além do permitido, e a OKX
+    recusa com 51000 "Parameter sz error"."""
+    from decimal import Decimal, ROUND_DOWN
+    info = _INST_CACHE.get(symbol, {})
+    lot = Decimal(str(info["lotSz"])) if info.get("state") and info.get("lotSz") else Decimal("0.00000001")
+    d = (Decimal(str(size)) / lot).to_integral_value(rounding=ROUND_DOWN) * lot
+    return format(d.normalize(), "f")
+
+
 # ── Credenciais ───────────────────────────────────────────────────────────────
 
 def _get_credentials() -> tuple[str, str, str, bool]:
@@ -568,7 +579,7 @@ class OKXExchange(BaseExchange):
             "tdMode":  _td_mode(symbol),
             "side":    side,
             "ordType": "market",
-            "sz":      str(size),
+            "sz":      _fmt_sz(symbol, size),
         }
         if _inst_type(symbol) == "SPOT":
             # Mantém contrato do app consistente: sz sempre é quantidade da moeda base.
@@ -607,7 +618,7 @@ class OKXExchange(BaseExchange):
             "tdMode":          _td_mode(symbol),
             "side":            side,
             "ordType":         "conditional",
-            "sz":              str(size),
+            "sz":              _fmt_sz(symbol, size),
             "slTriggerPx":     str(round(trigger_price, 8)),
             "slOrdPx":         "-1",
             "slTriggerPxType": "last",
@@ -642,7 +653,7 @@ class OKXExchange(BaseExchange):
             "side":          side,
             # OKX API v5 native trailing stop: order-algo + move_order_stop.
             "ordType":       "move_order_stop",
-            "sz":            str(size),
+            "sz":            _fmt_sz(symbol, size),
             "callbackRatio": str(round(callback_ratio, 4)),
         }
         if activation_price > 0:
@@ -789,7 +800,7 @@ class OKXExchange(BaseExchange):
             "tdMode":  "cash",
             "side":    side,
             "ordType": "market",
-            "sz":      str(pos.size),
+            "sz":      _fmt_sz(symbol, pos.size),
         }
         if _inst_type(symbol) == "SPOT":
             body_dict["tgtCcy"] = "base_ccy"
