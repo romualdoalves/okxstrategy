@@ -21,7 +21,8 @@ _DIR = Path(__file__).resolve().parent / "reports"
 _SRC = _DIR / "sources"
 _FACTORY = Path(__file__).resolve().parent.parent / "strategies" / "factory"
 
-VERDICT_LABELS = {"candidate": "Candidata", "watch": "Em observação", "retired": "Aposentada"}
+VERDICT_LABELS = {"candidate": "Candidata", "watch": "Em observação", "retired": "Aposentada",
+                  "insufficient": "Dados insuficientes"}
 CAVEATS = [
     "Só o timeframe 1D foi estudado (BTC e ETH desde 2018, SOL desde 2021).",
     "A janela contém um único mercado de baixa de verdade (2022); 2018 fica no período de aquecimento.",
@@ -133,12 +134,13 @@ def build_reports() -> list[str]:
         base = baseline.get(sid, {})
         tf = next(iter(base.values()))["tf"] if base else "1D"
         report = {
-            "strategy_id": sid, "timeframe": tf, "generated_at": now,
+            "strategy_id": sid, "timeframe": v.get("timeframe", tf), "generated_at": now,
             "verdict": v["verdict"], "verdict_label": VERDICT_LABELS[v["verdict"]], "reason": v["reason"],
             "applied_params": v.get("applied_params", {}), "note": v.get("note"),
             "file_sha256": _studied_hash(sid, v.get("studied_rev")),
             "walkforward": wf.get(sid, {}), "yearly": yearly.get(sid, {}), "buy_hold": bh,
-            "baseline": base, "caveats": CAVEATS if tf == "1D" else CAVEATS_INTRADAY,
+            "baseline": base,
+            "caveats": v.get("caveats") or (CAVEATS if tf == "1D" else CAVEATS_INTRADAY),
         }
         (_DIR / f"{sid}.json").write_text(json.dumps(report, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
         written.append(sid)

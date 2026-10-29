@@ -1,0 +1,51 @@
+{
+ "strategy_id": "PA009",
+ "timeframe": "2m",
+ "generated_at": "2026-10-29",
+ "verdict": "insufficient",
+ "verdict_label": "Dados insuficientes",
+ "reason": "É desenhada para gráfico de 2 minutos e a base não tem candles de 2m. Não há histórico para backtest.",
+ "applied_params": {},
+ "note": null,
+ "file_sha256": "7f9c765a52b7fc02cc0755ece797e42f4e18696a66944dee5b8651b876beb733",
+ "walkforward": {},
+ "yearly": {},
+ "buy_hold": {
+  "BTC-USDT": {
+   "2018": -29,
+   "2019": 90,
+   "2020": 309,
+   "2021": 49,
+   "2022": -65,
+   "2023": 156,
+   "2024": 109,
+   "2025": -9,
+   "2026": -10
+  },
+  "ETH-USDT": {
+   "2018": -16,
+   "2019": -11,
+   "2020": 468,
+   "2021": 385,
+   "2022": -68,
+   "2023": 90,
+   "2024": 42,
+   "2025": -14,
+   "2026": -24
+  },
+  "SOL-USDT": {
+   "2021": 5136,
+   "2022": -94,
+   "2023": 853,
+   "2024": 75,
+   "2025": -40,
+   "2026": -22
+  }
+ },
+ "baseline": {},
+ "caveats": [
+  "Não foi medida: sem candles de 2 minutos na base.",
+  "Para estudá-la seria preciso coletar esse histórico (a OKX só entrega janelas curtas de 2m).",
+  "Sem veredito: nada nesta página indica que ela ganha ou perde."
+ ]
+}

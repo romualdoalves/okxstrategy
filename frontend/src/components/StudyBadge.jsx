@@ -6,6 +6,7 @@ const BADGE_STYLE = {
   candidate: 'bg-bull/15 text-bull',
   watch:     'bg-yellow-400/15 text-yellow-300',
   retired:   'bg-bear/15 text-bear',
+  insufficient: 'bg-border text-muted',
   none:      'bg-border text-muted',
 }
 

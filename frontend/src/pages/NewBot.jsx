@@ -7,7 +7,7 @@ import { useLanguage } from '../i18n/LanguageContext'
 import AiUsageNotice from '../components/AiUsageNotice'
 import StudyBadge from '../components/StudyBadge'
 
-const STUDY_ORDER = { candidate: 0, watch: 1, none: 2, retired: 3 }
+const STUDY_ORDER = { candidate: 0, watch: 1, none: 2, insufficient: 2, retired: 3 }
 
 const SYMBOLS    = [
   'BTC-USDT', 'ETH-USDT', 'SOL-USDT', 'XRP-USDT', 'BNB-USDT',

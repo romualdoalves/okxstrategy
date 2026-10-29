@@ -1,0 +1,51 @@
+{
+ "strategy_id": "IF002",
+ "timeframe": "—",
+ "generated_at": "2026-10-29",
+ "verdict": "insufficient",
+ "verdict_label": "Dados insuficientes",
+ "reason": "Depende de dados que só existem ao vivo e não têm histórico para reproduzir no backtest: preços de corretoras descentralizadas (DEX) ao vivo. O backtest pula esta estratégia.",
+ "applied_params": {},
+ "note": null,
+ "file_sha256": "0aeee339ee27a2fd98b612adaad751593d3d6cebc3953bc55f3a76e756a11549",
+ "walkforward": {},
+ "yearly": {},
+ "buy_hold": {
+  "BTC-USDT": {
+   "2018": -29,
+   "2019": 90,
+   "2020": 309,
+   "2021": 49,
+   "2022": -65,
+   "2023": 156,
+   "2024": 109,
+   "2025": -9,
+   "2026": -10
+  },
+  "ETH-USDT": {
+   "2018": -16,
+   "2019": -11,
+   "2020": 468,
+   "2021": 385,
+   "2022": -68,
+   "2023": 90,
+   "2024": 42,
+   "2025": -14,
+   "2026": -24
+  },
+  "SOL-USDT": {
+   "2021": 5136,
+   "2022": -94,
+   "2023": 853,
+   "2024": 75,
+   "2025": -40,
+   "2026": -22
+  }
+ },
+ "baseline": {},
+ "caveats": [
+  "Não foi medida: o backtest só reproduz candles de preço e esta estratégia usa preços de corretoras descentralizadas (DEX) ao vivo.",
+  "Para estudá-la seria preciso gravar esses dados ao vivo por meses antes de qualquer backtest.",
+  "Sem veredito: nada nesta página indica que ela ganha ou perde."
+ ]
+}

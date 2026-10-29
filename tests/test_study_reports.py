@@ -3,7 +3,7 @@ import json
 
 from backend.validation import reports as R
 
-_VALID = {"candidate", "watch", "retired"}
+_VALID = {"candidate", "watch", "retired", "insufficient"}
 
 
 def test_reports_are_up_to_date_with_sources(tmp_path, monkeypatch):
@@ -26,7 +26,7 @@ def test_every_report_is_consistent():
         assert r["strategy_id"] == p.stem and r["verdict"] in _VALID and r["reason"] and r["caveats"]
         assert r["verdict_label"] == R.VERDICT_LABELS[r["verdict"]]
         assert r["file_sha256"], f"{p.stem}: sem hash do código estudado"
-        if r["verdict"] != "retired":
+        if r["verdict"] not in ("retired", "insufficient"):
             assert r["yearly"] or r.get("baseline"), f"{p.stem}: sem detalhamento"
 
 
@@ -98,3 +98,10 @@ def test_creating_bot_with_retired_strategy_is_blocked_unless_forced():
         assert r2.status_code != 409 or "aposentada" not in r2.json()["detail"]
     except Exception:
         pass  # etapas seguintes precisam de rede/banco; só interessa que não foi o bloqueio de estudo
+
+
+def test_insufficient_data_reports_have_reason_and_no_tables():
+    for sid in ("RG002", "RG003", "SC002", "IF001", "IF002", "NW001", "PA009", "PA012"):
+        r = R.load_study(sid)
+        assert r["verdict"] == "insufficient" and r["verdict_label"] == "Dados insuficientes"
+        assert not r["walkforward"] and not r["baseline"] and r["caveats"] and r["reason"]

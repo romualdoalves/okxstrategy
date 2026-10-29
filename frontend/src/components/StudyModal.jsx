@@ -7,6 +7,7 @@ const VERDICT_STYLE = {
   candidate: 'border-bull/40 bg-bull/10 text-bull',
   watch:     'border-yellow-400/40 bg-yellow-400/10 text-yellow-300',
   retired:   'border-bear/40 bg-bear/10 text-bear',
+  insufficient: 'border-border bg-white/5 text-muted',
   none:      'border-border bg-white/5 text-muted',
 }
 
@@ -182,12 +183,12 @@ export default function StudyModal({ strategyId, onClose }) {
 
             {data.verdict !== 'none' && (
               <>
-                {Object.keys(data.baseline || {}).length > 0 && (
+                {data.verdict !== 'insufficient' && Object.keys(data.baseline || {}).length > 0 && (
                   <Section title="Baseline no histórico completo">
                     <Baseline data={data.baseline} />
                   </Section>
                 )}
-                {Object.keys(data.baseline || {}).length === 0 && (
+                {data.verdict !== 'insufficient' && Object.keys(data.baseline || {}).length === 0 && (
                   <>
                     <Section title="Walk-forward (fora da amostra)">
                       <WalkForward data={data.walkforward} />

@@ -208,5 +208,93 @@
     "verdict": "retired",
     "reason": "Perde de forma grave (PF 0,17 a 0,35) com mais de 1100 trades por ano: sobretudo taxas.",
     "applied_params": {}
+  },
+  "RG002": {
+    "verdict": "insufficient",
+    "applied_params": {},
+    "timeframe": "—",
+    "reason": "Depende de dados que só existem ao vivo e não têm histórico para reproduzir no backtest: o grafo de correlação entre ativos montado ao vivo. O backtest pula esta estratégia.",
+    "caveats": [
+      "Não foi medida: o backtest só reproduz candles de preço e esta estratégia usa o grafo de correlação entre ativos montado ao vivo.",
+      "Para estudá-la seria preciso gravar esses dados ao vivo por meses antes de qualquer backtest.",
+      "Sem veredito: nada nesta página indica que ela ganha ou perde."
+    ]
+  },
+  "NW001": {
+    "verdict": "insufficient",
+    "applied_params": {},
+    "timeframe": "—",
+    "reason": "Depende de dados que só existem ao vivo e não têm histórico para reproduzir no backtest: o grafo de ativos montado ao vivo. O backtest pula esta estratégia.",
+    "caveats": [
+      "Não foi medida: o backtest só reproduz candles de preço e esta estratégia usa o grafo de ativos montado ao vivo.",
+      "Para estudá-la seria preciso gravar esses dados ao vivo por meses antes de qualquer backtest.",
+      "Sem veredito: nada nesta página indica que ela ganha ou perde."
+    ]
+  },
+  "RG003": {
+    "verdict": "insufficient",
+    "applied_params": {},
+    "timeframe": "—",
+    "reason": "Depende de dados que só existem ao vivo e não têm histórico para reproduzir no backtest: o snapshot de opções (GEX) da Deribit. O backtest pula esta estratégia.",
+    "caveats": [
+      "Não foi medida: o backtest só reproduz candles de preço e esta estratégia usa o snapshot de opções (GEX) da Deribit.",
+      "Para estudá-la seria preciso gravar esses dados ao vivo por meses antes de qualquer backtest.",
+      "Sem veredito: nada nesta página indica que ela ganha ou perde."
+    ]
+  },
+  "SC002": {
+    "verdict": "insufficient",
+    "applied_params": {},
+    "timeframe": "—",
+    "reason": "Depende de dados que só existem ao vivo e não têm histórico para reproduzir no backtest: os saldos de grandes carteiras (market players). O backtest pula esta estratégia.",
+    "caveats": [
+      "Não foi medida: o backtest só reproduz candles de preço e esta estratégia usa os saldos de grandes carteiras (market players).",
+      "Para estudá-la seria preciso gravar esses dados ao vivo por meses antes de qualquer backtest.",
+      "Sem veredito: nada nesta página indica que ela ganha ou perde."
+    ]
+  },
+  "IF001": {
+    "verdict": "insufficient",
+    "applied_params": {},
+    "timeframe": "—",
+    "reason": "Depende de dados que só existem ao vivo e não têm histórico para reproduzir no backtest: eventos on-chain ao vivo. O backtest pula esta estratégia.",
+    "caveats": [
+      "Não foi medida: o backtest só reproduz candles de preço e esta estratégia usa eventos on-chain ao vivo.",
+      "Para estudá-la seria preciso gravar esses dados ao vivo por meses antes de qualquer backtest.",
+      "Sem veredito: nada nesta página indica que ela ganha ou perde."
+    ]
+  },
+  "IF002": {
+    "verdict": "insufficient",
+    "applied_params": {},
+    "timeframe": "—",
+    "reason": "Depende de dados que só existem ao vivo e não têm histórico para reproduzir no backtest: preços de corretoras descentralizadas (DEX) ao vivo. O backtest pula esta estratégia.",
+    "caveats": [
+      "Não foi medida: o backtest só reproduz candles de preço e esta estratégia usa preços de corretoras descentralizadas (DEX) ao vivo.",
+      "Para estudá-la seria preciso gravar esses dados ao vivo por meses antes de qualquer backtest.",
+      "Sem veredito: nada nesta página indica que ela ganha ou perde."
+    ]
+  },
+  "PA009": {
+    "verdict": "insufficient",
+    "applied_params": {},
+    "timeframe": "2m",
+    "reason": "É desenhada para gráfico de 2 minutos e a base não tem candles de 2m. Não há histórico para backtest.",
+    "caveats": [
+      "Não foi medida: sem candles de 2 minutos na base.",
+      "Para estudá-la seria preciso coletar esse histórico (a OKX só entrega janelas curtas de 2m).",
+      "Sem veredito: nada nesta página indica que ela ganha ou perde."
+    ]
+  },
+  "PA012": {
+    "verdict": "insufficient",
+    "applied_params": {},
+    "timeframe": "1m",
+    "reason": "É desenhada para gráfico de 1 minuto e a base só tem cerca de 0,3 ano de candles de 1m, pouco para concluir (e inclui poucos trades).",
+    "caveats": [
+      "Não foi medida: histórico de 1m de apenas cerca de 0,3 ano.",
+      "Com mais histórico (os candles de 1m acumulam ao vivo) ela pode ser estudada.",
+      "Sem veredito: nada nesta página indica que ela ganha ou perde."
+    ]
   }
 }
