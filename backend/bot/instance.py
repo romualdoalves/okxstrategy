@@ -51,6 +51,7 @@ class BotInstance(OrderGateMixin, EntryMixin, PositionMixin, AccountingMixin, St
         self._tp1_price   = 0.0
         self._sl_price    = 0.0
         self._tp1_done    = False
+        self._last_meta: dict = {}    # metadata do último sinal da estratégia (SL/TP1/ts_pct de referência)
         self._last_price  = 0.0       # último preço AO VIVO (qualquer tick); _candles só guarda candles FECHADOS
         self._lock_retry_at = 0.0     # monotonic: não repetir a trava de lucro a cada tick se a OKX recusar
         self._lock_events: dict = {}  # degrau -> horário ISO em que foi alcançado (só desta sessão do processo)
@@ -427,6 +428,7 @@ class BotInstance(OrderGateMixin, EntryMixin, PositionMixin, AccountingMixin, St
                     result = self.strategy.compute_with_context(candles, ctx)
                     if result:
                         self._current_atr     = result.indicators.get("atr", 0)
+                        self._last_meta       = dict(result.metadata or {})
                         self._last_indicators = self._runtime_indicators(result)
                         log.info("[Bot %d] Pronto | %s",
                                  self.config.id, result.indicators)

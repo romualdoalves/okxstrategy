@@ -75,7 +75,7 @@ export default function BotCard({ bot, liveStatus }) {
   const unrealizedPct = netPct ?? grossPct
   const pctIsNet = netPct !== null
   const profitLock = isPositioned ? rt.profit_lock : null
-  const trailing = isPositioned ? rt.trailing : null
+  const trailing = rt.trailing ?? null   // política de trailing: vale com ou sem posição
   const mood = botMood({
     isPositioned,
     netPct: netPct,
@@ -305,42 +305,52 @@ export default function BotCard({ bot, liveStatus }) {
         )
       })()}
 
-      {/* Trailing stop sem degraus (padrão): arma no TP1 da estratégia; mostra o estado real */}
-      {isPositioned && !profitLock?.enabled && (
+      {/* Política de trailing do bot: sempre visível. Sem posição é referência; em posição, valores reais */}
+      {trailing && !profitLock?.enabled && (
         <div className="mb-3 rounded-lg border border-white/8 bg-white/4 p-2.5 text-[11px]">
           <span className="flex items-center gap-1 text-[10px] text-muted uppercase font-bold tracking-wider mb-1">
-            <Lock size={10} /> Trailing stop
+            <Lock size={10} /> Trailing stop {trailing.flat ? '· política adotada' : ''}
           </span>
-          {trailing ? (
-            <div className="space-y-0.5">
-              <p className={trailing.armed ? 'text-accent/90 font-semibold' : 'text-muted'}>
-                {trailing.armed
-                  ? 'ALCANÇADO · TP1 atingido, trailing nativo da OKX ativo'
-                  : 'Ainda não alcançado · aguardando o TP1'}
-              </p>
+          <div className="space-y-0.5">
+            <p className={trailing.armed ? 'text-accent/90 font-semibold' : 'text-muted'}>
+              {trailing.armed
+                ? 'ALCANÇADO · TP1 atingido, trailing nativo da OKX ativo'
+                : trailing.flat
+                ? 'Sem posição · o trailing arma ao atingir o TP1 da estratégia'
+                : 'Ainda não alcançado · aguardando o TP1'}
+            </p>
+            <p className="text-muted">
+              {trailing.flat ? 'TP1 de referência' : 'Arma em'}{' '}
+              <span className="font-mono text-white/80">{fmtPx(trailing.arm_price)}</span>{' '}
+              ({fmtSigned(trailing.arm_pct)} {trailing.flat ? 'sobre o preço atual' : 'sobre a entrada'})
+            </p>
+            <p className="text-muted">
+              Distância do trailing: <span className="text-white/80 font-semibold">{trailing.callback_pct}%</span>{' '}
+              <span className="text-muted/70">
+                ({trailing.callback_source === 'strategy' ? 'definida pela estratégia' : '1,5×ATR, limitado a 0,5%–5%'})
+              </span>
+            </p>
+            {trailing.stop_price && (
               <p className="text-muted">
-                Arma em <span className="font-mono text-white/80">{fmtPx(trailing.arm_price)}</span>{' '}
-                ({fmtSigned(trailing.arm_pct)} sobre a entrada)
-              </p>
-              <p className="text-muted">
-                Distância do trailing: <span className="text-white/80 font-semibold">{trailing.callback_pct}%</span>{' '}
-                <span className="text-muted/70">
-                  ({trailing.callback_source === 'strategy' ? 'definida pela estratégia' : '1,5×ATR, limitado a 0,5%–5%'})
+                {trailing.armed ? 'Stop atual' : trailing.flat ? 'Stop inicial de referência' : 'Stop inicial'}{' '}
+                <span className="font-mono text-white/80">{fmtPx(trailing.stop_price)}</span>{' '}
+                <span className={trailing.stop_pct_net > 0 ? 'text-bull font-semibold' : 'text-muted/70'}>
+                  (se executado: {fmtSigned(trailing.stop_pct_net)} líq.)
                 </span>
               </p>
-              {trailing.stop_price && (
-                <p className="text-muted">
-                  {trailing.armed ? 'Stop atual' : 'Stop inicial'}{' '}
-                  <span className="font-mono text-white/80">{fmtPx(trailing.stop_price)}</span>{' '}
-                  <span className={trailing.stop_pct_net > 0 ? 'text-bull font-semibold' : 'text-muted/70'}>
-                    (se executado: {fmtSigned(trailing.stop_pct_net)} líq.)
-                  </span>
-                </p>
-              )}
-            </div>
-          ) : (
-            <p className="text-muted">Dados do trailing indisponíveis (aguardando status do bot).</p>
-          )}
+            )}
+            <p className="text-muted">
+              Degraus de lucro:{' '}
+              {trailing.lock_step_pct
+                ? <span className="text-white/80 font-semibold">a cada +{trailing.lock_step_pct}%</span>
+                : <span className="text-muted/70">desligados · opera do TP1 ao sinal de saída da estratégia</span>}
+            </p>
+            {trailing.flat && (
+              <p className="pt-0.5 text-[10px] text-muted/60">
+                Níveis de referência do último sinal; na entrada o stop é ajustado entre 1,5 e 4 ATR.
+              </p>
+            )}
+          </div>
         </div>
       )}
 

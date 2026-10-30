@@ -13,7 +13,7 @@ from ..exchanges.base import BaseExchange
 from ..database import SessionLocal, TradeModel
 from ..notifications import build_exit_msg, build_order_confirmed_msg
 from ..profit_lock import (capped_callback, net_pct_at_stop, net_unrealized, ratchet_stop, step_of_stop,
-                           steps_view, stop_is_tighter)
+                           step_pct, steps_view, stop_is_tighter)
 from .common import log
 
 
@@ -96,25 +96,41 @@ class PositionMixin:
         return out
 
     def _trailing_view(self, last_price: float) -> dict | None:
-        """Parâmetros de trailing que o bot ADOTA nesta posição (os mesmos usados em _check_tp1), para o card:
-        onde o trailing arma, que distância usa e de onde ela vem, e o stop atual com o que ele garante."""
-        if self._direction == 0 or self._entry_price <= 0:
+        """Política de trailing que o bot ADOTA (mesmas regras de _check_tp1), para o card, com ou sem posição.
+
+        Em posição: onde arma, distância e stop atual, tudo da operação real. Sem posição: referência calculada
+        com o último sinal da estratégia (`flat=True`); o SL/TP1 reais são ajustados na entrada (piso 1,5 ATR,
+        teto 4 ATR) e o preço de entrada ainda não existe."""
+        flat = self._direction == 0
+        meta = getattr(self, "_last_meta", None) or {}
+        price = last_price or self._entry_price
+        if price <= 0:
             return None
-        d, entry = self._direction, self._entry_price
-        tp1 = self._tp1_price or entry * (1.02 if d == 1 else 0.98)   # mesmo fallback de _tp1_reached
-        if self._tp1_done and self._ts_callback_ratio > 0:
+        d = 1 if flat else self._direction
+        entry = price if flat else self._entry_price
+        tp1 = (float(meta.get("tp1_price") or 0.0) if flat else self._tp1_price) or entry * (1.02 if d == 1 else 0.98)
+        ts_pct = float(meta.get("ts_pct") or 0.0) if flat else self._ts_pct
+        if not flat and self._tp1_done and self._ts_callback_ratio > 0:
             callback = self._ts_callback_ratio                          # distância efetivamente enviada à OKX
+        elif ts_pct > 0:
+            callback = ts_pct
         else:
-            callback = capped_callback(self._trailing_callback(last_price or entry), self._sl_price,
-                                       last_price or entry, entry, d)
+            atr_cb = (self._current_atr * 1.5) / price if self._current_atr else 0.0
+            callback = max(0.005, min(0.05, atr_cb))                    # mesma regra de _trailing_callback
+        if not flat:
+            callback = capped_callback(callback, self._sl_price, price, entry, d) if not self._tp1_done else callback
+        stop = float(meta.get("sl_price") or 0.0) if flat else self._sl_price
+        step = step_pct(entry, d)
         return {
-            "armed": bool(self._tp1_done),
+            "flat": flat,
+            "armed": (not flat) and bool(self._tp1_done),
             "arm_price": round(tp1, 8),
             "arm_pct": round((tp1 / entry - 1) * d * 100, 2),
             "callback_pct": round(callback * 100, 2),
-            "callback_source": "strategy" if self._ts_pct > 0 else "atr",   # ts_pct da estratégia | 1,5×ATR (0,5%–5%)
-            "stop_price": round(self._sl_price, 8) if self._sl_price > 0 else None,
-            "stop_pct_net": round(net_pct_at_stop(entry, self._sl_price, d), 2) if self._sl_price > 0 else None,
+            "callback_source": "strategy" if ts_pct > 0 else "atr",   # ts_pct da estratégia | 1,5×ATR (0,5%–5%)
+            "stop_price": round(stop, 8) if stop > 0 else None,
+            "stop_pct_net": round(net_pct_at_stop(entry, stop, d), 2) if stop > 0 else None,
+            "lock_step_pct": round(step * 100, 2) if step > 0 else None,   # None = degraus de lucro desligados
         }
 
     def _tp1_reached(self, price: float) -> bool:

@@ -390,6 +390,7 @@ class EntryMixin:
             return
 
         self._current_atr     = result.indicators.get("atr", self._current_atr)
+        self._last_meta       = dict(result.metadata or {})   # níveis de referência (SL/TP1/ts_pct) p/ o card
         self._hold_reason     = result.hold_reason
         self._last_indicators = self._runtime_indicators(result)
 

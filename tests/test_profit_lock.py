@@ -182,3 +182,22 @@ def test_live_price_drives_status_not_the_last_closed_candle():
     assert st["unrealized_net_pct"] < 0                       # +0,01% bruto − ~0,2% de taxas
     assert st["unrealized_net_pct"] <= (st["last_price"] / ENTRY - 1) * 100   # líquido nunca excede o bruto
     assert st["fee_rate"] == pl.fee_rate()
+
+
+def test_trailing_policy_is_available_without_a_position():
+    bot = Bot()
+    bot._direction, bot._entry_price, bot._sl_price = 0, 0.0, 0.0
+    bot._last_meta = {"sl_price": ENTRY * 0.93, "tp1_price": ENTRY * 1.36}
+    bot._ts_pct, bot._ts_callback_ratio, bot._current_atr = 0.0, 0.0, 2000.0
+    v = bot._trailing_view(ENTRY)
+    assert v["flat"] is True and v["armed"] is False
+    assert v["arm_price"] == pytest.approx(ENTRY * 1.36) and v["arm_pct"] == pytest.approx(36.0)
+    assert v["callback_source"] == "atr" and v["callback_pct"] == pytest.approx(3.95, abs=0.01)   # 1,5×2000/76000
+    assert v["stop_price"] == pytest.approx(ENTRY * 0.93) and v["stop_pct_net"] < -7
+    assert v["lock_step_pct"] == 0.5                                # fixture liga os degraus; desligado → None
+    bot._last_meta = {"tp1_price": ENTRY * 1.05, "ts_pct": 0.02}
+    v = bot._trailing_view(ENTRY)
+    assert v["callback_source"] == "strategy" and v["callback_pct"] == 2.0
+    nopx = Bot()
+    nopx._direction, nopx._entry_price = 0, 0.0
+    assert nopx._trailing_view(0.0) is None                        # sem preço algum não inventa números
