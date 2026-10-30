@@ -40,14 +40,14 @@ def test_parsers():
 
 
 def test_parse_baseline():
-    b = R.parse_baseline((R._SRC / "baseline_intraday.txt").read_text(encoding="utf-8"))
+    b = R.parse_baseline((R._SRC / "baseline.txt").read_text(encoding="utf-8"))
     assert b["MR004"]["BTC-USDT"]["trades"] == 1622 and b["MR004"]["BTC-USDT"]["tf"] == "1H"
     assert b["PA008"]["SOL-USDT"]["trades"] == 0 and b["SC005"]["SOL-USDT"]["oos_pf"] == 0.528
     assert json.loads((R._DIR / "PA008.json").read_text(encoding="utf-8"))["timeframe"] == "15m"
 
 
 def test_unknown_strategy_has_no_study():
-    r = R.load_study("T000")
+    r = R.load_study("PA017")
     assert r["verdict"] == "none" and r["stale"] is False
 
 
@@ -77,7 +77,9 @@ def test_strategy_list_carries_verdict():
     app.include_router(strategies.router)
     by_id = {s["id"]: s for s in TestClient(app).get("/api/strategies").json()}
     assert by_id["TF001"]["study_verdict"] == "retired" and by_id["TF009"]["study_verdict"] == "candidate"
-    assert by_id["T000"]["study_verdict"] == "none"
+    # toda estratégia do registro tem veredito: nova estratégia sem estudo derruba este teste de propósito
+    sem = [i for i, v in by_id.items() if v["study_verdict"] == "none"]
+    assert not sem, f"sem estudo: {sem}"
 
 
 def test_creating_bot_with_retired_strategy_is_blocked_unless_forced():

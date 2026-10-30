@@ -126,7 +126,7 @@ def _studied_hash(sid: str, rev: str | None) -> str | None:
 def build_reports() -> list[str]:
     wf = parse_walkforward((_SRC / "walkforward_1d.txt").read_text(encoding="utf-8"))
     yearly, bh = parse_yearly((_SRC / "yearly_1d.txt").read_text(encoding="utf-8"))
-    baseline = parse_baseline((_SRC / "baseline_intraday.txt").read_text(encoding="utf-8"))
+    baseline = parse_baseline((_SRC / "baseline.txt").read_text(encoding="utf-8"))
     verdicts = json.loads((_SRC / "verdicts.json").read_text(encoding="utf-8"))
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     written = []

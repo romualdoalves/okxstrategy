@@ -1,0 +1,97 @@
+{
+ "strategy_id": "TF002",
+ "timeframe": "1D",
+ "generated_at": "2026-10-30",
+ "verdict": "watch",
+ "verdict_label": "Em observação",
+ "reason": "Quase não opera (0,6 a 2 trades por ano). O BTC perde (PF 0,54, fora da amostra 0,27); o PF 10 da ETH e da SOL vem de 5 trades, sem valor estatístico. Em observação por amostra insuficiente.",
+ "applied_params": {},
+ "note": null,
+ "file_sha256": "d812c5a9d0a7575991752f56522a3899eaace8423fa6b86fb77e72c1f00c54c3",
+ "walkforward": {},
+ "yearly": {},
+ "buy_hold": {
+  "BTC-USDT": {
+   "2018": -29,
+   "2019": 90,
+   "2020": 309,
+   "2021": 49,
+   "2022": -65,
+   "2023": 156,
+   "2024": 109,
+   "2025": -9,
+   "2026": -10
+  },
+  "ETH-USDT": {
+   "2018": -16,
+   "2019": -11,
+   "2020": 468,
+   "2021": 385,
+   "2022": -68,
+   "2023": 90,
+   "2024": 42,
+   "2025": -14,
+   "2026": -24
+  },
+  "SOL-USDT": {
+   "2021": 5136,
+   "2022": -94,
+   "2023": 853,
+   "2024": 75,
+   "2025": -40,
+   "2026": -22
+  }
+ },
+ "baseline": {
+  "BTC-USDT": {
+   "tf": "1D",
+   "years": 7.94,
+   "trades": 16,
+   "trades_per_year": 2.0,
+   "win_rate": 18.75,
+   "pf": 0.541,
+   "pf_p5": 0.001,
+   "profit_usd": -15.17,
+   "oos_trades": 7,
+   "oos_pf": 0.272,
+   "mdd_usd": 4.0,
+   "exposure_pct": 0.6,
+   "buy_hold_pct": 1468.3
+  },
+  "ETH-USDT": {
+   "tf": "1D",
+   "years": 7.94,
+   "trades": 5,
+   "trades_per_year": 0.6,
+   "win_rate": 20.0,
+   "pf": 10.0,
+   "pf_p5": 0.0,
+   "profit_usd": 23.47,
+   "oos_trades": 1,
+   "oos_pf": 0.0,
+   "mdd_usd": 3.76,
+   "exposure_pct": 0.2,
+   "buy_hold_pct": 1405.3
+  },
+  "SOL-USDT": {
+   "tf": "1D",
+   "years": 5.8,
+   "trades": 5,
+   "trades_per_year": 0.9,
+   "win_rate": 80.0,
+   "pf": 10.0,
+   "pf_p5": 10.0,
+   "profit_usd": 20.82,
+   "oos_trades": 0,
+   "oos_pf": 0.0,
+   "mdd_usd": 0.0,
+   "exposure_pct": 0.2,
+   "buy_hold_pct": 2992.8
+  }
+ },
+ "caveats": [
+  "Só o baseline com os parâmetros padrão foi medido em 1D (BTC e ETH desde 2018, SOL desde 2021), sem walk-forward.",
+  "Amostra muito pequena: poucas operações em 8 anos, então os números são indícios, não prova.",
+  "Valores em US$ do backtest (taxa 0,1% por lado e slippage 0,05%); não garantem resultado futuro."
+ ]
+}

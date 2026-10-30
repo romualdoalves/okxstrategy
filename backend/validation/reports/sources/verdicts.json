@@ -311,5 +311,55 @@
     "verdict": "retired",
     "reason": "Perde nos 3 ativos (PF 0,06 a 0,80) e fora da amostra (PF 0 em 2 a 7 trades), com só 5 a 8 trades por ano: sem amostra e sem vantagem.",
     "applied_params": {}
+  },
+  "TF002": {
+    "verdict": "watch",
+    "applied_params": {},
+    "caveats": [
+      "Só o baseline com os parâmetros padrão foi medido em 1D (BTC e ETH desde 2018, SOL desde 2021), sem walk-forward.",
+      "Amostra muito pequena: poucas operações em 8 anos, então os números são indícios, não prova.",
+      "Valores em US$ do backtest (taxa 0,1% por lado e slippage 0,05%); não garantem resultado futuro."
+    ],
+    "reason": "Quase não opera (0,6 a 2 trades por ano). O BTC perde (PF 0,54, fora da amostra 0,27); o PF 10 da ETH e da SOL vem de 5 trades, sem valor estatístico. Em observação por amostra insuficiente."
+  },
+  "TF010": {
+    "verdict": "watch",
+    "applied_params": {},
+    "caveats": [
+      "Só o baseline com os parâmetros padrão foi medido em 1D (BTC e ETH desde 2018, SOL desde 2021), sem walk-forward.",
+      "Amostra muito pequena: poucas operações em 8 anos, então os números são indícios, não prova.",
+      "Valores em US$ do backtest (taxa 0,1% por lado e slippage 0,05%); não garantem resultado futuro."
+    ],
+    "reason": "PF 1,79 / 1,42 / 2,30 nos 3 ativos, mas com só 7 a 13 trades em 8 anos, p5 abaixo de 0,5 e 1 a 2 trades fora da amostra. Resultado promissor, porém pequeno demais para um walk-forward: em observação."
+  },
+  "TF013": {
+    "verdict": "retired",
+    "applied_params": {},
+    "caveats": [
+      "Só o baseline com os parâmetros padrão foi medido em 1D (BTC e ETH desde 2018, SOL desde 2021), sem walk-forward.",
+      "Amostra muito pequena: poucas operações em 8 anos, então os números são indícios, não prova.",
+      "Valores em US$ do backtest (taxa 0,1% por lado e slippage 0,05%); não garantem resultado futuro."
+    ],
+    "reason": "Perde no BTC e na ETH (PF 0,72 e 0,80, com 73 e 91 trades); só a SOL tem PF 1,42, e fora da amostra BTC 0,31 e SOL 0,90. Sem consistência."
+  },
+  "TF016": {
+    "verdict": "retired",
+    "applied_params": {},
+    "reason": "Perde nos 3 ativos (PF 0,45 a 0,52) e fora da amostra (0,24 a 0,62), com cerca de 43 trades por ano."
+  },
+  "IF003": {
+    "verdict": "retired",
+    "applied_params": {},
+    "reason": "Perde de forma grave (PF 0,26 a 0,46) com mais de 800 trades por ano: sobretudo taxas."
+  },
+  "T000": {
+    "verdict": "insufficient",
+    "applied_params": {},
+    "timeframe": "1m",
+    "reason": "Estratégia de teste de 1 minuto: a base só tem cerca de 0,3 ano de candles de 1m, pouco para concluir.",
+    "caveats": [
+      "Não foi medida: histórico de 1m de apenas cerca de 0,3 ano.",
+      "Sem veredito: nada nesta página indica que ela ganha ou perde."
+    ]
   }
 }
