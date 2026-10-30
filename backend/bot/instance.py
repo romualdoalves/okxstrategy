@@ -17,6 +17,7 @@ from ..feeds.gex_feed import GexFeed
 from ..feeds.okx_market_players import OkxMarketPlayersFeed
 from ..strategies.base import STRATEGY_WINDOW, Signal
 from ..notifications import TelegramNotifier, build_start_msg
+from ..profit_lock import fee_rate as _fee_rate
 from ..risk import current_day_start_utc as _current_day_start_utc
 from ..exchanges.factory import build_exchange, get_exchange_maintenance, get_exchange_provider, get_public_stream_class, map_timeframe_for_history, map_timeframe_for_ws_channel
 from ..strategies.registry import get_strategy
@@ -50,6 +51,7 @@ class BotInstance(OrderGateMixin, EntryMixin, PositionMixin, AccountingMixin, St
         self._tp1_price   = 0.0
         self._sl_price    = 0.0
         self._tp1_done    = False
+        self._last_price  = 0.0       # último preço AO VIVO (qualquer tick); _candles só guarda candles FECHADOS
         self._lock_retry_at = 0.0     # monotonic: não repetir a trava de lucro a cada tick se a OKX recusar
         self._lock_events: dict = {}  # degrau -> horário ISO em que foi alcançado (só desta sessão do processo)
         self._ts_pct      = 0.0       # distância do trailing definida pela estratégia (0 = ATR)
@@ -564,6 +566,9 @@ class BotInstance(OrderGateMixin, EntryMixin, PositionMixin, AccountingMixin, St
         # reprocessar nem duplicar o histórico fora de ordem.
         if closed and self._candles and int(bar.epoch) <= int(self._candles[-1].epoch):
             return
+        # Preço ao vivo para P&L, trailing e status: num bot 1D o último candle fechado tem até 24h de atraso.
+        if float(getattr(bar, "close", 0.0) or 0.0) > 0:
+            self._last_price = float(bar.close)
         # Sincronização Dinâmica Automática: Apenas no fechamento do candle para economizar API
         if closed and self._direction != 0:
             await self.force_sync_trailing(exchange)
@@ -643,7 +648,7 @@ class BotInstance(OrderGateMixin, EntryMixin, PositionMixin, AccountingMixin, St
 
     def get_status(self) -> dict:
         # Preço atual vindo do último candle
-        last_price = self._candles[-1].close if self._candles else 0.0
+        last_price = self._last_price or (self._candles[-1].close if self._candles else 0.0)
         execution_cycle = {
             "timeframe": self.config.timeframe,
             "closed_candles": self._closed_candle_count,
@@ -704,6 +709,7 @@ class BotInstance(OrderGateMixin, EntryMixin, PositionMixin, AccountingMixin, St
             "guaranteed_pnl": pv["guaranteed_pnl"],
             "profit_lock": pv["profit_lock"],
             "trailing": self._trailing_view(last_price),
+            "fee_rate": _fee_rate(),          # o card calcula o líquido sobre o preço ao vivo com esta taxa
             "unrealized_net_usd": pv["unrealized_net_usd"],
             "unrealized_net_pct": pv["unrealized_net_pct"],
             "daily_pnl":   round(self._daily_pnl, 2),

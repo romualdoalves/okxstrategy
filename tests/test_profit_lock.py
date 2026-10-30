@@ -161,3 +161,24 @@ def test_trailing_view_reports_the_parameters_the_bot_adopts():
     assert bot._trailing_view(ENTRY)["callback_pct"] == 2.0 and bot._trailing_view(ENTRY)["callback_source"] == "strategy"
     bot._tp1_done, bot._ts_callback_ratio = True, 0.031          # já armado: mostra o valor enviado à OKX
     assert bot._trailing_view(ENTRY * 1.4)["callback_pct"] == 3.1 and bot._trailing_view(ENTRY * 1.4)["armed"] is True
+
+
+def test_live_price_drives_status_not_the_last_closed_candle():
+    """Regressão: bot 1D mostrava líquido +0,74% com bruto +0,01% porque o líquido usava o fechamento do último
+    candle fechado (defasado até 24h) e o bruto o preço ao vivo."""
+    from backend.bot.instance import BotInstance
+    bot = BotInstance.__new__(BotInstance)
+    bot.__dict__.update(
+        config=NS(id=1, symbol="BTC-USDT", name="b", timeframe="1D"),
+        status="running", _candles=[NS(close=ENTRY * 1.0094, epoch=1)], _last_price=ENTRY * 1.0001,
+        _direction=1, _entry_price=ENTRY, _sz=0.0013, _sl_price=ENTRY * 0.9, _tp1_price=ENTRY * 1.36,
+        _tp1_done=False, _ts_pct=0.0, _ts_callback_ratio=0.0, _current_atr=800.0, _lock_events={},
+        _peak_price=0.0, _daily_pnl=0.0, _wins=0, _losses=0, _halted=False, _hold_reason="", _last_indicators={},
+        _last_order_criteria={}, _last_order_error=None, _maintenance=None, _started_at=None,
+        _closed_candle_count=0, _last_closed_candle_at=None, _graph_state=None, _onchain_events=[],
+    )
+    st = bot.get_status()
+    assert st["last_price"] == pytest.approx(ENTRY * 1.0001)
+    assert st["unrealized_net_pct"] < 0                       # +0,01% bruto − ~0,2% de taxas
+    assert st["unrealized_net_pct"] <= (st["last_price"] / ENTRY - 1) * 100   # líquido nunca excede o bruto
+    assert st["fee_rate"] == pl.fee_rate()

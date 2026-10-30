@@ -65,7 +65,13 @@ export default function BotCard({ bot, liveStatus }) {
   const grossPct = isPositioned && lastPrice && rt.entry_price
     ? direction * ((lastPrice - rt.entry_price) / rt.entry_price) * 100
     : null
-  const netPct = isPositioned && rt.unrealized_net_pct != null ? rt.unrealized_net_pct : null
+  // Líquido calculado sobre o MESMO preço ao vivo que o bruto (mesma fórmula do backend: net_unrealized).
+  // O valor do backend é só reserva: vem de um snapshot e pode estar defasado em segundos.
+  const feeRate = rt.fee_rate ?? null
+  const netPctLive = isPositioned && lastPrice && rt.entry_price && feeRate != null
+    ? ((direction * (lastPrice - rt.entry_price) - (rt.entry_price + lastPrice) * feeRate) / rt.entry_price) * 100
+    : null
+  const netPct = netPctLive ?? (isPositioned && rt.unrealized_net_pct != null ? rt.unrealized_net_pct : null)
   const unrealizedPct = netPct ?? grossPct
   const pctIsNet = netPct !== null
   const profitLock = isPositioned ? rt.profit_lock : null
