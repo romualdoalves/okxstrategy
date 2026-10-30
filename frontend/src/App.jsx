@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
 import {
-  LayoutDashboard, Bot, Zap, BookText, TrendingUp, Trophy, Plug, CheckCircle2, FlaskConical, MonitorIcon, ScanSearch, Database, ShieldCheck
+  LayoutDashboard, Bot, Zap, BookText, TrendingUp, Trophy, Plug, CheckCircle2, FlaskConical, MonitorIcon, ScanSearch, Database, ShieldCheck, Target
 } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 
@@ -19,6 +19,7 @@ import StrategyFactory  from './pages/StrategyFactory'
 import Monitor          from './pages/Monitor'
 import BatchBacktest    from './pages/BatchBacktest'
 import MarketData       from './pages/MarketData'
+import MetaHoje         from './pages/MetaHoje'
 import Integrity        from './pages/Integrity'
 import ErrorBoundary   from './components/ErrorBoundary'
 import ToastContainer  from './components/ToastContainer'
@@ -98,6 +99,7 @@ function AppShell() {
     { to: '/strategy-factory',  labelKey: 'nav.factory',     icon: FlaskConical },
     { to: '/monitor',           labelKey: 'nav.monitor',     icon: MonitorIcon },
     { to: '/batch-backtest',    labelKey: 'nav.scanner',     icon: ScanSearch },
+    { to: '/meta-1-hoje',       labelKey: 'nav.goal',        icon: Target },
     { to: '/market-data',       labelKey: 'MarketData',      icon: Database },
     { to: '/registros',         labelKey: 'nav.registros',   icon: BookText },
     { to: '/performance',       labelKey: 'nav.performance', icon: Trophy },
@@ -249,6 +251,7 @@ function AppShell() {
             <Route path="/monitor"          element={<Monitor />} />
             <Route path="/batch-backtest"   element={<BatchBacktest />} />
             <Route path="/market-data"      element={<MarketData />} />
+            <Route path="/meta-1-hoje"      element={<MetaHoje />} />
             <Route path="/integridade"      element={<Integrity />} />
           </Routes>
         </ErrorBoundary>

@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 
 from fastapi import HTTPException
 
-from ..exchanges.factory import build_exchange, get_exchange_provider, get_ranked_assets_universe, map_timeframe_for_history
+from ..exchanges.factory import build_exchange, get_exchange_provider, map_timeframe_for_history
 from ..exchanges.okx_universe import fetch_top_spot_assets
 from ..common import _assert_spot_only, _get_symbol_tradability, _norm_symbol
 
@@ -182,7 +182,10 @@ async def rank_assets(strategy_id: str = "graph_regime", timeframe: str = "15m")
     import pandas_ta as ta
 
     top = await fetch_top_spot_assets()
-    RANK_ASSETS = [a["symbol"] for a in top] or get_ranked_assets_universe()[:5]
+    if not top:
+        # Sem o ranking da OKX não há universo: nunca se usa uma lista fixa de reserva.
+        raise HTTPException(503, "Ranking de ativos da OKX indisponível; não é permitido usar outra lista de ativos.")
+    RANK_ASSETS = [a["symbol"] for a in top]
     bar = map_timeframe_for_history(timeframe)
 
     ohlcv: dict[str, list] = {}

@@ -29,28 +29,12 @@ def test_commit_info_never_raises_without_git(monkeypatch, tmp_path):
     assert version_mod.get_commit_info() == {"version": "unknown", "timestamp": None}
 
 
-class FakeDb:
-    def __init__(self, tracked):
-        self.tracked = tracked
-
-    def query(self, *_):
-        return NS(all=lambda: [(s,) for s in self.tracked])
-
-
 def test_market_data_symbols_come_from_the_top_five(monkeypatch):
+    from backend.exchanges import okx_universe
+
     async def top(n=5):
         return [{"symbol": s} for s in ("BTC-USDT", "ETH-USDT", "SOL-USDT", "HYPE-USDT", "ZEC-USDT")]
-    monkeypatch.setattr(market_data, "fetch_top_spot_assets", top)
-    out = asyncio.run(market_data.get_available_symbols(FakeDb(tracked=[])))
-    symbols = [o["symbol"] if isinstance(o, dict) else o for o in out]
-    assert symbols[:5] == ["BTC-USDT", "ETH-USDT", "SOL-USDT", "HYPE-USDT", "ZEC-USDT"]
-    assert "DOGE-USDT" not in symbols and "BNB-USDT" not in symbols      # a lista antiga saiu
-
-
-def test_market_data_keeps_already_tracked_symbols(monkeypatch):
-    async def top(n=5):
-        return [{"symbol": s} for s in ("BTC-USDT", "ETH-USDT", "SOL-USDT")]
-    monkeypatch.setattr(market_data, "fetch_top_spot_assets", top)
-    out = asyncio.run(market_data.get_available_symbols(FakeDb(tracked=["LINK-USDT"])))
-    symbols = [o["symbol"] if isinstance(o, dict) else o for o in out]
-    assert "LINK-USDT" in symbols                                         # dados já rastreados não se perdem
+    monkeypatch.setattr(okx_universe, "fetch_top_spot_assets", top)
+    out = asyncio.run(market_data.get_available_symbols())
+    assert out == ["BTC-USDT", "ETH-USDT", "SOL-USDT", "HYPE-USDT", "ZEC-USDT"]
+    assert "DOGE-USDT" not in out and "BNB-USDT" not in out        # a lista antiga saiu

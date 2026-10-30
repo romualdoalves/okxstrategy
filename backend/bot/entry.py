@@ -443,6 +443,9 @@ class EntryMixin:
             "ts":          bar.epoch,
         })
 
+        if getattr(self, "_goal_done", False):
+            self._hold_reason = "Meta encerrada: bot parado"
+            return
         if self._halted:
             self._hold_reason = "Circuit Breaker: Bot pausado (Stop Loss atingido)"
             return
@@ -478,6 +481,9 @@ class EntryMixin:
     # ── Entrada ───────────────────────────────────────────────────────────────
     async def _enter(self, direction: str, price: float, result, exchange: BaseExchange,
                      signal_log_id: Optional[int] = None):
+        if getattr(self, "_goal_done", False):
+            log.info("[Bot %d] Entrada %s não enviada — a meta deste bot já foi encerrada.", self.config.id, direction.upper())
+            return
         order_gate = await self._evaluate_order_criteria(
             result=result,
             direction=direction,

@@ -13,10 +13,6 @@ import {
 } from '../api'
 
 const DEFAULT_TIMEFRAMES = ['1m', '5m', '15m', '1h', '1d']
-const FALLBACK_SYMBOLS = [
-  'BTC-USDT', 'ETH-USDT', 'SOL-USDT', 'BNB-USDT', 'XRP-USDT',
-  'DOGE-USDT', 'ADA-USDT', 'AVAX-USDT', 'DOT-USDT', 'LINK-USDT',
-]
 
 function fmtDate(iso) {
   if (!iso) return '-'
@@ -53,12 +49,8 @@ export default function MarketData() {
     staleTime: 60_000,
   })
 
-  const symbolsForSelect = useMemo(() => {
-    if (Array.isArray(availableSymbols) && availableSymbols.length >= 3) {
-      return availableSymbols
-    }
-    return FALLBACK_SYMBOLS
-  }, [availableSymbols])
+  // Só o top 5 da OKX (vem do servidor). Sem o ranking, a lista fica vazia: não existe lista reserva.
+  const symbolsForSelect = useMemo(() => (Array.isArray(availableSymbols) ? availableSymbols : []), [availableSymbols])
 
   useEffect(() => {
     if (!symbol && symbolsForSelect.length > 0) {

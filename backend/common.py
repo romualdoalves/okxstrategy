@@ -100,6 +100,24 @@ async def _get_symbol_tradability(symbol: str, *, demo: bool = True) -> dict:
         "source": "fallback",
     }
 
+async def top5_symbols() -> list[str]:
+    """Os 5 pares SPOT X-USDT de maior volume em 24h na OKX (sem stablecoins). Lista vazia = ranking indisponível."""
+    from .exchanges.okx_universe import fetch_top_spot_assets
+    return [a["symbol"] for a in await fetch_top_spot_assets()]
+
+
+async def _assert_top5_symbol(symbol: str):
+    """REGRA DO APP: só se cria bot, troca de ativo ou rastreia dados em ativo do TOP 5. Sem o ranking da OKX a operação é
+    recusada: nunca se assume uma lista fixa."""
+    top = await top5_symbols()
+    if not top:
+        raise HTTPException(503, "Não foi possível confirmar o top 5 de ativos da OKX agora. Tente novamente em instantes.")
+    sym = _norm_symbol(symbol)
+    if sym not in top:
+        raise HTTPException(400, f"{sym} está fora do top 5 ativos spot por volume na OKX hoje ({', '.join(top)}). "
+                                 "Só ativos do top 5 são permitidos.")
+
+
 async def _assert_symbol_tradable(symbol: str, *, demo: bool = True):
     status = await _get_symbol_tradability(symbol, demo=demo)
     if status.get("tradable") is False:

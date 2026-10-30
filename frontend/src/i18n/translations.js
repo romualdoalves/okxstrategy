@@ -14,6 +14,7 @@ const T = {
     'nav.factory':          'Fábrica IA',
     'nav.monitor':          'Monitor',
     'nav.scanner':          'Scanner BT',
+    'nav.goal':             'Meta 1% Hoje!',
     'nav.integrity':        'Integridade',
 
     // ── Comuns ─────────────────────────────────────────────────────────────────
@@ -578,6 +579,7 @@ const T = {
     'nav.factory':          'AI Factory',
     'nav.monitor':          'Monitor',
     'nav.scanner':          'BT Scanner',
+    'nav.goal':             'Goal: 1% Today!',
     'nav.integrity':        'Integrity',
 
     // ── Common ────────────────────────────────────────────────────────────────

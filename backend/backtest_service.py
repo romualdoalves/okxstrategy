@@ -146,8 +146,14 @@ def unsupported_result(strategy_id: str, reasons: list[str], timeframe: str | No
     }
 
 
-async def load_candles_for(symbol: str, timeframes) -> dict[str, list]:
-    """Candles por timeframe: cache local (banco) primeiro, OKX para o que faltar. Atualiza o cache em segundo plano."""
+async def load_candles_for(symbol: str, timeframes, limits: dict[str, int] | None = None) -> dict[str, list]:
+    """Candles por timeframe: cache local (banco) primeiro, OKX para o que faltar. Atualiza o cache em segundo plano.
+
+    `limits` (opcional) = quantas velas buscar por timeframe; sem ele vale o histórico-alvo (history_target), que para 1h
+    são 20.000 velas (200 páginas da OKX). Quem só usa as últimas N velas deve pedir só N."""
+    limits = limits or {}
+    def _limit(tf: str) -> int:
+        return int(limits.get(tf) or history_target(tf))
     import aiohttp
 
     candle_cache: dict[str, list] = {}
@@ -160,7 +166,7 @@ async def load_candles_for(symbol: str, timeframes) -> dict[str, list]:
     for tf in timeframes:
         try:
             # Em thread: a leitura do banco é bloqueante e o laço de eventos é o mesmo dos bots.
-            local = await asyncio.to_thread(_from_db, tf, history_target(tf))
+            local = await asyncio.to_thread(_from_db, tf, _limit(tf))
             if local:
                 candle_cache[tf] = local
         except Exception as exc:
@@ -174,7 +180,7 @@ async def load_candles_for(symbol: str, timeframes) -> dict[str, list]:
                 for tf in missing:
                     try:
                         bar = map_timeframe_for_history(tf)
-                        candle_cache[tf] = await ex.fetch_history_candles(symbol, bar, limit=history_target(tf)) or []
+                        candle_cache[tf] = await ex.fetch_history_candles(symbol, bar, limit=_limit(tf)) or []
                     except Exception as exc:
                         log.warning("Backtest: erro buscando candles %s/%s: %s", symbol, tf, exc)
                         candle_cache[tf] = []

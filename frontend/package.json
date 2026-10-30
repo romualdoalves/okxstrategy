@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "check:tdz": "node scripts/check-tdz.mjs src",
-    "prebuild": "node scripts/check-tdz.mjs src && node scripts/render-scanner-states.mjs",
+    "prebuild": "node scripts/check-tdz.mjs src && node scripts/render-scanner-states.mjs && node scripts/render-goal-states.mjs",
     "check:ui": "node scripts/render-scanner-states.mjs"
   },
   "dependencies": {

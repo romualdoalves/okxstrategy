@@ -25,9 +25,10 @@ class TestSymbolChangeGuard(unittest.TestCase):
         for model in (BotModel, TradeModel):
             model.__table__.create(engine)
         self.db = sessionmaker(bind=engine)()
-        patch = mock.patch.object(bots_router, "_assert_symbol_tradable", _tradable)   # sem rede
-        patch.start()
-        self.addCleanup(patch.stop)
+        for name in ("_assert_symbol_tradable", "_assert_top5_symbol"):                  # sem rede
+            patch = mock.patch.object(bots_router, name, _tradable)
+            patch.start()
+            self.addCleanup(patch.stop)
         self.addCleanup(self.db.close)
 
     def add_bot(self, bot_id=1, symbol="BTC-USDT", active=False):

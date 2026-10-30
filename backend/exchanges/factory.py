@@ -49,12 +49,6 @@ def map_timeframe_for_ws_channel(timeframe: str) -> str:
     return map_timeframe_for_history(timeframe)
 
 
-def get_ranked_assets_universe() -> list[str]:
-    get_exchange_provider()
-    return ["BTC-USDT", "ETH-USDT", "SOL-USDT", "BNB-USDT", "XRP-USDT",
-            "DOGE-USDT", "ADA-USDT", "AVAX-USDT", "DOT-USDT", "LINK-USDT"]
-
-
 def build_exchange(
     session: aiohttp.ClientSession,
     *,

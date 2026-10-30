@@ -7,18 +7,12 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..database import HistoricCandleModel, MarketDataSyncJobModel, SessionLocal, TrackedSymbolModel
-from ..exchanges.factory import get_ranked_assets_universe
-from ..exchanges.okx_universe import fetch_top_spot_assets
+from ..common import _assert_top5_symbol, top5_symbols
 from ..market_data_service import MarketDataService
 
 router = APIRouter(prefix="/market-data", tags=["Market Data"])
 
 _ALLOWED_TIMEFRAMES = {"1m", "3m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "12h", "1D", "1W"}
-_DEFAULT_OKX_SPOT_SYMBOLS = [
-    "BTC-USDT", "ETH-USDT", "SOL-USDT", "BNB-USDT", "XRP-USDT",
-    "DOGE-USDT", "ADA-USDT", "AVAX-USDT", "DOT-USDT", "LINK-USDT",
-    "LTC-USDT", "UNI-USDT", "TRX-USDT", "BCH-USDT", "APT-USDT",
-]
 
 
 def _norm_symbol(symbol: str) -> str:
@@ -197,28 +191,9 @@ def get_tracked_symbols(db: Session = Depends(get_db)):
 
 
 @router.get("/available-symbols")
-async def get_available_symbols(db: Session = Depends(get_db)):
-    # Universo = top 5 SPOT por volume na OKX (dinâmico); a lista fixa só entra se a OKX estiver inacessível.
-    raw = [a["symbol"] for a in await fetch_top_spot_assets()] or list(get_ranked_assets_universe() or [])
-    # Inclui também ativos já rastreados para não perder opções em cenários parciais.
-    tracked = db.query(TrackedSymbolModel.symbol).all()
-    raw.extend([row[0] for row in tracked if row and row[0]])
-    # Fallback seguro para UI quando universo vier vazio/curto no ambiente.
-    if len(raw) < 3:
-        raw.extend(_DEFAULT_OKX_SPOT_SYMBOLS)
-    out = []
-    seen = set()
-    for symbol in raw:
-        sym = _norm_symbol(symbol)
-        if not sym or sym in seen:
-            continue
-        try:
-            _assert_okx_spot_symbol(sym)
-        except HTTPException:
-            continue
-        out.append(sym)
-        seen.add(sym)
-    return out
+async def get_available_symbols():
+    """Ativos oferecidos para rastrear: SOMENTE o top 5 SPOT por volume na OKX. Sem o ranking, lista vazia (sem reserva)."""
+    return [sym for sym in (_norm_symbol(x) for x in await top5_symbols()) if sym]
 
 
 @router.get("/sync-jobs")
@@ -240,6 +215,7 @@ async def add_tracked_symbol(
 ):
     symbol = _norm_symbol(req.symbol)
     _assert_okx_spot_symbol(symbol)
+    await _assert_top5_symbol(symbol)
 
     tfs = []
     for tf in (req.timeframes or []):
@@ -276,18 +252,21 @@ async def bootstrap_defaults(
     db: Session = Depends(get_db),
     svc: MarketDataService = Depends(get_service),
 ):
-    base_symbols = req.symbols or [a["symbol"] for a in await fetch_top_spot_assets()] or get_ranked_assets_universe()
+    top5 = [_norm_symbol(x) for x in await top5_symbols()]
+    if not top5:
+        raise HTTPException(503, "Não foi possível confirmar o top 5 de ativos da OKX agora. Tente novamente em instantes.")
     symbols = []
-    for sym in base_symbols:
+    for sym in (req.symbols or top5):
         norm = _norm_symbol(sym)
         try:
             _assert_okx_spot_symbol(norm)
-            symbols.append(norm)
         except HTTPException:
             continue
+        if norm in top5:                       # ativos fora do top 5 são ignorados
+            symbols.append(norm)
 
     if not symbols:
-        raise HTTPException(400, "Nenhum ativo spot OKX válido para bootstrap.")
+        raise HTTPException(400, "Nenhum ativo do top 5 válido para bootstrap.")
 
     tfs = []
     for tf in (req.timeframes or []):

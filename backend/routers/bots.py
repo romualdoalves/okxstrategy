@@ -14,11 +14,13 @@ from pydantic import BaseModel
 from fastapi import Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from ..goal import view_from_row as goal_view_from_row
 from ..database import AiAnalysisLogModel, BotModel, BotSnapshotModel, SignalLogModel, TradeModel, get_db
 from ..exchanges.factory import build_exchange
 from ..strategies.registry import get_strategy
 from ..bot_manager import manager
-from ..common import FIXED_STAKE_USD, _assert_spot_only, _assert_symbol_available, _assert_symbol_tradable, _norm_symbol
+from ..common import (FIXED_STAKE_USD, _assert_spot_only, _assert_symbol_available, _assert_symbol_tradable,
+                      _assert_top5_symbol, _norm_symbol)
 
 router = APIRouter()
 log = logging.getLogger("main")
@@ -36,6 +38,8 @@ class BotCreate(BaseModel):
     stop_loss_usd:   float  = -50.0
     strategy_params: dict   = {}
     force_retired:   bool   = False   # confirma criar bot com estratégia aposentada pelo estudo
+    goal_pct:          Optional[float] = None   # modo "Meta 1% Hoje!": meta líquida em % do stake
+    goal_window_hours: Optional[float] = None   # janela da meta (padrão 24 h)
 
 class BotUpdate(BaseModel):
     name:            Optional[str]   = None
@@ -259,6 +263,8 @@ def list_bots(db: Session = Depends(get_db)):
             "stake_usd": FIXED_STAKE_USD, "leverage": b.leverage,
             "active": b.active, "created_at": str(b.created_at),
             "baseline_balance": b.baseline_balance or 0.0,
+            "goal": goal_view_from_row(pct=b.goal_pct, window_hours=b.goal_window_hours,
+                                       started_at=b.goal_started_at, outcome=b.goal_outcome),
             "runtime": status,
         })
     return result
@@ -279,9 +285,16 @@ async def create_bot(payload: BotCreate, db: Session = Depends(get_db)):
 
     _assert_spot_only(payload.symbol)
     payload.symbol = _norm_symbol(payload.symbol)
+    await _assert_top5_symbol(payload.symbol)            # regra: só ativos do top 5
     await _assert_symbol_tradable(payload.symbol, demo=payload.demo)
     payload.leverage = 1
     payload.stake_usd = FIXED_STAKE_USD
+    if payload.goal_pct is not None:
+        if not (0 < payload.goal_pct <= 10):
+            raise HTTPException(400, "A meta deve ficar entre 0 e 10% líquido do stake.")
+        payload.goal_window_hours = payload.goal_window_hours or 24.0
+        if not (0 < payload.goal_window_hours <= 168):
+            raise HTTPException(400, "A janela da meta deve ficar entre 0 e 168 horas.")
     _assert_symbol_available(db, payload.symbol)
 
     bot = BotModel(**payload.model_dump(exclude={"force_retired"}))
@@ -325,7 +338,9 @@ def get_bot(bot_id: int, db: Session = Depends(get_db)):
         ).scalar()
         status = {**status, "accumulated_fees": round(float(fee_sum or 0), 4)}
 
-    return {**bot.__dict__, "runtime": status}
+    goal = goal_view_from_row(pct=bot.goal_pct, window_hours=bot.goal_window_hours,
+                              started_at=bot.goal_started_at, outcome=bot.goal_outcome)
+    return {**bot.__dict__, "goal": goal, "runtime": status}
 
 def _assert_flat_before_symbol_change(db: Session, bot: BotModel, new_symbol: str) -> None:
     """
@@ -361,6 +376,7 @@ async def update_bot(bot_id: int, payload: BotUpdate, db: Session = Depends(get_
         payload.symbol = _norm_symbol(payload.symbol)
         await _assert_symbol_tradable(payload.symbol, demo=bool(bot.demo))
     if payload.symbol and payload.symbol != _norm_symbol(bot.symbol):
+        await _assert_top5_symbol(payload.symbol)        # trocar para ativo fora do top 5 não é permitido
         _assert_flat_before_symbol_change(db, bot, payload.symbol)
         _assert_symbol_available(db, payload.symbol, exclude_bot_id=bot_id)
     update_data = payload.model_dump(exclude_none=True)
@@ -428,6 +444,13 @@ async def start_bot(bot_id: int, db: Session = Depends(get_db)):
     bot.symbol = _norm_symbol(bot.symbol)
     bot.leverage = 1
     bot.active = True
+    if bot.goal_pct:
+        # Modo meta: cada Iniciar abre uma janela nova (a de 24 h conta a partir daqui). Reinício do servidor NÃO passa
+        # por aqui, então a janela em andamento continua.
+        import datetime as _dt
+        bot.goal_started_at = _dt.datetime.utcnow()
+        bot.goal_ended_at = None
+        bot.goal_outcome = None
     db.commit()
     try:
         manager.start_bot(bot)   # asyncio.create_task() exige contexto async
@@ -469,6 +492,8 @@ async def switch_bot_symbol(
 
     _assert_spot_only(payload.symbol)
     payload.symbol = _norm_symbol(payload.symbol)
+    if payload.symbol != _norm_symbol(bot.symbol):
+        await _assert_top5_symbol(payload.symbol)
     await _assert_symbol_tradable(payload.symbol, demo=bool(bot.demo))
     _assert_flat_before_symbol_change(db, bot, payload.symbol)
     _assert_symbol_available(db, payload.symbol, exclude_bot_id=bot_id)

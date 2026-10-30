@@ -355,6 +355,7 @@ class PositionMixin:
         pnl = size * ct_size * (price - self._entry_price) * self._direction
         entry_price_snap = self._entry_price
         direction_snap   = "long" if self._direction == 1 else "short"
+        closed_net_pct   = net_unrealized(entry_price_snap, price, size * ct_size, self._direction)[1]   # líquido da operação
 
         self._record_pnl(pnl)
         self._save_trade({
@@ -398,6 +399,7 @@ class PositionMixin:
             asyncio.create_task(self._deferred_fee_sync(_trade_id_snap, _symbol_snap))
 
         self._reset()
+        await self._goal_after_close(closed_net_pct)      # modo meta: meta atingida / stop loss / prazo
 
     async def _confirm_fill_price(self, ord_id: str, exchange: BaseExchange):
         """Fallback REST polling para entry fill price caso o WebSocket não chegue a tempo.

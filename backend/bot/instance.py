@@ -25,11 +25,12 @@ from .criteria import OrderGateMixin
 from .entry import EntryMixin
 from .position import PositionMixin
 from .accounting import AccountingMixin
+from .goal import GoalMixin
 from .streams import StreamsMixin
 from .common import CANONICAL_ENTRY_CRITERIA, log
 
 
-class BotInstance(OrderGateMixin, EntryMixin, PositionMixin, AccountingMixin, StreamsMixin):
+class BotInstance(OrderGateMixin, EntryMixin, PositionMixin, AccountingMixin, GoalMixin, StreamsMixin):
     """
     Uma instância de bot em execução.
     Conecta ao WebSocket da exchange, processa candles e executa ordens.
@@ -54,6 +55,14 @@ class BotInstance(OrderGateMixin, EntryMixin, PositionMixin, AccountingMixin, St
         self._last_meta: dict = {}    # metadata do último sinal da estratégia (SL/TP1/ts_pct de referência)
         self._last_price  = 0.0       # último preço AO VIVO (qualquer tick); _candles só guarda candles FECHADOS
         self._lock_retry_at = 0.0     # monotonic: não repetir a trava de lucro a cada tick se a OKX recusar
+        # Modo meta (bot/goal.py)
+        self._goal_loaded = False
+        self._goal_done = False
+        self._goal_closing = False
+        self._goal_realized_pct = 0.0
+        self._goal_had_order = False
+        self._goal_outcome = None
+        self._goal_retry_at = 0.0
         self._lock_events: dict = {}  # degrau -> horário ISO em que foi alcançado (só desta sessão do processo)
         self._ts_pct      = 0.0       # distância do trailing definida pela estratégia (0 = ATR)
         self._sl_algo_id  : Optional[str] = None
@@ -571,6 +580,7 @@ class BotInstance(OrderGateMixin, EntryMixin, PositionMixin, AccountingMixin, St
         # Preço ao vivo para P&L, trailing e status: num bot 1D o último candle fechado tem até 24h de atraso.
         if float(getattr(bar, "close", 0.0) or 0.0) > 0:
             self._last_price = float(bar.close)
+        await self._goal_tick(float(bar.close), exchange)      # modo meta: vender ao cobrir / parar
         # Sincronização Dinâmica Automática: Apenas no fechamento do candle para economizar API
         if closed and self._direction != 0:
             await self.force_sync_trailing(exchange)
@@ -675,6 +685,7 @@ class BotInstance(OrderGateMixin, EntryMixin, PositionMixin, AccountingMixin, St
                 "guaranteed_pnl": 0.0,
                 "profit_lock": {"enabled": False, "steps": []},
                 "trailing": None,
+                "goal": self._goal_view(0.0),
                 "unrealized_net_usd": 0.0,
                 "unrealized_net_pct": 0.0,
                 "daily_pnl":   round(self._daily_pnl, 2),
@@ -711,6 +722,7 @@ class BotInstance(OrderGateMixin, EntryMixin, PositionMixin, AccountingMixin, St
             "guaranteed_pnl": pv["guaranteed_pnl"],
             "profit_lock": pv["profit_lock"],
             "trailing": self._trailing_view(last_price),
+            "goal": self._goal_view(last_price),
             "fee_rate": _fee_rate(),          # o card calcula o líquido sobre o preço ao vivo com esta taxa
             "unrealized_net_usd": pv["unrealized_net_usd"],
             "unrealized_net_pct": pv["unrealized_net_pct"],

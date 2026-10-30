@@ -71,6 +71,14 @@ class BotModel(Base):
     # holdings pré-existentes do usuário da detecção de divergências.
     baseline_balance = Column(Float, default=0.0)
 
+    # Modo "Meta 1% Hoje!" (NULL = bot comum): meta líquida em % do stake, janela em horas, quando a janela começou
+    # (a cada Iniciar), quando terminou e como (reached | stop_loss | no_order | expired).
+    goal_pct          = Column(Float,    nullable=True)
+    goal_window_hours = Column(Float,    nullable=True)
+    goal_started_at   = Column(DateTime, nullable=True)
+    goal_ended_at     = Column(DateTime, nullable=True)
+    goal_outcome      = Column(String,   nullable=True)
+
 
 class TradeModel(Base):
     __tablename__ = "trades"
@@ -306,6 +314,11 @@ def _run_migrations():
         "CREATE INDEX IF NOT EXISTS idx_order_rejections_resolved ON order_rejections(resolved)",
         "CREATE UNIQUE INDEX IF NOT EXISTS ux_bots_symbol_upper ON bots (UPPER(symbol))",
         "ALTER TABLE bots ADD COLUMN IF NOT EXISTS baseline_balance FLOAT DEFAULT 0.0",
+        "ALTER TABLE bots ADD COLUMN IF NOT EXISTS goal_pct FLOAT",
+        "ALTER TABLE bots ADD COLUMN IF NOT EXISTS goal_window_hours FLOAT",
+        "ALTER TABLE bots ADD COLUMN IF NOT EXISTS goal_started_at TIMESTAMP",
+        "ALTER TABLE bots ADD COLUMN IF NOT EXISTS goal_ended_at TIMESTAMP",
+        "ALTER TABLE bots ADD COLUMN IF NOT EXISTS goal_outcome VARCHAR",
         """
         CREATE TABLE IF NOT EXISTS tracked_symbols (
             id SERIAL PRIMARY KEY,

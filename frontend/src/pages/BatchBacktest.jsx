@@ -5,6 +5,7 @@ import { ScanSearch, Play, HelpCircle, ChevronDown, ChevronUp, PlusCircle, Check
 import BacktestLikert from '../components/BacktestLikert'
 import { getStrategies, getBots, createBot, getTopAssets } from '../api'
 import { authFetch } from '../auth'
+import { buildBotPayload } from '../botPayload'
 
 const CATEGORIES = [
   { id: 'TF', label: 'Trend Following',  description: 'Estratégias que seguem a tendência (EMA, MACD, SuperTrend…)' },
@@ -16,8 +17,6 @@ const CATEGORIES = [
   { id: 'NW', label: 'Network',          description: 'Relações entre ativos (Influencers & Followers)' },
 ]
 
-// Reserva se a OKX estiver inacessível; o universo real é o top 5 SPOT por volume (getTopAssets)
-const FALLBACK_SYMBOLS = ['BTC-USDT', 'ETH-USDT', 'SOL-USDT', 'BNB-USDT', 'XRP-USDT']
 const ALL_ASSETS = '__ALL_ASSETS__'          // opção "Todos os ativos" (os livres, sem bot, do top 5)
 const prefixOf = id => (id || '').match(/^([A-Z]+)/i)?.[1]?.toUpperCase()
 const SECONDS_PER_STRATEGY = 15              // referência medida: ~15 s por estratégia (2 workers)
@@ -227,20 +226,6 @@ function AssetConsistency({ rows }) {
 
 function resultKey(r, fallbackSymbol = '') {
   return `${r.strategy_id}:${r.symbol || fallbackSymbol}`
-}
-
-function buildBotPayload(r, symbol) {
-  return {
-    name: `${r.strategy_id} - ${r.strategy_name || 'Scanner BT'} (${symbol})`,
-    strategy_id: r.strategy_id,
-    symbol,
-    timeframe: r.timeframe || '15m',
-    demo: true,
-    stake_usd: 100,
-    leverage: 1,
-    stop_loss_usd: -50,
-    strategy_params: {},
-  }
 }
 
 async function readErrorMessage(res) {
@@ -459,7 +444,7 @@ export default function BatchBacktest() {
   const { data: strategies = [] } = useQuery({ queryKey: ['strategies'], queryFn: getStrategies })
   const { data: bots = [] }       = useQuery({ queryKey: ['bots'],       queryFn: getBots       })
   const { data: topData }         = useQuery({ queryKey: ['top-assets'], queryFn: getTopAssets, staleTime: 60_000 })
-  const SYMBOLS = topData?.assets?.map(a => a.symbol) ?? FALLBACK_SYMBOLS
+  const SYMBOLS = topData?.assets?.map(a => a.symbol) ?? []          // só o top 5; sem ranking, nenhum ativo
 
   const strategyCounts = strategies.reduce((acc, st) => {
     const prefix = prefixOf(st.id)
@@ -841,12 +826,12 @@ export default function BatchBacktest() {
         <div className="flex flex-wrap items-end gap-3">
           <div className="flex-1 min-w-[160px]">
             <label className="text-xs text-muted uppercase tracking-wider mb-0.5 block">
-              {usingTopAssets ? 'Top 5 Ativos' : 'Ativos (lista reserva — OKX indisponível)'}
+              {usingTopAssets ? 'Top 5 Ativos' : 'Top 5 Ativos — indisponível agora'}
             </label>
             <p className="text-[11px] text-muted/70 mb-2">
               {usingTopAssets
                 ? 'Os 5 pares spot X-USDT de maior volume em 24h na OKX (sem stablecoins). Ativos que já têm bot ficam desabilitados.'
-                : 'Não foi possível consultar o ranking da OKX; usando uma lista reserva.'}
+                : 'Não foi possível consultar o ranking da OKX. Sem ele nenhum ativo é oferecido: o app nunca usa ativos fora do top 5.'}
             </p>
             <div className="flex gap-2 flex-wrap">
               {SYMBOLS.map((s, idx) => {

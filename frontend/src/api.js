@@ -117,6 +117,9 @@ export const rankAssets  = (strategyId, timeframe) =>
   req(`/market/rank-assets?strategy_id=${strategyId}&timeframe=${timeframe}`)
 // Top 5 pares SPOT X-USDT da OKX por volume em 24h (dinâmico; é o único universo de ativos do app)
 export const getTopAssets = () => req('/market/top-assets')
+// Meta 1% Hoje!: busca em segundo plano e estado
+export const startGoalScan = (force = false) => req(`/goal/scan?force=${force}`, { method: 'POST' })
+export const getGoalStatus = () => req('/goal/status')
 export const getSymbolTradability = (symbols = [], demo = true) => {
   const csv = symbols.join(',')
   return req(`/market/symbol-tradability?symbols=${encodeURIComponent(csv)}&demo=${demo}`)

@@ -176,6 +176,7 @@ def test_live_price_drives_status_not_the_last_closed_candle():
         _peak_price=0.0, _daily_pnl=0.0, _wins=0, _losses=0, _halted=False, _hold_reason="", _last_indicators={},
         _last_order_criteria={}, _last_order_error=None, _maintenance=None, _started_at=None,
         _closed_candle_count=0, _last_closed_candle_at=None, _graph_state=None, _onchain_events=[],
+        _goal_loaded=False, _goal_done=False, _goal_realized_pct=0.0, _goal_outcome=None, _last_meta={},
     )
     st = bot.get_status()
     assert st["last_price"] == pytest.approx(ENTRY * 1.0001)

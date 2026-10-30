@@ -7,6 +7,7 @@ import { useLanguage } from '../i18n/LanguageContext'
 import StrategyChecklist, { getCriteriaCount } from './StrategyChecklist'
 import AssetPriceCard from './AssetPriceCard'
 import StudyBadge from './StudyBadge'
+import GoalLine from './GoalLine'
 import { useMarketStatus } from '../hooks/useMarketStatus'
 import { botMood } from '../botMood'
 
@@ -304,6 +305,8 @@ export default function BotCard({ bot, liveStatus }) {
           </div>
         )
       })()}
+
+      {(rt.goal?.enabled || bot.goal?.enabled) && <GoalLine goal={rt.goal?.enabled ? rt.goal : bot.goal} />}
 
       {/* Política de trailing do bot: sempre visível. Sem posição é referência; em posição, valores reais */}
       {trailing && !profitLock?.enabled && (
