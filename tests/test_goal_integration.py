@@ -60,7 +60,10 @@ class TestGoalMode(GoalIntegrationBase):
         self.assertEqual(row.goal_outcome, "reached")
         self.assertIsNotNone(row.goal_ended_at)
         self.assertTrue(any(m.get("type") == "goal" and m["outcome"] == "reached" for m in self.broadcasts))
-        self.assertTrue(any("META ATINGIDA" in m.upper() for m in bot._notifier.sent))
+        self.assertTrue(any("META BRUTA ATINGIDA" in m.upper() for m in bot._notifier.sent))
+        self.assertGreater(row.goal_result_gross_pct, 2.5)                        # +3% bruto
+        self.assertGreater(row.goal_result_net_pct, 2.0)                          # e ainda sobra bem mais que zero depois das taxas
+        self.assertLess(row.goal_result_net_pct, row.goal_result_gross_pct)       # líquido sempre abaixo do bruto
 
     def test_stop_loss_ends_the_session_and_stops_the_bot(self):
         bot = self.goal_bot()
@@ -82,8 +85,9 @@ class TestGoalMode(GoalIntegrationBase):
         self.assertEqual(bot.status, "running")
         self.assertTrue(self.bot_row().active)
         self.assertIsNone(self.bot_row().goal_outcome)
-        self.assertGreater(bot._goal_realized_pct, 0.4)
-        self.assertLess(bot._goal_realized_pct, 1.0)
+        self.assertGreater(bot._goal_realized_gross_pct, 0.6)                    # +0,8% bruto: abaixo da meta bruta de 1%
+        self.assertLess(bot._goal_realized_gross_pct, 1.0)
+        self.assertLess(bot._goal_realized_net_pct, bot._goal_realized_gross_pct)  # o líquido já descontou as taxas
 
     def test_two_partial_gains_add_up_to_the_goal(self):
         bot = self.goal_bot()
@@ -112,6 +116,22 @@ class TestGoalMode(GoalIntegrationBase):
         self.assertFalse(bot._goal_done)
         self.assertEqual(bot.status, "running")
         self.assertEqual([c for c in self.ex.calls[before:] if c[0] == "market_order"], [])
+
+    def test_gross_goal_hit_through_many_tiny_trades_is_flagged_as_an_illusion(self):
+        """O bruto chega a +1% por muitas operações pequenas, mas as taxas consomem o ganho: o bot para (a meta é bruta),
+        registra bruto E líquido e marca a ilusão."""
+        bot = self.goal_bot()
+        for _ in range(6):                                           # 6 x +0,18% bruto; cada ida e volta custa ~0,20% de taxas
+            self.enter(bot)
+            self.algo_fill(bot, bot._sl_algo_id, 50_090.0)
+        self.assertTrue(bot._goal_done and bot._goal_outcome == "reached")
+        self.assertGreaterEqual(bot._goal_realized_gross_pct, 1.0)
+        self.assertLess(bot._goal_realized_net_pct, 0.0)             # as taxas comeram o ganho
+        row = self.bot_row()
+        self.assertEqual(row.goal_outcome, "reached")
+        self.assertLess(row.goal_result_net_pct, 0.0)
+        self.assertTrue(bot._goal_view(50_090.0)["illusory"])
+        self.assertTrue(any("taxas consumiram o ganho" in m for m in bot._notifier.sent))
 
     def test_a_bot_without_goal_ignores_everything(self):
         bot = self.make_bot()

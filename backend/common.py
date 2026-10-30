@@ -24,6 +24,8 @@ log = logging.getLogger("main")
 _TZ_OFFSET: int = int(os.getenv("TZ_OFFSET", "0"))
 
 FIXED_STAKE_USD: float = 100.0
+# Stop diário de todo bot novo (limite de perda do dia): fixo, o usuário não configura.
+FIXED_DAILY_STOP_USD: float = -50.0
 
 def _local_date_to_utc_range(date_str: str) -> tuple[str, str]:
     """Converte uma data local (YYYY-MM-DD) para o intervalo UTC equivalente."""

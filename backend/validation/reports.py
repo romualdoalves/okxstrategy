@@ -166,5 +166,23 @@ def study_summary(sid: str) -> dict:
             "study_reason": r["reason"]}
 
 
+def canonical_timeframe(tf: str) -> str:
+    """Forma única usada nos bots: minutos em minúsculo (15m), horas/dias/semanas em maiúsculo (1H, 1D)."""
+    tf = (tf or "").strip()
+    return tf.lower() if tf.lower().endswith("m") else tf.upper()
+
+
+def validated_timeframe(sid: str, fallback: str | None = None) -> str:
+    """Timeframe em que a estratégia foi VALIDADA pelo estudo: o único que o app usa ao criar um bot dela.
+    Sem estudo com timeframe (ex.: depende de dados ao vivo), vale o recomendado no registro (`fallback`).
+    Antes o usuário escolhia o timeframe e o padrão do registro (15m) divergia do validado (1D): o bot nascia numa
+    configuração que o estudo nunca aprovou."""
+    study = load_study(sid)
+    tf = str(study.get("timeframe") or "").strip()
+    if tf and tf not in ("—", "-"):
+        return canonical_timeframe(tf)
+    return canonical_timeframe(fallback or "15m")
+
+
 if __name__ == "__main__":
     print("gerados:", ", ".join(build_reports()))

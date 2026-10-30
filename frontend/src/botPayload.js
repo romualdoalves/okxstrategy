@@ -3,16 +3,12 @@
 export const FIXED_STAKE_USD = 100
 
 export function buildBotPayload(row, symbol, extra = {}) {
+  // Só identifica o bot. Timeframe (o validado), parâmetros (padrões) e stop diário são definidos pelo SERVIDOR.
   return {
     name: `${row.strategy_id} - ${row.strategy_name || 'Scanner BT'} (${symbol})`,
     strategy_id: row.strategy_id,
     symbol,
-    timeframe: row.timeframe || '15m',
     demo: true,
-    stake_usd: FIXED_STAKE_USD,
-    leverage: 1,
-    stop_loss_usd: -50,
-    strategy_params: {},
     ...extra,
   }
 }

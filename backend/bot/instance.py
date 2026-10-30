@@ -59,7 +59,8 @@ class BotInstance(OrderGateMixin, EntryMixin, PositionMixin, AccountingMixin, Go
         self._goal_loaded = False
         self._goal_done = False
         self._goal_closing = False
-        self._goal_realized_pct = 0.0
+        self._goal_realized_gross_pct = 0.0
+        self._goal_realized_net_pct = 0.0
         self._goal_had_order = False
         self._goal_outcome = None
         self._goal_retry_at = 0.0

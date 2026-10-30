@@ -30,29 +30,95 @@ def hourly_candles(n=300):
     return [CandleBar(epoch=1_700_000_000_000 + i * H, open=100, high=101, low=99, close=100, volume=1) for i in range(n)]
 
 
-def trade(entry_idx, exit_idx, pct):
-    return {"entry_time": entry_idx, "exit_time": exit_idx, "profit_pct": pct}
+def trade(entry_idx, exit_idx, net_pct, fee_pct=0.0):
+    """Operação fechada do motor: `profit_pct` é o LÍQUIDO; o bruto é o líquido mais as taxas (`fee_pct`)."""
+    return {"entry_time": entry_idx, "exit_time": exit_idx, "profit_pct": net_pct, "gross_profit_pct": net_pct + fee_pct}
 
 
 # ── métrica: janelas móveis de 24 h ─────────────────────────────────────────────────────────────────────────────
 def test_window_hits_counts_only_windows_that_contain_the_whole_winning_trade():
     cs = hourly_candles(300)
-    hits, windows, independent = G.window_hits([trade(150, 155, 1.2)], cs)
-    assert windows == 176 and independent == pytest.approx(199 / 24)
-    assert hits == 20                      # inícios de 131 a 150: entrada >= início e saída <= início + 24 h
+    res = G.window_hits([trade(150, 155, 1.2, fee_pct=0.2)], cs)          # bruto 1,4%, líquido 1,2%
+    assert res["windows"] == 176 and res["independent"] == pytest.approx(199 / 24)
+    assert res["real"] == 20 and res["illusory"] == 0     # inícios de 131 a 150: entrada >= início e saída <= início + 24 h
 
 
 def test_two_small_trades_add_up_only_inside_the_same_24h_window():
     cs = hourly_candles(300)
-    assert G.window_hits([trade(150, 152, 0.6), trade(160, 162, 0.6)], cs)[0] > 0       # 12 h entre elas: soma 1,2%
-    assert G.window_hits([trade(150, 152, 0.6), trade(200, 202, 0.6)], cs)[0] == 0      # 48 h entre elas: nunca na mesma janela
+    assert G.window_hits([trade(150, 152, 0.6), trade(160, 162, 0.6)], cs)["real"] > 0       # 12 h entre elas: soma 1,2%
+    assert G.window_hits([trade(150, 152, 0.6), trade(200, 202, 0.6)], cs)["real"] == 0      # 48 h entre elas: nunca na mesma janela
 
 
 def test_a_trade_that_started_before_the_window_does_not_count():
     cs = hourly_candles(300)
-    hits, _, _ = G.window_hits([trade(120, 130, 1.5)], cs)
+    hits = G.window_hits([trade(120, 130, 1.5)], cs)["real"]
     assert hits == 15                                            # só inícios de 106 a 120: antes disso a saída não cabe, depois a entrada ficou para trás
-    assert G.window_hits([trade(120, 130, 0.9)], cs)[0] == 0     # e abaixo de +1% nunca é acerto
+    assert G.window_hits([trade(120, 130, 0.9)], cs)["real"] == 0     # e abaixo de +1% bruto nunca é acerto
+
+
+def full_trade(entry, exit_, gross, net, peak):
+    return {"entry_time": entry, "exit_time": exit_, "gross_profit_pct": gross, "profit_pct": net, "max_gross_pct": peak}
+
+
+def test_the_bot_sells_when_the_peak_covers_the_goal_even_if_the_trade_closes_lower():
+    cs = hourly_candles(300)
+    # a operação chegou a +1,3% bruto e fechou em −0,6% (stop): o bot teria vendido na meta, a +1% bruto
+    res = G.window_hits([full_trade(150, 155, -0.6, -0.8, 1.3)], cs)
+    assert res["real"] == 20 and res["stop_loss"] == 0 and res["illusory"] == 0
+    # sem o pico cobrindo a meta, a mesma operação é um stop loss
+    res = G.window_hits([full_trade(150, 155, -0.6, -0.8, 0.4)], cs)
+    assert res["real"] == 0 and res["stop_loss"] == 20
+
+
+def test_every_window_ends_in_exactly_one_outcome_and_the_average_net_counts_the_losing_sessions():
+    cs = hourly_candles(300)
+    loss = G.window_hits([full_trade(150, 155, -0.4, -0.6, 0.3)], cs)             # 20 sessões acabam em stop loss
+    assert loss["stop_loss"] == 20 and loss["no_order"] == loss["windows"] - 20
+    assert loss["expected_net_pct"] == pytest.approx(-0.6 * 20 / loss["windows"])
+    small = G.window_hits([full_trade(150, 155, 0.5, 0.3, 0.5)], cs)               # operou, ganhou pouco, não chegou à meta
+    assert small["expired"] == 20 and small["real"] == 0 and small["stop_loss"] == 0
+    assert small["expected_net_pct"] == pytest.approx(0.3 * 20 / small["windows"])
+    for res in (loss, small, G.window_hits([], cs), G.window_hits([full_trade(150, 155, 1.4, 1.2, 1.4)], cs)):
+        assert res["real"] + res["illusory"] + res["stop_loss"] + res["expired"] + res["no_order"] == res["windows"]
+
+
+def test_hits_alone_do_not_make_a_good_strategy_when_stop_losses_outweigh_them():
+    """O caso real (SC004 no PEPE): muitas sessões batem a meta, mas as que terminam em stop loss custam mais."""
+    cs = hourly_candles(1000)
+    trades = []
+    for i in range(30):                                                     # 30 operações: 2 de cada 3 batem +1% bruto (≈ +0,8% líquido)...
+        e = 110 + 28 * i
+        if i % 3 != 2:
+            trades.append(full_trade(e, e + 2, 0.5, 0.3, 1.2))
+        else:                                                               # ...e 1 de cada 3 perde 2,5% (stop loss)
+            trades.append(full_trade(e, e + 2, -2.3, -2.5, 0.2))
+    res = G.window_hits(trades, cs)
+    assert res["real"] / res["windows"] > 0.4                              # a "chance" parece ótima
+    assert res["stop_loss"] > 0
+    ok, unmet = G.qualification({"trades_count": 30, "total_profit": 1.0, "profit_factor": 1.5,
+                                 "chance": res["real"] / res["windows"], "independent_windows": res["independent"],
+                                 "expected_net_pct": res["expected_net_pct"]})
+    assert res["expected_net_pct"] < 0                                     # 2/3 x (+0,8%) + 1/3 x (−2,5%) ≈ −0,3% por sessão com operação
+    assert not ok and any("Resultado líquido médio por sessão" in m for m in unmet)    # o critério líquido barra, não a chance
+
+
+def test_gross_target_hit_whose_net_is_eaten_by_fees_is_illusory_not_real():
+    cs = hourly_candles(300)
+    # 6 operações de +0,2% bruto com 0,25% de taxas cada: o bruto chega a +1% (ilusão), mas o líquido fica negativo
+    scalper = [trade(150 + 3 * i, 151 + 3 * i, -0.05, fee_pct=0.25) for i in range(6)]
+    res = G.window_hits(scalper, cs)
+    assert res["real"] == 0 and res["illusory"] > 0
+    # uma operação só: +1,0% bruto = +0,8% líquido, acerto REAL
+    one = G.window_hits([trade(150, 155, 0.8, fee_pct=0.2)], cs)
+    assert one["real"] == 20 and one["illusory"] == 0
+    # bruto na meta e líquido exatamente zero também é ilusório: o líquido precisa ser POSITIVO
+    zero = G.window_hits([trade(150, 155, 0.0, fee_pct=1.0)], cs)
+    assert zero["real"] == 0 and zero["illusory"] == 20
+
+
+def test_the_gross_target_has_a_smaller_net_equivalent():
+    assert G.net_equivalent_pct(1.0, fee=0.001) == pytest.approx(0.799)       # +1% bruto ≈ +0,80% líquido
+    assert G.net_equivalent_pct(1.0, fee=0.0) == 1.0
 
 
 def test_wilson_lower_bound_punishes_small_samples():
@@ -63,18 +129,23 @@ def test_wilson_lower_bound_punishes_small_samples():
 
 def test_qualification_explains_every_unmet_criterion():
     ok, unmet = G.qualification({"trades_count": 20, "total_profit": 15.0, "profit_factor": 1.6, "chance": 0.30,
-                                 "independent_windows": 30.0})
+                                 "independent_windows": 30.0, "expected_net_pct": 0.3})
     assert ok and unmet == []
     ok, unmet = G.qualification({"trades_count": 4, "total_profit": -3.0, "profit_factor": 0.4, "chance": 0.05,
-                                 "independent_windows": 2.0})
-    assert not ok and len(unmet) == 5
+                                 "independent_windows": 2.0, "expected_net_pct": -0.4})
+    assert not ok and len(unmet) == 6
     assert any("Histórico curto" in m for m in unmet)
     assert any("Poucas operações" in m for m in unmet) and any("negativo" in m for m in unmet)
     assert any("Profit Factor" in m for m in unmet) and any("Chance" in m for m in unmet)
     # chance altíssima medida em 2 dias de histórico não qualifica
     ok, unmet = G.qualification({"trades_count": 40, "total_profit": 9.0, "profit_factor": 2.0, "chance": 0.9,
-                                 "independent_windows": 2.0})
+                                 "independent_windows": 2.0, "expected_net_pct": 0.2})
     assert not ok and len(unmet) == 1 and "Histórico curto" in unmet[0]
+    # a ilusão do caso real (SC004 no PEPE): bate a meta em 55% das janelas, mas as sessões que terminam em stop loss
+    # fazem o resultado líquido médio por sessão ficar negativo: não qualifica
+    ok, unmet = G.qualification({"trades_count": 42, "total_profit": 5.0, "profit_factor": 1.5, "chance": 0.55,
+                                 "independent_windows": 30.0, "expected_net_pct": -0.15})
+    assert not ok and len(unmet) == 1 and "Resultado líquido médio por sessão" in unmet[0]
 
 
 # ── regras do bot (funções puras) ────────────────────────────────────────────────────────────────────────────────
@@ -83,50 +154,55 @@ BASE = dict(started_at=T0, window_hours=24.0, goal_pct=1.0)
 
 
 def tick(**kw):
-    args = dict(BASE, now=T0 + timedelta(hours=3), realized_net_pct=0.0, in_position=False, open_net_pct=0.0, had_order=False)
+    args = dict(BASE, now=T0 + timedelta(hours=3), realized_gross_pct=0.0, in_position=False, open_gross_pct=0.0, had_order=False)
     args.update(kw)
     return G.decide_tick(**args)
 
 
 def test_position_is_sold_when_open_net_profit_covers_what_is_missing():
-    assert tick(in_position=True, open_net_pct=0.5) == ("continue", "")
-    assert tick(in_position=True, open_net_pct=1.2) == ("take_profit", "reached")
+    assert tick(in_position=True, open_gross_pct=0.5) == ("continue", "")
+    assert tick(in_position=True, open_gross_pct=1.2) == ("take_profit", "reached")
     # já realizou +0,6%: só faltam 0,4% (+ folga de slippage)
-    assert tick(in_position=True, realized_net_pct=0.6, open_net_pct=0.3) == ("continue", "")
-    assert tick(in_position=True, realized_net_pct=0.6, open_net_pct=0.5) == ("take_profit", "reached")
+    assert tick(in_position=True, realized_gross_pct=0.6, open_gross_pct=0.3) == ("continue", "")
+    assert tick(in_position=True, realized_gross_pct=0.6, open_gross_pct=0.5) == ("take_profit", "reached")
 
 
 def test_with_an_open_position_the_bot_never_stops_because_of_time():
     late = T0 + timedelta(hours=40)
-    assert tick(now=late, in_position=True, open_net_pct=0.2, had_order=True) == ("continue", "")
+    assert tick(now=late, in_position=True, open_gross_pct=0.2, had_order=True) == ("continue", "")
 
 
 def test_flat_bot_stops_after_24h_without_any_order_or_without_the_goal():
     assert tick(now=T0 + timedelta(hours=23)) == ("continue", "")
     assert tick(now=T0 + timedelta(hours=24), had_order=False) == ("stop", "no_order")
     assert tick(now=T0 + timedelta(hours=24), had_order=True) == ("stop", "expired")
-    assert tick(realized_net_pct=1.05) == ("stop", "reached")
+    assert tick(realized_gross_pct=1.05) == ("stop", "reached")
 
 
 def test_after_a_close_the_session_ends_on_goal_or_loss_but_keeps_going_after_a_small_trailing_gain():
     def after(**kw):
-        args = dict(BASE, now=T0 + timedelta(hours=5), realized_net_pct=0.3, closed_net_pct=0.3)
+        args = dict(BASE, now=T0 + timedelta(hours=5), realized_gross_pct=0.3, closed_gross_pct=0.3)
         args.update(kw)
         return G.decide_after_close(**args)
     assert after() == ("continue", "")                                        # trailing saiu com +0,3%: ainda há tempo
-    assert after(realized_net_pct=1.1, closed_net_pct=1.1) == ("stop", "reached")
-    assert after(realized_net_pct=-0.8, closed_net_pct=-0.8) == ("stop", "stop_loss")
+    assert after(realized_gross_pct=1.1, closed_gross_pct=1.1) == ("stop", "reached")
+    assert after(realized_gross_pct=-0.8, closed_gross_pct=-0.8) == ("stop", "stop_loss")
     assert after(now=T0 + timedelta(hours=25)) == ("stop", "expired")
 
 
 # ── cola com o bot ───────────────────────────────────────────────────────────────────────────────────────────────
+def set_realized(bot, gross, net):
+    bot._goal_realized_gross_pct, bot._goal_realized_net_pct = gross, net
+
+
 class GoalBot(GoalMixin):
     def __init__(self, started=T0, direction=0, entry=100.0, sz=1.0):
         self.config = NS(id=7, name="bot", symbol="SOL-USDT", stake_usd=100.0, goal_pct=1.0, goal_window_hours=24.0,
                          goal_started_at=started, goal_outcome=None)
         self._direction, self._entry_price, self._sz = direction, entry, sz
         self._goal_loaded, self._goal_done, self._goal_closing = True, False, False
-        self._goal_realized_pct, self._goal_had_order, self._goal_outcome, self._goal_retry_at = 0.0, False, None, 0.0
+        self._goal_realized_gross_pct = self._goal_realized_net_pct = 0.0
+        self._goal_had_order, self._goal_outcome, self._goal_retry_at = False, None, 0.0
         self._hold_reason, self.log = "", []
         self.now = T0 + timedelta(hours=3)
         self._notifier = NS(send=self._send)
@@ -190,14 +266,14 @@ def test_open_position_after_24h_is_left_alone():
 
 def test_after_close_stops_on_goal_and_on_a_losing_exit_and_is_idempotent():
     reached = GoalBot()
-    reached._goal_load = lambda: setattr(reached, "_goal_realized_pct", 1.1)
+    reached._goal_load = lambda: set_realized(reached, 1.1, 0.9)
     run(reached._goal_after_close(1.1))
     assert reached._goal_outcome == "reached"
     run(reached._goal_finish("expired"))                       # segunda chamada não muda nada
     assert reached._goal_outcome == "reached" and reached.log.count(("stop", None)) == 1
 
     loss = GoalBot()
-    loss._goal_load = lambda: setattr(loss, "_goal_realized_pct", -0.7)
+    loss._goal_load = lambda: set_realized(loss, -0.7, -0.9)
     run(loss._goal_after_close(-0.7))
     assert loss._goal_outcome == "stop_loss"
 
@@ -212,11 +288,14 @@ def test_bot_without_goal_is_untouched():
 
 def test_goal_view_reports_time_left_and_session_result():
     bot = GoalBot(direction=1, entry=100.0)
-    bot._goal_realized_pct = 0.4
+    set_realized(bot, 0.4, 0.2)
     v = bot._goal_view(101.0)
     assert v["target_pct"] == 1.0 and v["in_position"] and v["done"] is False
     assert v["seconds_left"] == 21 * 3600 and v["deadline"].endswith("Z")
-    assert v["realized_net_pct"] == 0.4 and v["session_net_pct"] == pytest.approx(0.4 + v["open_net_pct"])
+    assert v["realized_gross_pct"] == 0.4 and v["session_gross_pct"] == pytest.approx(0.4 + v["open_gross_pct"])
+    assert v["realized_net_pct"] == 0.2 and v["session_net_pct"] == pytest.approx(0.2 + v["open_net_pct"])
+    assert v["open_gross_pct"] == pytest.approx(1.0) and v["open_net_pct"] < v["open_gross_pct"]      # líquido < bruto
+    assert v["net_equivalent_pct"] == pytest.approx(0.8, abs=0.01)
 
 
 # ── busca e ranking ──────────────────────────────────────────────────────────────────────────────────────────────
@@ -229,7 +308,7 @@ def test_candidates_are_only_intraday_backtestable_strategies():
 
 def result_with(trades_pct, total_profit, pf, n_candles=1200):
     cs = hourly_candles(n_candles)
-    trades = [trade(110 + 20 * i, 112 + 20 * i, p) for i, p in enumerate(trades_pct)]
+    trades = [trade(110 + 20 * i, 112 + 20 * i, p, fee_pct=0.2) for i, p in enumerate(trades_pct)]
     return {"closed_trades": trades, "trades_count": len(trades), "total_profit": total_profit,
             "profit_factor": pf, "max_drawdown": 3.0, "win_rate": 60.0}, cs
 
@@ -240,6 +319,7 @@ def test_build_row_and_rank_keep_non_qualifying_strategies_out_of_the_top():
     row_good = svc.build_row("TF001", "SOL-USDT", "15m", good, cs)
     row_weak = svc.build_row("TF002", "SOL-USDT", "15m", weak, cs)
     assert row_good["qualifies"] is True and row_good["unmet"] == [] and row_good["chance_pct"] == 100.0
+    assert row_good["gross_chance_pct"] == 100.0 and row_good["windows_illusory"] == 0
     assert row_weak["qualifies"] is False and row_weak["unmet"] and row_weak["chance_pct"] == 0.0
     top, closest = svc.rank([row_good, row_weak, dict(row_good, strategy_id="X", qualifies=False, unmet=["x"], chance_pct=1.0)])
     assert [r["strategy_id"] for r in top] == ["TF001"]
@@ -345,7 +425,11 @@ def test_view_from_row_for_stopped_and_finished_bots():
     never = G.view_from_row(pct=1.0, window_hours=None, started_at=None, outcome=None)
     assert never["window_hours"] == 24.0 and never["started_at"] is None and never["seconds_left"] is None
     ended = G.view_from_row(pct=1.0, window_hours=24, started_at=T0, outcome="reached", now=now)
-    assert ended["done"] is True and ended["outcome_label"] == "Meta atingida"
+    assert ended["done"] is True and ended["outcome_label"] == "Meta bruta atingida"
+    assert ended["net_equivalent_pct"] == pytest.approx(0.8, abs=0.01) and ended["illusory"] is False
+    ill = G.view_from_row(pct=1.0, window_hours=24, started_at=T0, outcome="reached", now=now,
+                          result_gross_pct=1.1, result_net_pct=-0.1)
+    assert ill["illusory"] is True and ill["result_net_pct"] == -0.1      # meta bruta batida, líquido negativo
     assert G.view_from_row(pct=None, window_hours=None, started_at=T0, outcome=None) is None
 
 

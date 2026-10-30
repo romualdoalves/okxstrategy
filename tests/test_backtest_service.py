@@ -194,3 +194,12 @@ def test_scanner_with_nothing_ticked_is_a_clear_404(monkeypatch):
     with pytest.raises(HTTPException) as e:
         run(scanner_router._run_category_backtest_core("TF", "BTC-USDT", include_strategies=[]))
     assert e.value.status_code == 404
+
+
+def test_engine_closed_trades_carry_gross_net_and_peak(inline_worker):
+    cs = synthetic_candles(900, seed=11)
+    res = BacktestEngine("TF001").run_strict_sync(cs)
+    assert res["closed_trades"]
+    for t in res["closed_trades"]:
+        assert t["gross_profit_pct"] - t["profit_pct"] == pytest.approx(t["fees"])         # stake 100: bruto = líquido + taxas
+        assert t["max_gross_pct"] + 1e-9 >= t["gross_profit_pct"]                          # o pico nunca fica abaixo do fechamento

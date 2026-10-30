@@ -194,6 +194,9 @@ class BacktestEngine:
                 "price": exit_price,
                 "profit": profit,
                 "profit_pct": profit / stake_usd * 100,
+                "gross_profit_pct": (profit + fees) / stake_usd * 100,   # antes das taxas (o slippage já está nos preços)
+                "max_gross_pct": (max(position.get("mfe_high", position["entry_price"]), position["entry_price"])
+                                  / position["entry_price"] - 1) * 100,   # pico do ganho bruto durante a operação
                 "fees": fees,
                 "balance": self.balance,
                 "entry_time": position["entry_time"],
@@ -249,6 +252,8 @@ class BacktestEngine:
                     else:
                         close_position(exit_px, i, "Stop Loss simulado", "stop")
                 else:
+                    # Pico favorável da operação (só conta se o candle NÃO derrubou o stop: o stop tem prioridade no empate).
+                    position["mfe_high"] = max(position.get("mfe_high", position["entry_price"]), high)
                     if not position["tp1_done"] and high >= position["tp1_price"]:
                         position["tp1_done"] = True
                         position["trailing_active"] = True

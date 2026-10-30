@@ -5,8 +5,8 @@ import { getBot, getStrategies, updateBot, rankAssets, stopBot, getBots, getTopA
 import { ArrowLeft, Save, Loader2, Sparkles, List, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { useLanguage } from '../i18n/LanguageContext'
 import AiUsageNotice from '../components/AiUsageNotice'
+import FixedBotConfig from '../components/FixedBotConfig'
 
-const TIMEFRAMES = ['1m','5m','15m','1h','4h','1D']
 const MEDALS     = ['🥇','🥈','🥉','','','','','','','']
 const FIXED_STAKE_USD = 100
 
@@ -94,12 +94,7 @@ export default function EditBot() {
       setForm({
         name: bot.name,
         symbol: bot.symbol,
-        timeframe: bot.timeframe,
-        stake_usd: FIXED_STAKE_USD,
-        leverage: 1,
-        stop_loss_usd: bot.stop_loss_usd,
-        strategy_params: bot.strategy_params || {},
-        demo: bot.demo
+        demo: bot.demo,
       })
     }
   }, [bot, form])
@@ -114,7 +109,7 @@ export default function EditBot() {
     setRankLoading(true)
     setAssetMode('auto')
     try {
-      const data = await rankAssets(bot.strategy_id, form.timeframe)
+      const data = await rankAssets(bot.strategy_id, bot.timeframe)
       setRanking(data)
       if (data.assets?.length > 0) setField('symbol', data.assets[0].symbol)
     } catch (err) {
@@ -133,7 +128,7 @@ export default function EditBot() {
       if (bot.active) {
         await stopBot(id)
       }
-      await updateBot(id, { ...form, stake_usd: FIXED_STAKE_USD })
+      await updateBot(id, { name: form.name, symbol: form.symbol })      // só nome e ativo são editáveis
       qc.invalidateQueries({ queryKey: ['bot', id] })
       qc.invalidateQueries({ queryKey: ['bots'] })
       nav(`/bots/${id}`)
@@ -160,12 +155,6 @@ export default function EditBot() {
           <div>
             <label className="label">Nome do Robô</label>
             <input className="input" value={form.name} onChange={e => setField('name', e.target.value)} />
-          </div>
-          <div>
-            <label className="label">Timeframe</label>
-            <select className="input" value={form.timeframe} onChange={e => setField('timeframe', e.target.value)}>
-              {TIMEFRAMES.map(tf => <option key={tf}>{tf}</option>)}
-            </select>
           </div>
         </div>
 
@@ -205,39 +194,7 @@ export default function EditBot() {
           )}
         </div>
 
-        <div className="card space-y-4">
-          <h2 className="font-semibold text-sm">Gestão de Risco</h2>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="label">Stake</label>
-              <div className="input flex items-center font-mono font-semibold text-white">$100</div>
-            </div>
-            <div><label className="label">Stop Diário</label><input className="input" type="number" value={form.stop_loss_usd} onChange={e => setField('stop_loss_usd', Number(e.target.value))} /></div>
-          </div>
-          <p className="text-xs text-muted">Spot sem alavancagem: toda entrada usa stake fixo de US$100.</p>
-        </div>
-
-        {selectedStrategy && Object.keys(selectedStrategy.params).length > 0 && (
-          <div className="card space-y-4 relative overflow-hidden">
-            <h2 className="font-semibold text-sm">Parâmetros de {selectedStrategy.name}</h2>
-            
-
-            <div className="grid grid-cols-2 gap-4">
-              {Object.entries(selectedStrategy.params).map(([k, p]) => (
-                <div key={k}>
-                  <label className="label">{k}</label>
-                  <input 
-                    className="input" 
-                    type={p.type === 'bool' ? 'checkbox' : 'number'} 
-                    value={form.strategy_params[k] ?? p.default} 
-                    onChange={e => setField('strategy_params', {...form.strategy_params, [k]: p.type === 'int' ? parseInt(e.target.value) : parseFloat(e.target.value)})} 
-                  />
-                  <p className="text-xs text-muted mt-1">{p.description}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        <FixedBotConfig timeframe={bot.timeframe} validatedTimeframe={selectedStrategy?.recommended_timeframe} />
 
         {error && <p className="text-red-400 text-sm">{error}</p>}
 

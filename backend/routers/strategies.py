@@ -22,8 +22,11 @@ log = logging.getLogger("main")
 @router.get("/api/strategies")
 def get_strategies():
     """Lista todas as estratégias disponíveis com metadados e parâmetros."""
-    from ..validation.reports import study_summary
-    return [{**s, **study_summary(s["id"])} for s in list_strategies()]
+    from ..validation.reports import study_summary, validated_timeframe
+    # `recommended_timeframe` passa a ser o timeframe VALIDADO: o único que o app usa ao criar o bot.
+    return [{**s, **study_summary(s["id"]),
+             "recommended_timeframe": validated_timeframe(s["id"], s.get("recommended_timeframe"))}
+            for s in list_strategies()]
 
 
 # ── Rotas: Fábrica de Estratégias ─────────────────────────────────────────────

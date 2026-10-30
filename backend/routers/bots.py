@@ -19,7 +19,7 @@ from ..database import AiAnalysisLogModel, BotModel, BotSnapshotModel, SignalLog
 from ..exchanges.factory import build_exchange
 from ..strategies.registry import get_strategy
 from ..bot_manager import manager
-from ..common import (FIXED_STAKE_USD, _assert_spot_only, _assert_symbol_available, _assert_symbol_tradable,
+from ..common import (FIXED_DAILY_STOP_USD, FIXED_STAKE_USD, _assert_spot_only, _assert_symbol_available, _assert_symbol_tradable,
                       _assert_top5_symbol, _norm_symbol)
 
 router = APIRouter()
@@ -264,7 +264,8 @@ def list_bots(db: Session = Depends(get_db)):
             "active": b.active, "created_at": str(b.created_at),
             "baseline_balance": b.baseline_balance or 0.0,
             "goal": goal_view_from_row(pct=b.goal_pct, window_hours=b.goal_window_hours,
-                                       started_at=b.goal_started_at, outcome=b.goal_outcome),
+                                       started_at=b.goal_started_at, outcome=b.goal_outcome,
+                                       result_gross_pct=b.goal_result_gross_pct, result_net_pct=b.goal_result_net_pct),
             "runtime": status,
         })
     return result
@@ -273,7 +274,7 @@ def list_bots(db: Session = Depends(get_db)):
 async def create_bot(payload: BotCreate, db: Session = Depends(get_db)):
     # Valida estratégia
     try:
-        get_strategy(payload.strategy_id)
+        strategy = get_strategy(payload.strategy_id)
     except ValueError as e:
         raise HTTPException(400, str(e))
 
@@ -289,6 +290,12 @@ async def create_bot(payload: BotCreate, db: Session = Depends(get_db)):
     await _assert_symbol_tradable(payload.symbol, demo=payload.demo)
     payload.leverage = 1
     payload.stake_usd = FIXED_STAKE_USD
+    # Configuração FIXA: o que o cliente enviar de timeframe, parâmetros ou stop é ignorado. Timeframe = o validado
+    # pelo estudo; parâmetros = os padrões da estratégia; stop diário = constante. Configurar isso pode prejudicar o bot.
+    from ..validation.reports import validated_timeframe
+    payload.timeframe = validated_timeframe(payload.strategy_id, strategy.info().recommended_timeframe)
+    payload.strategy_params = {}
+    payload.stop_loss_usd = FIXED_DAILY_STOP_USD
     if payload.goal_pct is not None:
         if not (0 < payload.goal_pct <= 10):
             raise HTTPException(400, "A meta deve ficar entre 0 e 10% líquido do stake.")
@@ -339,7 +346,8 @@ def get_bot(bot_id: int, db: Session = Depends(get_db)):
         status = {**status, "accumulated_fees": round(float(fee_sum or 0), 4)}
 
     goal = goal_view_from_row(pct=bot.goal_pct, window_hours=bot.goal_window_hours,
-                              started_at=bot.goal_started_at, outcome=bot.goal_outcome)
+                              started_at=bot.goal_started_at, outcome=bot.goal_outcome,
+                              result_gross_pct=bot.goal_result_gross_pct, result_net_pct=bot.goal_result_net_pct)
     return {**bot.__dict__, "goal": goal, "runtime": status}
 
 def _assert_flat_before_symbol_change(db: Session, bot: BotModel, new_symbol: str) -> None:
@@ -379,7 +387,8 @@ async def update_bot(bot_id: int, payload: BotUpdate, db: Session = Depends(get_
         await _assert_top5_symbol(payload.symbol)        # trocar para ativo fora do top 5 não é permitido
         _assert_flat_before_symbol_change(db, bot, payload.symbol)
         _assert_symbol_available(db, payload.symbol, exclude_bot_id=bot_id)
-    update_data = payload.model_dump(exclude_none=True)
+    # Só nome e ativo são editáveis. Timeframe, parâmetros, stop, stake e alavancagem são fixos (ver create_bot).
+    update_data = {k: v for k, v in payload.model_dump(exclude_none=True).items() if k in ("name", "symbol")}
     update_data["leverage"] = 1
     update_data["stake_usd"] = FIXED_STAKE_USD
     for k, v in update_data.items():
@@ -451,6 +460,7 @@ async def start_bot(bot_id: int, db: Session = Depends(get_db)):
         bot.goal_started_at = _dt.datetime.utcnow()
         bot.goal_ended_at = None
         bot.goal_outcome = None
+        bot.goal_result_gross_pct = bot.goal_result_net_pct = None
     db.commit()
     try:
         manager.start_bot(bot)   # asyncio.create_task() exige contexto async

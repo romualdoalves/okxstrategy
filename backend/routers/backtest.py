@@ -113,7 +113,8 @@ async def _run_category_backtest_core(
         if needs_external_context(cls):
             na_ids.append(sid)
             continue
-        tf = cls.info().recommended_timeframe or "15m"
+        from ..validation.reports import validated_timeframe
+        tf = validated_timeframe(sid, cls.info().recommended_timeframe)     # o mesmo timeframe do bot
         tf_groups.setdefault(tf, []).append(sid)
         all_timeframes.add(tf)
         all_timeframes.update(cls.extra_timeframes() or [])

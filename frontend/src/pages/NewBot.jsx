@@ -6,10 +6,10 @@ import { ArrowLeft, Sparkles, List, Loader2, AlertTriangle, CheckCircle2, Clock 
 import { useLanguage } from '../i18n/LanguageContext'
 import AiUsageNotice from '../components/AiUsageNotice'
 import StudyBadge from '../components/StudyBadge'
+import FixedBotConfig from '../components/FixedBotConfig'
 
 const STUDY_ORDER = { candidate: 0, watch: 1, none: 2, insufficient: 2, retired: 3 }
 
-const TIMEFRAMES = ['1m','5m','15m','1h','4h','1D']
 const MEDALS     = ['🥇','🥈','🥉','','','','','','','']
 const FIXED_STAKE_USD = 100
 
@@ -135,14 +135,9 @@ export default function NewBot() {
     name:            '',
     strategy_id:     defaultStrategy,
     symbol:          defaultSymbol,
-    timeframe:       '15m',
+    timeframe:       '',          // só para o ranking: vem do servidor (o timeframe VALIDADO da estratégia), não é editável
     demo:            true,
-    stake_usd:       FIXED_STAKE_USD,
-    leverage:        1,
-    stop_loss_usd:   -50,
-    strategy_params: {},
   })
-  const [customParams, setCustomParams] = useState({})
   const [forceRetired, setForceRetired] = useState(false)
   const [error, setError]     = useState('')
   const [loading, setLoading] = useState(false)
@@ -246,7 +241,8 @@ export default function NewBot() {
     }
     setLoading(true)
     try {
-      const bot = await createBot({ ...form, stake_usd: FIXED_STAKE_USD, strategy_params: customParams, force_retired: forceRetired })
+      // Só identifica o bot: timeframe, parâmetros e stop são fixos e definidos pelo servidor.
+      const bot = await createBot({ name: form.name, strategy_id: form.strategy_id, symbol: form.symbol, demo: form.demo, force_retired: forceRetired })
       qc.invalidateQueries({ queryKey: ['bots'] })
       nav(`/bots/${bot.id}`)
     } catch (err) {
@@ -342,17 +338,6 @@ export default function NewBot() {
                 )}
               </div>
             )}
-          </div>
-
-          <div>
-            <label className="label">{t('nb.timeframe')}</label>
-            <select
-              className="input"
-              value={form.timeframe}
-              onChange={e => setField('timeframe', e.target.value)}
-            >
-              {TIMEFRAMES.map(tf => <option key={tf}>{tf}</option>)}
-            </select>
           </div>
         </div>
 
@@ -522,9 +507,7 @@ export default function NewBot() {
             </div>
             <div>
               <label className="label">{t('nb.daily_stop')}</label>
-              <input className="input" type="number" max="0" step="1"
-                value={form.stop_loss_usd}
-                onChange={e => setField('stop_loss_usd', Number(e.target.value))} />
+              <div className="input flex items-center font-mono font-semibold text-white">US$ −50</div>
             </div>
           </div>
 
@@ -535,35 +518,8 @@ export default function NewBot() {
           </p>
         </div>
 
-        {/* ── Strategy Parameters ────────────────────────────────────────── */}
-        {selectedStrategy && Object.keys(selectedStrategy.params).length > 0 && (
-          <div className="card space-y-4">
-            <h2 className="font-semibold text-sm">{t('nb.strat_params')}</h2>
-            <p className="text-xs text-muted">{t('nb.params_hint')}</p>
-            <div className="grid grid-cols-2 gap-4">
-              {Object.entries(selectedStrategy.params).map(([k, p]) => (
-                <div key={k}>
-                  <label className="label">{k}</label>
-                  <input
-                    className="input"
-                    type={p.type === 'bool' ? 'checkbox' : 'number'}
-                    placeholder={t('nb.param_ph', { v: p.default })}
-                    step={p.step ?? (p.type === 'int' ? 1 : 0.1)}
-                    min={p.min ?? undefined}
-                    max={p.max ?? undefined}
-                    onChange={e => setCustomParams(prev => ({
-                      ...prev,
-                      [k]: p.type === 'int'
-                        ? parseInt(e.target.value)
-                        : parseFloat(e.target.value),
-                    }))}
-                  />
-                  <p className="text-xs text-muted mt-0.5">{p.description}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* Configuração fixa (somente leitura): timeframe validado, parâmetros padrão, stake, stop */}
+        {selectedStrategy && <FixedBotConfig timeframe={form.timeframe} />}
 
         {/* Aviso: mercado fechado para ações */}
         {marketClosed && (

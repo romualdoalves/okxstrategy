@@ -78,6 +78,8 @@ class BotModel(Base):
     goal_started_at   = Column(DateTime, nullable=True)
     goal_ended_at     = Column(DateTime, nullable=True)
     goal_outcome      = Column(String,   nullable=True)
+    goal_result_gross_pct = Column(Float, nullable=True)   # resultado da sessão ao encerrar, antes das taxas
+    goal_result_net_pct   = Column(Float, nullable=True)   # e depois das taxas (o que sobrou de verdade)
 
 
 class TradeModel(Base):
@@ -319,6 +321,8 @@ def _run_migrations():
         "ALTER TABLE bots ADD COLUMN IF NOT EXISTS goal_started_at TIMESTAMP",
         "ALTER TABLE bots ADD COLUMN IF NOT EXISTS goal_ended_at TIMESTAMP",
         "ALTER TABLE bots ADD COLUMN IF NOT EXISTS goal_outcome VARCHAR",
+        "ALTER TABLE bots ADD COLUMN IF NOT EXISTS goal_result_gross_pct FLOAT",
+        "ALTER TABLE bots ADD COLUMN IF NOT EXISTS goal_result_net_pct FLOAT",
         """
         CREATE TABLE IF NOT EXISTS tracked_symbols (
             id SERIAL PRIMARY KEY,

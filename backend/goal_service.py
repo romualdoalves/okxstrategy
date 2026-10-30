@@ -22,6 +22,7 @@ from .database import BotModel, SessionLocal
 from .exchanges.okx_universe import fetch_top_spot_assets
 from .profit_lock import EXIT_SLIPPAGE_RATE, fee_rate
 from .strategies.registry import REGISTRY
+from .validation.reports import validated_timeframe
 
 log = logging.getLogger("goal_service")
 
@@ -56,7 +57,7 @@ def candidate_strategies() -> list[tuple[str, str]]:
         info = cls.info()
         if "test" in (info.tags or []):          # estratégias de diagnóstico da plataforma (ex.: T000) nunca são candidatas
             continue
-        tf = info.recommended_timeframe or "15m"
+        tf = validated_timeframe(sid, info.recommended_timeframe)     # o timeframe do estudo = o do bot
         if tf.lower() in G.INTRADAY_TIMEFRAMES:
             out.append((sid, tf))
     return out
@@ -71,16 +72,19 @@ def build_row(strategy_id: str, symbol: str, timeframe: str, result: dict, candl
     """Métricas de um (estratégia, ativo) a partir do resultado do backtest estrito; None se não houver dados."""
     if result.get("error") or len(candles) <= WARMUP + 1:
         return None
-    hits, windows, independent = G.window_hits(result.get("closed_trades") or [], candles)
+    hit = G.window_hits(result.get("closed_trades") or [], candles)
+    windows, independent = hit["windows"], hit["independent"]
     if not windows:
         return None
-    chance = hits / windows
+    real, illusory = hit["real"], hit["illusory"]
+    chance = real / windows                    # só acertos REAIS: bruto >= meta E líquido > 0 naquele instante
     stats = {
         "trades_count": result.get("trades_count", 0),
-        "total_profit": result.get("total_profit", 0.0),
-        "profit_factor": result.get("profit_factor", 0.0),
+        "total_profit": result.get("total_profit", 0.0),          # LÍQUIDO (taxas e slippage descontados)
+        "profit_factor": result.get("profit_factor", 0.0),        # LÍQUIDO
         "chance": chance,
         "independent_windows": independent,
+        "expected_net_pct": hit["expected_net_pct"],
     }
     ok, unmet = G.qualification(stats)
     cls = REGISTRY[strategy_id]
@@ -89,9 +93,16 @@ def build_row(strategy_id: str, symbol: str, timeframe: str, result: dict, candl
         "strategy_name": cls.info().name,
         "symbol": symbol,
         "timeframe": timeframe,
-        "chance_pct": round(100 * chance, 1),
+        "chance_pct": round(100 * chance, 1),                                  # chance REAL (bruto atingido e líquido > 0)
         "chance_lb_pct": round(100 * G.wilson_lower_bound(chance, independent), 1),
-        "windows_hit": hits,
+        "gross_chance_pct": round(100 * (real + illusory) / windows, 1),      # se ignorássemos as taxas
+        "windows_hit": real,
+        "windows_illusory": illusory,                                          # bruto atingido, líquido <= 0: ilusão
+        "windows_stop_loss": hit["stop_loss"],                                 # sessões que terminam em stop loss
+        "windows_expired": hit["expired"],                                     # operou mas não chegou à meta em 24 h
+        "windows_no_order": hit["no_order"],                                   # nenhuma ordem em 24 h
+        "stop_loss_pct": round(100 * hit["stop_loss"] / windows, 1),
+        "expected_net_pct": round(hit["expected_net_pct"], 3),                 # líquido médio por sessão de 24 h
         "windows_total": windows,
         "independent_windows": round(independent, 1),
         "trades_count": stats["trades_count"],
@@ -208,7 +219,7 @@ def status() -> dict:
     """Estado atual + os parâmetros reais das regras (a tela os mostra: nada fica escrito em dois lugares)."""
     out = {k: v for k, v in _state.items() if k != "finished_ts"}
     out["criteria"] = {
-        "target_pct": G.TARGET_PCT, "window_hours": G.WINDOW_HOURS, "min_trades": G.MIN_TRADES,
+        "target_pct": G.TARGET_PCT, "net_equivalent_pct": round(G.net_equivalent_pct(), 2), "window_hours": G.WINDOW_HOURS, "min_trades": G.MIN_TRADES,
         "min_profit_factor": G.MIN_PROFIT_FACTOR, "min_chance_pct": round(100 * G.MIN_CHANCE), "top_n": G.TOP_N,
         "min_independent_windows": G.MIN_INDEPENDENT_WINDOWS,
         "fee_rate_pct": round(100 * fee_rate(), 3), "exit_slippage_pct": round(100 * EXIT_SLIPPAGE_RATE, 3),

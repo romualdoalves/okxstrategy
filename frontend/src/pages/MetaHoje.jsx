@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  Target, Play, RefreshCw, AlertTriangle, CheckCircle2, XCircle, Clock, ShieldAlert, Info, Bot as BotIcon,
+  Target, Play, RefreshCw, AlertTriangle, CheckCircle2, XCircle, Clock, ShieldAlert, Info, Bot as BotIcon, Eye,
 } from 'lucide-react'
 import { getGoalStatus, startGoalScan, createBot } from '../api'
 import { buildBotPayload } from '../botPayload'
@@ -74,7 +74,7 @@ function CandidateCard({ row, rank, criteria, qualifies, onCreate, creating, cre
           </p>
         </div>
         <div className="text-right">
-          <p className="text-[10px] uppercase tracking-wider text-muted">Chance de +{criteria.target_pct}% líquido em 24 h</p>
+          <p className="text-[10px] uppercase tracking-wider text-muted">Chance REAL de +{criteria.target_pct}% bruto em 24 h</p>
           <p className={`text-3xl font-black leading-none ${qualifies ? 'text-green-400' : 'text-yellow-300'}`}>{fmtPct(row.chance_pct)}</p>
           <p className="mt-1 text-[10px] text-muted">
             piso com 95% de confiança: <strong className="text-white/80">{fmtPct(row.chance_lb_pct)}</strong>
@@ -83,13 +83,39 @@ function CandidateCard({ row, rank, criteria, qualifies, onCreate, creating, cre
       </div>
 
       <p className="mt-3 text-[11px] text-white/60">
-        Em {row.windows_hit} das {row.windows_total} janelas de 24 h testadas um bot que começasse zerado teria batido a meta
-        (≈ {Math.round(row.independent_windows)} janelas independentes em {Math.round(row.history_days)} dias de histórico).
+        Em {row.windows_hit} das {row.windows_total} janelas de 24 h testadas um bot que começasse zerado teria batido a meta bruta
+        <strong> e ainda ficado com líquido positivo</strong> (≈ {Math.round(row.independent_windows)} janelas independentes em {Math.round(row.history_days)} dias de histórico).
       </p>
+
+      <div className="mt-3 rounded-lg border border-white/10 bg-white/[0.03] p-2.5 text-[11px] text-white/70">
+        <p className="mb-1 flex items-center gap-1.5 font-bold uppercase tracking-wider text-[10px] text-muted"><Eye size={11} /> Bruto x real</p>
+        <p>
+          Se ignorássemos as taxas, a chance seria <strong className="text-white">{fmtPct(row.gross_chance_pct)}</strong>.
+          {row.windows_illusory > 0
+            ? <> Em <strong className="text-yellow-300">{row.windows_illusory}</strong> janelas o bruto chegou a +{criteria.target_pct}% mas as taxas deixaram o líquido em zero ou negativo: são <strong className="text-yellow-300">acertos ilusórios</strong> e não contam.</>
+            : <> Nenhum acerto foi ilusório: em todas as janelas em que o bruto bateu a meta, o líquido ficou positivo.</>}
+        </p>
+      </div>
+
+      <div className="mt-3 rounded-lg border border-white/10 bg-white/[0.03] p-2.5">
+        <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted">Como terminam as sessões de 24 h (simulação com as regras do bot)</p>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-6">
+          <Metric label="Meta bruta, líquido positivo" value={fmtPct(100 * row.windows_hit / row.windows_total)} tone="text-green-400" />
+          <Metric label="Meta bruta, líquido ≤ 0 (ilusão)" value={fmtPct(100 * row.windows_illusory / row.windows_total)} tone={row.windows_illusory > 0 ? 'text-yellow-300' : 'text-white'} />
+          <Metric label="Stop loss" value={fmtPct(row.stop_loss_pct)} tone={row.stop_loss_pct > 0 ? 'text-bear' : 'text-white'} />
+          <Metric label="Operou, sem chegar à meta" value={fmtPct(100 * row.windows_expired / row.windows_total)} />
+          <Metric label="Sem ordem em 24 h" value={fmtPct(100 * row.windows_no_order / row.windows_total)} />
+          <Metric label="Líquido médio por sessão" value={`${row.expected_net_pct > 0 ? '+' : ''}${Number(row.expected_net_pct).toFixed(2).replace('.', ',')}%`}
+            tone={row.expected_net_pct > 0 ? 'text-bull' : 'text-bear'} />
+        </div>
+        <p className="mt-1.5 text-[10px] text-muted/70">
+          O líquido médio por sessão conta todas as sessões, inclusive as que terminam em stop loss. Se for negativo, a estratégia perde dinheiro mesmo batendo a meta com frequência.
+        </p>
+      </div>
 
       <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-5">
         <Metric label="Lucro líquido no período" value={fmtMoney(row.total_profit)} tone={row.total_profit > 0 ? 'text-bull' : 'text-bear'} />
-        <Metric label="Profit Factor" value={row.profit_factor.toFixed(2).replace('.', ',')} tone={row.profit_factor >= criteria.min_profit_factor ? 'text-bull' : 'text-bear'} />
+        <Metric label="Profit Factor (líquido)" value={row.profit_factor.toFixed(2).replace('.', ',')} tone={row.profit_factor >= criteria.min_profit_factor ? 'text-bull' : 'text-bear'} />
         <Metric label="Operações" value={row.trades_count} tone={row.trades_count >= criteria.min_trades ? 'text-white' : 'text-bear'} />
         <Metric label="Acerto" value={fmtPct(row.win_rate, 0)} />
         <Metric label="Maior queda" value={fmtMoney(-row.max_drawdown)} tone="text-bear" />
@@ -123,7 +149,7 @@ function CandidateCard({ row, rank, criteria, qualifies, onCreate, creating, cre
                 className="btn flex items-center gap-2 bg-accent font-bold text-black hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Target size={14} />
-                {creating ? 'Criando…' : `Criar bot com meta de ${criteria.target_pct}% em 24 h`}
+                {creating ? 'Criando…' : `Criar bot com meta de ${criteria.target_pct}% bruto em 24 h`}
               </button>
               {!inTop5 && <span className="text-[11px] text-red-300">O ativo saiu do top 5 desde a busca. Refaça a busca para atualizar.</span>}
             </>
@@ -150,11 +176,11 @@ export default function MetaHoje() {
   })
 
   const c = data?.criteria ?? {
-    target_pct: 1, window_hours: 24, min_trades: 10, min_profit_factor: 1.2, min_chance_pct: 20, top_n: 3,
-    min_independent_windows: 10,
-    fee_rate_pct: 0.1, exit_slippage_pct: 0.05, exit_margin_pct: 0.05, strategies_considered: 0,
-    history_cap: { '1m': 3000, '5m': 3000, '15m': 3000, '1h': 4400 },
+    target_pct: 1, net_equivalent_pct: 0.8, window_hours: 24, min_trades: 10, min_profit_factor: 1.2, min_chance_pct: 20,
+    top_n: 3, min_independent_windows: 10, fee_rate_pct: 0.1, exit_slippage_pct: 0.05, exit_margin_pct: 0.05,
+    strategies_considered: 0, history_cap: { '1m': 3000, '5m': 3000, '15m': 3000, '1h': 4400 },
   }
+  const netEq = String(c.net_equivalent_pct).replace('.', ',')
   const state = data?.state ?? 'idle'
   const running = state === 'running'
   const progress = data?.progress ?? { done: 0, total: 0, current: null }
@@ -182,7 +208,7 @@ export default function MetaHoje() {
     setCreateError(prev => ({ ...prev, [key]: '' }))
     try {
       const bot = await createBot(buildBotPayload(row, row.symbol, {
-        name: `META ${c.target_pct}% · ${row.strategy_id} (${row.symbol})`,
+        name: `META ${c.target_pct}% BRUTO · ${row.strategy_id} (${row.symbol})`,
         goal_pct: c.target_pct,
         goal_window_hours: c.window_hours,
       }))
@@ -198,32 +224,59 @@ export default function MetaHoje() {
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-6">
       <div>
-        <h1 className="flex items-center gap-2 text-xl font-bold"><Target size={22} className="text-accent" /> Meta 1% Hoje!</h1>
+        <h1 className="flex items-center gap-2 text-xl font-bold"><Target size={22} className="text-accent" /> Meta 1% Bruto (24 h)</h1>
         <p className="text-sm text-muted">
-          Procura, entre as estratégias intradiárias, as que mais se aproximam de +{c.target_pct}% líquido em {c.window_hours} horas
-          e cria o bot já com a meta configurada.
+          Procura, entre as estratégias intradiárias, as que mais se aproximam de +{c.target_pct}% <strong>bruto</strong> em {c.window_hours} horas
+          sem deixar o resultado líquido no vermelho, e cria o bot já com a meta configurada.
         </p>
       </div>
 
       <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-4">
-        <p className="mb-1.5 flex items-center gap-2 text-sm font-bold text-yellow-200"><ShieldAlert size={16} /> Leia antes: a meta é agressiva</p>
+        <p className="mb-1.5 flex items-center gap-2 text-sm font-bold text-yellow-200"><ShieldAlert size={16} /> Leia antes: a meta é agressiva, e é BRUTA</p>
         <ul className="list-disc space-y-1 pl-5 text-xs leading-relaxed text-yellow-100/85">
+          <li>
+            <strong>Bruto</strong> é o ganho de preço <em>antes</em> das taxas. Depois de pagar as taxas ({c.fee_rate_pct}% por lado), +{c.target_pct}% bruto
+            vira ≈ <strong>+{netEq}% líquido</strong> numa operação só, e menos que isso se forem várias. O dinheiro que sobra é o líquido.
+          </li>
           <li>
             +{c.target_pct}% <strong>por dia</strong>, composto, são ≈ <strong>+{COMPOUND_YEAR.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}% ao ano</strong>
             {' '}(US$ 100 viram ≈ US$ {(100 + COMPOUND_YEAR).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}). Nenhuma estratégia conhecida sustenta isso.
           </li>
           <li>O que esta página faz é <strong>medir no passado recente</strong> quantas vezes cada estratégia teria chegado lá em 24 h. É evidência, não promessa.</li>
-          <li>Pode haver perda: o stop loss existe e a meta pode não ser atingida. Todos os números abaixo são líquidos de taxas e slippage.</li>
+          <li>Pode haver perda: o stop loss existe e a meta pode não ser atingida.</li>
         </ul>
       </div>
+
+      <section className="rounded-xl border border-accent/30 bg-accent/[0.06] p-4">
+        <h2 className="mb-2 flex items-center gap-2 text-sm font-bold text-white"><Eye size={16} className="text-accent" /> Critério para sair da ilusão</h2>
+        <p className="mb-2 text-xs leading-relaxed text-white/75">
+          Uma meta bruta é fácil de “bater” no papel: basta fazer muitas operações pequenas, e as taxas comem o resultado sem que o número bruto mostre isso.
+          Por isso três regras separam acerto de ilusão:
+        </p>
+        <ol className="list-decimal space-y-1.5 pl-5 text-xs leading-relaxed text-white/80">
+          <li>
+            <strong>Um acerto só é REAL se, no instante em que o bruto chega a +{c.target_pct}%, o líquido da sessão for positivo.</strong>{' '}
+            Se o líquido estiver em zero ou negativo, é um <strong>acerto ilusório</strong>: não entra na chance e aparece à parte, com a contagem.
+          </li>
+          <li>
+            <strong>A estratégia só entra no Top {c.top_n} com resultado LÍQUIDO positivo no histórico</strong>: lucro líquido total acima de zero, Profit Factor
+            líquido ≥ {String(c.min_profit_factor).replace('.', ',')} e <strong>resultado líquido médio por sessão de 24 h positivo, contando também as sessões que terminam em stop loss</strong>.
+            Bater a meta com frequência não basta se os stops custam mais do que as metas rendem.
+          </li>
+          <li>
+            <strong>Bruto e líquido aparecem lado a lado, sempre.</strong> No card do bot, no resultado do backtest e no aviso final. Se o bot parar com a meta bruta
+            batida mas o líquido ≤ 0, o card avisa expressamente que foi uma ilusão.
+          </li>
+        </ol>
+      </section>
 
       <section>
         <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-muted">Como funciona</h2>
         <div className="grid gap-3 md:grid-cols-2">
           <Step n={1} title="A meta">
             <p>
-              <strong>+{c.target_pct}% líquido</strong> sobre o stake fixo de US$ 100 = <strong>US$ {(c.target_pct).toFixed(2).replace('.', ',')}</strong> de lucro
-              {' '}<em>depois</em> das taxas ({c.fee_rate_pct}% por lado, entrada e saída) e do slippage de saída ({c.exit_slippage_pct}%).
+              <strong>+{c.target_pct}% bruto</strong> sobre o stake fixo de US$ 100 = <strong>US$ {(c.target_pct).toFixed(2).replace('.', ',')}</strong> de variação de preço
+              acumulada na sessão, <em>antes</em> das taxas ({c.fee_rate_pct}% por lado). Equivale a ≈ <strong>US$ {netEq} líquidos</strong>.
             </p>
             <p>“Hoje” = <strong>{c.window_hours} horas corridas</strong> a partir do momento em que você clica em Iniciar, não o dia do calendário.</p>
           </Step>
@@ -234,11 +287,12 @@ export default function MetaHoje() {
           <Step n={3} title="Como medimos a chance">
             <p>
               Backtest <strong>estrito</strong> (o mesmo motor do Scanner: taxas, slippage, stop e trailing) das {c.strategies_considered || 'dezenas de'} estratégias
-              de {c.timeframes?.join(', ') || '1m a 1h'}, nos candles recentes (até {c.history_cap['15m']} velas de 15 min ≈ 31 dias; 1h ≈ 6 meses).
+              validadas em {c.timeframes?.join(', ') || '1m a 1h'}, no timeframe em que o estudo as validou, nos candles recentes (até {c.history_cap['15m']} velas de 15 min ≈ 31 dias; 1h ≈ 6 meses).
             </p>
             <p>
-              Uma janela de 24 h começa a cada hora. Em cada uma o bot “começa zerado” e só contam operações <strong>inteiras</strong> dentro dela.
-              <strong> Chance</strong> = % das janelas em que o lucro líquido chegou a +{c.target_pct}%.
+              Uma janela de 24 h começa a cada hora. Em cada uma o bot “começa zerado” e só contam operações <strong>inteiras</strong> dentro dela, seguindo as
+              regras do bot: vende quando o <em>pico</em> da operação cobre o que falta da meta, e a sessão termina em stop loss se uma operação fecha abaixo da entrada.
+              <strong> Chance real</strong> = % das janelas em que o ganho <em>bruto</em> chegou a +{c.target_pct}% <em>e</em> o líquido ficou positivo.
               O <strong>piso (95%)</strong> desconta a incerteza de uma amostra curta: janelas de hora em hora se sobrepõem, então a amostra real é bem menor.
             </p>
           </Step>
@@ -247,8 +301,9 @@ export default function MetaHoje() {
             <ul className="list-disc space-y-0.5 pl-4">
               <li>ao menos <strong>{c.min_trades} operações</strong> no histórico;</li>
               <li><strong>lucro líquido positivo</strong> no período;</li>
-              <li><strong>Profit Factor ≥ {String(c.min_profit_factor).replace('.', ',')}</strong>;</li>
-              <li><strong>chance ≥ {c.min_chance_pct}%</strong> (ao menos 1 janela em cada 5 bate a meta);</li>
+              <li><strong>Profit Factor líquido ≥ {String(c.min_profit_factor).replace('.', ',')}</strong>;</li>
+              <li><strong>resultado líquido médio por sessão de 24 h positivo</strong>, contando as sessões que terminam em stop loss;</li>
+              <li><strong>chance real ≥ {c.min_chance_pct}%</strong> (ao menos 1 janela em cada 5 bate a meta bruta com líquido positivo);</li>
               <li><strong>histórico mínimo</strong> de {c.min_independent_windows} janelas de 24 h independentes (≈ {c.min_independent_windows} dias): com menos que isso a chance medida não significa nada.</li>
             </ul>
             <p>Se ninguém cumprir, a página diz isso. Não inventamos candidatas.</p>
@@ -260,8 +315,8 @@ export default function MetaHoje() {
         <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-muted">O que o bot faz quando tem uma meta</h2>
         <ul className="space-y-2">
           <Rule icon={Target} tone="text-green-400">
-            <strong>Para ao atingir a meta.</strong> Quando o lucro líquido da sessão (realizado + aberto) cobre +{c.target_pct}%, o bot vende a mercado
-            (com folga de {c.exit_margin_pct}% para o slippage) e para. Só a posição que ele abriu é vendida.
+            <strong>Para ao atingir a meta bruta.</strong> Quando o ganho bruto da sessão (realizado + aberto) cobre +{c.target_pct}%, o bot vende a mercado
+            (com folga de {c.exit_margin_pct}% para o slippage) e para. Só a posição que ele abriu é vendida. Ao parar, registra o resultado <strong>bruto e líquido</strong>.
           </Rule>
           <Rule icon={Clock} tone="text-yellow-300">
             <strong>Para se não emitir nenhuma ordem em {c.window_hours} h.</strong> Se a estratégia não der sinal na janela, o bot encerra sozinho.
@@ -270,14 +325,14 @@ export default function MetaHoje() {
             <strong>Com posição aberta, não para por tempo.</strong> Passadas as {c.window_hours} h, ele segue na operação e só para por <em>meta atingida</em> ou <em>stop loss</em>.
           </Rule>
           <Rule icon={XCircle} tone="text-red-300">
-            <strong>Saída com prejuízo encerra a sessão.</strong> Stop loss (ou trailing que saia no negativo) fecha a posição e para o bot: a meta daquela janela falhou.
+            <strong>Saída com prejuízo encerra a sessão.</strong> Stop loss (saída abaixo do preço de entrada) fecha a posição e para o bot: a meta daquela janela falhou.
           </Rule>
           <Rule icon={RefreshCw} tone="text-accent">
             <strong>O trailing stop continua valendo</strong> na posição, até a meta ser atingida. Uma saída por trailing com ganho pequeno <em>não</em> encerra: se ainda houver tempo, o bot busca o que falta.
           </Rule>
           <Rule icon={Info} tone="text-muted">
             Cada <strong>Iniciar</strong> abre uma janela nova de {c.window_hours} h. Reiniciar o servidor (deploy) não zera a janela em andamento.
-            O algoritmo da estratégia não muda: a meta só decide <em>quando vender</em> e <em>quando parar</em>.
+            O algoritmo da estratégia não muda: a meta só decide <em>quando vender</em> e <em>quando parar</em>. Timeframe, parâmetros e stop do bot são fixos.
           </Rule>
         </ul>
       </section>
@@ -373,10 +428,11 @@ export default function MetaHoje() {
             <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-4">
               <p className="flex items-center gap-2 text-sm font-bold text-yellow-200"><AlertTriangle size={16} /> Nenhuma estratégia atende aos critérios agora.</p>
               <p className="mt-1.5 text-xs leading-relaxed text-yellow-100/85">
-                No histórico recente, nenhuma combinação reuniu ao mesmo tempo lucro líquido positivo, Profit Factor ≥ {String(c.min_profit_factor).replace('.', ',')},
-                {' '}{c.min_trades}+ operações e chance de pelo menos {c.min_chance_pct}% de bater +{c.target_pct}% em 24 h. Isso é coerente com a matemática da meta:
-                +{c.target_pct}% por dia é muito mais do que as estratégias do app entregam. Abaixo estão as que mais se aproximaram, só para você ver
-                o quão longe ficaram. <strong>Elas não têm botão de criar.</strong>
+                No histórico recente, nenhuma combinação reuniu ao mesmo tempo lucro líquido positivo, Profit Factor líquido ≥ {String(c.min_profit_factor).replace('.', ',')}, resultado líquido médio por sessão positivo,
+                {' '}{c.min_trades}+ operações e chance <strong>real</strong> de pelo menos {c.min_chance_pct}% de bater +{c.target_pct}% bruto em 24 h.
+                Isso é coerente com a matemática da meta: +{c.target_pct}% por dia é muito mais do que as estratégias do app entregam.
+                Abaixo estão as que mais se aproximaram, com o bruto e o real lado a lado, só para você ver o quão longe ficaram.
+                <strong> Elas não têm botão de criar.</strong>
               </p>
             </div>
           )}
