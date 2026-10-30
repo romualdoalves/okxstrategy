@@ -330,7 +330,7 @@
       "Amostra muito pequena: poucas operações em 8 anos, então os números são indícios, não prova.",
       "Valores em US$ do backtest (taxa 0,1% por lado e slippage 0,05%); não garantem resultado futuro."
     ],
-    "reason": "PF 1,79 / 1,42 / 2,30 nos 3 ativos, mas com só 7 a 13 trades em 8 anos, p5 abaixo de 0,5 e 1 a 2 trades fora da amostra. Resultado promissor, porém pequeno demais para um walk-forward: em observação."
+    "reason": "PF 1,79 / 1,42 / 2,30 em 1D, mas com só 7 a 13 trades em 8 anos e 1 a 2 fora da amostra. Os timeframes menores, com mais amostra, não confirmam: em 4H o PF é 1,03 / 0,85 / 1,13 (25 a 34 trades, fora da amostra abaixo de 1) e em 1H é 0,90 / 0,54 / 0,96. O resultado do 1D provavelmente é sorte de amostra. Em observação."
   },
   "TF013": {
     "verdict": "retired",
