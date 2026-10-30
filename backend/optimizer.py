@@ -2,14 +2,16 @@ import asyncio
 import logging
 import itertools
 from typing import Dict, Any, List
-from .backtest_engine import BacktestEngine
 
 log = logging.getLogger("optimizer")
 
 class StrategyOptimizer:
     """
-    Motor de otimização de parâmetros.
-    Testa múltiplas combinações e retorna a melhor.
+    Espaços de busca de parâmetros por estratégia (apenas dados).
+
+    A OTIMIZAÇÃO ESTÁ DESATIVADA. O método antigo escolhia o maior lucro em 500 candles com o motor "clássico" (sem taxas,
+    slippage nem stops), exigindo só 3 operações, e a tela aplicava o resultado nos parâmetros do bot. Reativar exige o
+    motor estrito (backtest_service), custos e validação fora da amostra.
     """
 
     def __init__(self, strategy_id: str):
@@ -273,40 +275,3 @@ class StrategyOptimizer:
                 "rr_ratio": [2.0, 3.0, 4.0]
             }
         }.get(strategy_id, {})
-
-    async def optimize(self, candles: list, stake_usd: float = 100.0) -> Dict[str, Any]:
-        stake_usd = 100.0
-        if not self.search_space:
-            return {"error": "Espaço de busca não definido para esta estratégia"}
-
-        # Gera todas as combinações possíveis
-        keys = self.search_space.keys()
-        values = self.search_space.values()
-        combinations = [dict(zip(keys, v)) for v in itertools.product(*values)]
-        
-        log.info(f"Otimizando {self.strategy_id}: testando {len(combinations)} combinações...")
-        
-        best_profit = -999999.0
-        best_params = {}
-        best_trades = 0
-
-        # Para cada combinação, roda um backtest rápido
-        # Usamos uma versão simplificada ou reduzimos os candles para performance
-        for params in combinations:
-            engine = BacktestEngine(self.strategy_id, params)
-            result = await engine.run(candles, stake_usd=stake_usd)
-            
-            profit = result.get("total_profit", 0)
-            
-            # Critério: Maior lucro, mas deve ter feito pelo menos 3 trades
-            if profit > best_profit and result.get("trades_count", 0) >= 3:
-                best_profit = profit
-                best_params = params
-                best_trades = result.get("trades_count")
-
-        return {
-            "best_params": best_params,
-            "estimated_profit": best_profit,
-            "trades_count": best_trades,
-            "combinations_tested": len(combinations)
-        }

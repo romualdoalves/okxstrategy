@@ -60,7 +60,6 @@
  "POST /api/bots/sync-trailing",
  "POST /api/bots/{bot_id}/backtest",
  "POST /api/bots/{bot_id}/liquidate",
- "POST /api/bots/{bot_id}/optimize",
  "POST /api/bots/{bot_id}/recapture-baseline",
  "POST /api/bots/{bot_id}/start",
  "POST /api/bots/{bot_id}/stop",

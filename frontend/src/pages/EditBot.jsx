@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { getBot, getStrategies, updateBot, rankAssets, stopBot, optimizeBotParams, getBots, getTopAssets } from '../api'
-import { ArrowLeft, Save, Loader2, Sparkles, List, CheckCircle2, AlertTriangle, Wand2 } from 'lucide-react'
+import { getBot, getStrategies, updateBot, rankAssets, stopBot, getBots, getTopAssets } from '../api'
+import { ArrowLeft, Save, Loader2, Sparkles, List, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { useLanguage } from '../i18n/LanguageContext'
 import AiUsageNotice from '../components/AiUsageNotice'
 
@@ -87,7 +87,6 @@ export default function EditBot() {
   const [ranking, setRanking] = useState(null)
   const [rankLoading, setRankLoading] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [optimizing, setOptimizing] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -123,23 +122,6 @@ export default function EditBot() {
       setAssetMode('manual')
     } finally {
       setRankLoading(false)
-    }
-  }
-
-  async function handleOptimize() {
-    setOptimizing(true)
-    setError('')
-    try {
-      const data = await optimizeBotParams(id)
-      if (data.best_params) {
-        setField('strategy_params', data.best_params)
-      } else if (data.error) {
-        setError(data.error)
-      }
-    } catch (err) {
-      setError("Falha na otimização: " + err.message)
-    } finally {
-      setOptimizing(false)
     }
   }
 
@@ -237,28 +219,8 @@ export default function EditBot() {
 
         {selectedStrategy && Object.keys(selectedStrategy.params).length > 0 && (
           <div className="card space-y-4 relative overflow-hidden">
-            <div className="flex items-center justify-between">
-              <h2 className="font-semibold text-sm">Parâmetros de {selectedStrategy.name}</h2>
-              <button 
-                type="button" 
-                onClick={handleOptimize}
-                disabled={optimizing}
-                className="btn-ghost btn btn-xs flex items-center gap-1.5 text-accent hover:bg-accent/10 border border-accent/20"
-              >
-                {optimizing ? <Loader2 size={12} className="animate-spin" /> : <Wand2 size={12} />}
-                {optimizing ? "Otimizando..." : "Otimizar"}
-              </button>
-            </div>
-            <AiUsageNotice consumesTokens={false} text="Otimização usa análise estatística local. Não consome tokens de IA." />
+            <h2 className="font-semibold text-sm">Parâmetros de {selectedStrategy.name}</h2>
             
-            {optimizing && (
-              <div className="absolute inset-0 bg-panel/60 backdrop-blur-[1px] flex items-center justify-center z-10 animate-in fade-in duration-300">
-                <div className="flex flex-col items-center gap-2">
-                  <div className="w-8 h-8 border-4 border-accent border-t-transparent rounded-full animate-spin" />
-                  <p className="text-xs font-bold text-white uppercase tracking-tighter">Buscando Melhor Setup...</p>
-                </div>
-              </div>
-            )}
 
             <div className="grid grid-cols-2 gap-4">
               {Object.entries(selectedStrategy.params).map(([k, p]) => (
@@ -281,7 +243,7 @@ export default function EditBot() {
 
         <div className="flex gap-3">
           <button type="button" onClick={() => nav(-1)} className="btn-ghost btn flex-1">Cancelar</button>
-          <button type="submit" disabled={saving || optimizing} className="btn-primary btn flex-1 flex items-center justify-center gap-2">
+          <button type="submit" disabled={saving} className="btn-primary btn flex-1 flex items-center justify-center gap-2">
             {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
             {bot.active ? "Parar Bot e Salvar" : "Salvar Alterações"}
           </button>

@@ -46,98 +46,6 @@ const CHART_SUBTITLE = {
   RG001: 'Markov Regime + EMA21',
 }
 
-function getBacktestScore(r) {
-  const pf = r.profit_factor ?? 0
-  const tc = r.trades_count ?? 0
-  const tp = r.total_profit ?? 0
-  const dd = r.max_drawdown ?? 0
-  const wr = r.win_rate ?? 0
-
-  if (tc === 0) return 0.0
-  if (tp <= 0)  return 1.0
-  if (pf < 1.0) return Math.round((1.0 + pf * 1.5) * 100) / 100
-
-  // PF: 1.0→3.0, 1.5→4.25, 2.0→5.5, 3.0→8.0, ≥4.6→9.0
-  const pfScore = Math.min(3.0 + (pf - 1.0) * 2.5, 9.0)
-
-  let adj = 0
-  if (tc >= 10)     adj += 1.0
-  else if (tc >= 5) adj += 0.5
-  else if (tc < 3)  adj -= 0.5
-
-  const ddRatio = tp > 0 ? dd / tp : 999
-  if (ddRatio <= 0.3)      adj += 0.5
-  else if (ddRatio <= 0.5) adj += 0.2
-  else if (ddRatio > 1.0)  adj -= 0.5
-
-  if (wr >= 60)      adj += 0.3
-  else if (wr < 40)  adj -= 0.2
-
-  return Math.round(Math.max(0, Math.min(10, pfScore + adj)) * 100) / 100
-}
-
-function getBacktestRecommendation(r) {
-  const pf = r.profit_factor ?? 0
-  const tc = r.trades_count ?? 0
-  const tp = r.total_profit ?? 0
-  const dd = r.max_drawdown ?? 0
-  const score = getBacktestScore(r)
-  const STAKE = 100
-
-  if (tc === 0) return {
-    verdict: 'NÃO INICIAR', level: 'danger', score,
-    reasons: ['Nenhum trade fechado no período — impossível calcular PF, Win Rate ou Drawdown.'],
-  }
-  if (tp <= 0) return {
-    verdict: 'NÃO INICIAR', level: 'danger', score,
-    reasons: [`PnL negativo (${tp.toFixed(2)} USD) em ${tc} trade(s) — estratégia perdedora neste período.`],
-  }
-  if (pf < 1.0) return {
-    verdict: 'NÃO INICIAR', level: 'danger', score,
-    reasons: [`Profit Factor ${pf.toFixed(2)}: para cada $1,00 ganho, a estratégia perdeu $${(1 / pf).toFixed(2)} — saldo bruto negativo.`],
-  }
-
-  const highlights = []
-  const issues = []
-  const ddRatio = tp > 0 ? dd / tp : 999
-  const avgTrade = r.avg_trade != null ? r.avg_trade : (tc > 0 ? tp / tc : 0)
-  const avgPct = (avgTrade / STAKE * 100).toFixed(2)
-
-  highlights.push(`PnL positivo: +${tp.toFixed(2)} USD total — média de +$${avgTrade.toFixed(2)}/trade (+${avgPct}% do stake de $${STAKE}).`)
-
-  if (pf >= 1.5) {
-    highlights.push(`Profit Factor excelente: ${pf.toFixed(2)} — para cada $1,00 perdido, a estratégia retornou $${pf.toFixed(2)} em ganhos.`)
-  } else if (pf >= 1.2) {
-    highlights.push(`Profit Factor adequado: ${pf.toFixed(2)} — para cada $1,00 perdido, retornou $${pf.toFixed(2)} (idealmente ≥ 1.5).`)
-  } else {
-    issues.push(`Profit Factor ${pf.toFixed(2)} abaixo do mínimo recomendado (1.2) — para cada $1,00 perdido, retornou apenas $${pf.toFixed(2)}.`)
-  }
-
-  if (tc >= 10) {
-    highlights.push(`${tc} trades fechados — amostra robusta; métricas são estatisticamente confiáveis.`)
-  } else if (tc >= 5) {
-    highlights.push(`${tc} trades fechados — amostra razoável; resultados tendem a se manter com mais dados.`)
-  } else if (tc >= 3) {
-    highlights.push(`${tc} trades fechados (mínimo aceitável) — amostra pequena; PF e Win Rate podem distorcer com mais histórico.`)
-  } else {
-    issues.push(`Apenas ${tc} trade(s) fechado(s) — amostra insuficiente; qualquer métrica pode ser fruto do acaso.`)
-  }
-
-  const ddStakePct = (dd / STAKE * 100).toFixed(2)
-  if (ddRatio <= 0.5) {
-    highlights.push(`Drawdown controlado: $${dd.toFixed(2)} (${(ddRatio * 100).toFixed(0)}% do lucro · ${ddStakePct}% do stake de $${STAKE}) — risco bem dimensionado.`)
-  } else if (ddRatio <= 1.0) {
-    issues.push(`Drawdown de $${dd.toFixed(2)} representa ${(ddRatio * 100).toFixed(0)}% do lucro e ${ddStakePct}% do stake de $${STAKE} — o capital flutuou bastante antes de fechar no positivo.`)
-  } else {
-    issues.push(`Drawdown de $${dd.toFixed(2)} supera o lucro total (${ddStakePct}% do stake de $${STAKE}) — a estratégia ficou profundamente no vermelho antes de recuperar, risco muito elevado.`)
-  }
-
-  if (issues.length === 0) {
-    return { verdict: 'INICIAR', level: 'success', score, reasons: highlights }
-  }
-  return { verdict: 'CUIDADO', level: 'warning', score, reasons: [...highlights, ...issues] }
-}
-
 function useElapsed(startedAt) {
   const [elapsed, setElapsed] = useState(0)
   useEffect(() => {
@@ -449,7 +357,10 @@ export default function BotDetail() {
               <div className="p-2 rounded-lg bg-accent/20">
                 <BarChart size={20} className="text-accent" />
               </div>
-              <h3 className="text-lg font-bold text-white">Relatório de Backtest (Últimas 500 Velas)</h3>
+              <h3 className="text-lg font-bold text-white">
+                Relatório de Backtest · {backtestResult.strategy_id} {backtestResult.symbol} {backtestResult.timeframe}
+                <span className="ml-2 text-xs font-normal text-muted">{backtestResult.candles_count} velas · motor estrito (taxas, slippage, stop e trailing)</span>
+              </h3>
             </div>
             <button 
               onClick={() => setBacktestResult(null)}
@@ -504,7 +415,7 @@ export default function BotDetail() {
 
           {/* Recommendation block */}
           {(() => {
-            const rec = getBacktestRecommendation(backtestResult)
+            const rec = backtestResult.recommendation   // calculada no servidor, a mesma do Scanner
             const cfg = {
               success: { border: 'border-green-500/30', bg: 'bg-green-500/10', title: 'text-green-400', Icon: CheckCircle },
               warning: { border: 'border-yellow-500/30', bg: 'bg-yellow-500/10', title: 'text-yellow-400', Icon: AlertTriangle },

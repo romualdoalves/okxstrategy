@@ -542,7 +542,7 @@ export default function BatchBacktest() {
         const sym = assetMode ? unit : symbol          // ativo da requisição
         setCategoryProgress(unit, 'running', { error: '' })
         const scan = await requestCategoryScan(
-          { category: cat, symbol: sym, strict: true, ...(stopWhenSuitable ? { stop_when_suitable: true } : {}) },
+          { category: cat, symbol: sym, ...(stopWhenSuitable ? { stop_when_suitable: true } : {}) },
           3,
         )
         if (!scan.ok) {

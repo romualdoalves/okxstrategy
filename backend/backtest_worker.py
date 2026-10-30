@@ -31,10 +31,10 @@ def _workers() -> int:
         return 2
 
 
-def run_strict_job(strategy_id: str, candles: list, extra_candles: Optional[dict]) -> dict:
+def run_strict_job(strategy_id: str, candles: list, extra_candles: Optional[dict], params: Optional[dict] = None) -> dict:
     """Executa um backtest estrito completo (roda no processo worker)."""
     from .backtest_engine import BacktestEngine
-    return BacktestEngine(strategy_id).run_strict_sync(candles, extra_candles=extra_candles)
+    return BacktestEngine(strategy_id, params or None).run_strict_sync(candles, extra_candles=extra_candles)
 
 
 def _get_pool() -> ProcessPoolExecutor:
@@ -51,11 +51,12 @@ def shutdown_pool() -> None:
         _pool = None
 
 
-async def run_strict_async(strategy_id: str, candles: list, extra_candles: Optional[dict] = None) -> dict:
+async def run_strict_async(strategy_id: str, candles: list, extra_candles: Optional[dict] = None,
+                           params: Optional[dict] = None) -> dict:
     loop = asyncio.get_running_loop()
     try:
-        return await loop.run_in_executor(_get_pool(), run_strict_job, strategy_id, candles, extra_candles)
+        return await loop.run_in_executor(_get_pool(), run_strict_job, strategy_id, candles, extra_candles, params)
     except (BrokenProcessPool, OSError, RuntimeError) as exc:
         log.warning("Pool de backtest indisponível (%s); usando thread.", exc)
         shutdown_pool()
-        return await asyncio.to_thread(run_strict_job, strategy_id, candles, extra_candles)
+        return await asyncio.to_thread(run_strict_job, strategy_id, candles, extra_candles, params)

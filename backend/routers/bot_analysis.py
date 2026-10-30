@@ -13,8 +13,7 @@ from fastapi import Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ..database import AiAnalysisLogModel, BotModel, SignalLogModel, TradeModel, get_db
-from ..backtest_engine import BacktestEngine
-from ..optimizer import StrategyOptimizer
+from ..backtest_service import BacktestUnavailable, run_for_symbol
 from ..exchanges.factory import build_exchange, map_timeframe_for_history
 from ..bot_manager import manager
 from ..common import FIXED_STAKE_USD
@@ -25,49 +24,14 @@ log = logging.getLogger("main")
 
 @router.post("/api/bots/{bot_id}/backtest")
 async def run_bot_backtest(bot_id: int, db: Session = Depends(get_db)):
+    """Backtest do bot: mesmo serviço do Scanner (backtest_service), com o símbolo, timeframe e parâmetros do bot."""
     bot = db.get(BotModel, bot_id)
     if not bot:
         raise HTTPException(404, "Bot não encontrado")
-    
-    # 1. Busca dados históricos (limitado a 500 para performance inicial)
-    import aiohttp
-    import pandas as pd
-
-    async with aiohttp.ClientSession() as session:
-        ex = build_exchange(session, demo=bot.demo)
-        bar = map_timeframe_for_history(bot.timeframe)
-        
-        candles = await ex.fetch_candles(bot.symbol, bar, limit=500)
-        if not candles:
-            raise HTTPException(400, "Não foi possível obter dados históricos")
-
-    # 2. Executa Motor
-    engine = BacktestEngine(bot.strategy_id, bot.strategy_params)
-    results = await engine.run(candles, stake_usd=FIXED_STAKE_USD)
-    
-    return results
-
-@router.post("/api/bots/{bot_id}/optimize")
-async def optimize_bot_params(bot_id: int, db: Session = Depends(get_db)):
-    bot = db.get(BotModel, bot_id)
-    if not bot:
-        raise HTTPException(404, "Bot não encontrado")
-    
-    # 1. Busca dados históricos (limitado a 500 para otimização)
-    import aiohttp
-
-    async with aiohttp.ClientSession() as session:
-        ex = build_exchange(session, demo=bot.demo)
-        bar = map_timeframe_for_history(bot.timeframe)
-        candles = await ex.fetch_candles(bot.symbol, bar, limit=500)
-        if not candles:
-            raise HTTPException(400, "Dados insuficientes")
-
-    # 2. Executa Otimizador
-    optimizer = StrategyOptimizer(bot.strategy_id)
-    best_results = await optimizer.optimize(candles, stake_usd=FIXED_STAKE_USD)
-    
-    return best_results
+    try:
+        return await run_for_symbol(bot.strategy_id, bot.symbol, bot.timeframe, bot.strategy_params or None)
+    except BacktestUnavailable as exc:
+        raise HTTPException(422, str(exc)) from exc
 
 @router.get("/api/bots/{bot_id}/ai-analysis")
 async def bot_ai_analysis(bot_id: int, db: Session = Depends(get_db)):
