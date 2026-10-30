@@ -8,6 +8,7 @@ import StrategyChecklist, { getCriteriaCount } from './StrategyChecklist'
 import AssetPriceCard from './AssetPriceCard'
 import StudyBadge from './StudyBadge'
 import { useMarketStatus } from '../hooks/useMarketStatus'
+import { botMood } from '../botMood'
 
 const FIXED_STAKE_USD = 100
 
@@ -69,6 +70,11 @@ export default function BotCard({ bot, liveStatus }) {
   const pctIsNet = netPct !== null
   const profitLock = isPositioned ? rt.profit_lock : null
   const trailing = isPositioned ? rt.trailing : null
+  const mood = botMood({
+    isPositioned,
+    netPct: netPct,
+    trailingLocked: Boolean(rt.tp1_done) && (rt.guaranteed_pnl ?? 0) > 0,
+  })
 
   const startedAt   = rt.started_at ?? null
   const cycle       = rt.execution_cycle ?? {}
@@ -138,6 +144,17 @@ export default function BotCard({ bot, liveStatus }) {
     >
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
+        <span
+          key={mood.key}
+          role="img"
+          aria-label={`Humor do bot: ${mood.label}`}
+          title={`${mood.label} — ${mood.reason}`}
+          className={`mr-3 shrink-0 select-none text-3xl leading-none transition-all duration-500 ${
+            mood.key === 'exultant' ? 'animate-pulse drop-shadow-[0_0_8px_rgba(250,204,21,0.6)]' : ''
+          } ${!isRunning && !isPositioned ? 'opacity-40 grayscale' : ''}`}
+        >
+          {mood.emoji}
+        </span>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <h3 className="font-bold truncate text-white/90 group-hover:text-accent transition-colors">
