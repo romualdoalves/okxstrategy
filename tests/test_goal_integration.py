@@ -21,7 +21,7 @@ class GoalIntegrationBase(OrderPathBase):
         bot.config.goal_pct, bot.config.goal_window_hours = 1.0, window
         bot.config.goal_started_at, bot.config.goal_outcome = started, None
         with self.db() as db:
-            db.add(BotModel(id=1, name="bot1", strategy_id="TF001", symbol=SYMBOL, active=True,
+            db.add(BotModel(id=1, name="bot1", strategy_id="TF002", symbol=SYMBOL, active=True,
                             goal_pct=1.0, goal_window_hours=window, goal_started_at=started))
             db.commit()
         return bot

@@ -32,7 +32,7 @@ class TestSymbolChangeGuard(unittest.TestCase):
         self.addCleanup(self.db.close)
 
     def add_bot(self, bot_id=1, symbol="BTC-USDT", active=False):
-        bot = BotModel(id=bot_id, name=f"bot{bot_id}", strategy_id="TF001", symbol=symbol, active=active)
+        bot = BotModel(id=bot_id, name=f"bot{bot_id}", strategy_id="TF002", symbol=symbol, active=active)
         self.db.add(bot)
         self.db.commit()
         return bot

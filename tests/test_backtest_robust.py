@@ -60,7 +60,7 @@ class TestStats(unittest.TestCase):
 
 class TestEngineRobust(unittest.TestCase):
     def test_run_strict_reports_consistent_robust_block(self):
-        res = BacktestEngine("TF001").run_strict_sync(synthetic_candles(700, seed=2))
+        res = BacktestEngine("TF003").run_strict_sync(synthetic_candles(700, seed=2))
         rb = res["robust"]
         self.assertEqual(rb["all"]["trades"], res["trades_count"])
         self.assertEqual(rb["in_sample"]["trades"] + rb["out_of_sample"]["trades"], res["trades_count"])
@@ -70,7 +70,7 @@ class TestEngineRobust(unittest.TestCase):
         """Com mais de STRICT_WINDOW candles o resultado depende só da janela: o início da série não importa."""
         from backend.backtest_engine import STRICT_WINDOW
         cs = synthetic_candles(STRICT_WINDOW + 400, seed=3)
-        full = BacktestEngine("TF001").run_strict_sync(cs)
+        full = BacktestEngine("TF003").run_strict_sync(cs)
         self.assertGreaterEqual(full["robust"]["bars_evaluated"], 400)
 
     def test_pool_matches_direct_run(self):
@@ -78,9 +78,9 @@ class TestEngineRobust(unittest.TestCase):
         os.environ["BACKTEST_WORKERS"] = "1"
         from backend import backtest_worker
         cs = synthetic_candles(500, seed=4)
-        direct = BacktestEngine("TF001").run_strict_sync(cs)
+        direct = BacktestEngine("TF003").run_strict_sync(cs)
         try:
-            pooled = asyncio.run(backtest_worker.run_strict_async("TF001", cs, None))
+            pooled = asyncio.run(backtest_worker.run_strict_async("TF003", cs, None))
         finally:
             backtest_worker.shutdown_pool()
         self.assertEqual(pooled["trades_count"], direct["trades_count"])

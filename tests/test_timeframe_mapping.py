@@ -103,3 +103,12 @@ class TestSpacingGuards(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_unknown_timeframe_fails_instead_of_becoming_15m():
+    import pytest
+    from backend.exchanges.factory import map_timeframe_for_history
+    for tf in ("2m", "7h", "", "abc"):
+        with pytest.raises(ValueError):
+            map_timeframe_for_history(tf)
+    assert map_timeframe_for_history("1h") == "1H" and map_timeframe_for_history("1D") == "1D"

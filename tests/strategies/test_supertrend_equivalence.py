@@ -28,7 +28,7 @@ def _clean(x):
     return round(x, 8) if isinstance(x, float) else x
 
 
-@pytest.mark.parametrize("key", sorted(GOLDEN))
+@pytest.mark.parametrize("key", sorted(k for k in GOLDEN if k.split("|")[0] in REGISTRY))     # TF004 foi excluída
 def test_matches_pre_optimization_output(key):
     sid, seed, end = key.split("|")
     r = REGISTRY[sid]().compute_with_context(_walk(500, 3_600_000, int(seed))[:int(end)], {})

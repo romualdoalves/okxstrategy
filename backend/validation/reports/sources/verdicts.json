@@ -38,11 +38,6 @@
     "reason": "Sem trades até 2023 em 1D; só opera de 2024 em diante. Não é testável nesta janela.",
     "applied_params": {}
   },
-  "TF001": {
-    "verdict": "retired",
-    "reason": "Perde em quase todos os anos, com 50 a 150 trades por ano: excesso de operações sem vantagem.",
-    "applied_params": {}
-  },
   "TF003": {
     "verdict": "retired",
     "reason": "Perde na maioria dos anos, com 40 a 120 trades por ano: excesso de operações sem vantagem.",
@@ -55,11 +50,6 @@
       "sl_mult": 3.0
     },
     "note": "O stop passou de 2,0 para 3,0 ATR depois do walk-forward (único parâmetro em que os 3 ativos convergiram). Baseline e tabela por ano foram medidos com 3,0, com o limite de stop de 4 ATR que o bot usa."
-  },
-  "RG001": {
-    "verdict": "retired",
-    "reason": "Perde em todos os ativos (PF 0,07 a 0,36; só 5 a 14% de acertos, cerca de 13 trades por ano): excesso de operações sem vantagem.",
-    "applied_params": {}
   },
   "MR007": {
     "verdict": "watch",
@@ -74,34 +64,9 @@
     "reason": "Perde na ETH com qualquer parâmetro (PF 0,53 a 0,74) e teve -166 na SOL em 2022: compra a queda em mercado de baixa.",
     "applied_params": {}
   },
-  "TF004": {
-    "verdict": "retired",
-    "reason": "Reprovada no baseline 1D. Sem walk-forward.",
-    "applied_params": {}
-  },
   "TF005": {
     "verdict": "retired",
     "reason": "Reprovada no baseline 1D (BTC e ETH). Sem walk-forward.",
-    "applied_params": {}
-  },
-  "TF011": {
-    "verdict": "retired",
-    "reason": "Reprovada no baseline 1D. Sem walk-forward.",
-    "applied_params": {}
-  },
-  "TF012": {
-    "verdict": "retired",
-    "reason": "Reprovada no baseline 1D. Sem walk-forward.",
-    "applied_params": {}
-  },
-  "MR004": {
-    "verdict": "retired",
-    "reason": "Perde nos 3 ativos (PF 0,56 a 0,76) com cerca de 340 trades por ano: as taxas consomem qualquer vantagem. Fora da amostra também perde.",
-    "applied_params": {}
-  },
-  "PA011": {
-    "verdict": "retired",
-    "reason": "Perde nos 3 ativos (PF 0,67 a 0,73, probabilidade de PF acima de 1 de no máximo 4%) e também fora da amostra.",
     "applied_params": {}
   },
   "MR001": {
@@ -109,208 +74,15 @@
     "reason": "Quase não opera (4 a 30 trades em 4 anos) e perde no BTC e na ETH; o PF 1,10 da SOL não se repete fora da amostra (5 trades, nenhum ganho).",
     "applied_params": {}
   },
-  "MR005": {
-    "verdict": "retired",
-    "reason": "Perde de forma grave (PF 0,32 a 0,54) com mais de 900 trades por ano: sobretudo taxas.",
-    "applied_params": {}
-  },
-  "MR006": {
-    "verdict": "retired",
-    "reason": "Perde nos 3 ativos (PF 0,47 a 0,58) e fora da amostra (PF 0,25 a 0,61).",
-    "applied_params": {}
-  },
-  "MR008": {
-    "verdict": "retired",
-    "reason": "Perde nos 3 ativos (PF 0,47 a 0,72) e fora da amostra (PF 0,24 a 0,33).",
-    "applied_params": {}
-  },
-  "PA001": {
-    "verdict": "retired",
-    "reason": "Perde nos 3 ativos (PF 0,38 a 0,68) com cerca de 250 trades por ano: sem vantagem sobre as taxas.",
-    "applied_params": {}
-  },
-  "PA002": {
-    "verdict": "retired",
-    "reason": "Perde nos 3 ativos (PF 0,05 a 0,61) e quase não opera (3 a 7 trades por ano).",
-    "applied_params": {}
-  },
-  "PA003": {
-    "verdict": "retired",
-    "reason": "Perde nos 3 ativos (PF 0,55 a 0,63) com cerca de 270 a 350 trades por ano.",
-    "applied_params": {}
-  },
   "PA004": {
     "verdict": "retired",
     "reason": "Perde nos 3 ativos (PF 0,23 a 0,55) com poucos trades; o PF 3,59 fora da amostra na SOL são só 6 trades.",
-    "applied_params": {}
-  },
-  "PA007": {
-    "verdict": "retired",
-    "reason": "Perde nos 3 ativos (PF 0,41 a 0,63) com cerca de 800 a 900 trades por ano: sobretudo taxas.",
-    "applied_params": {}
-  },
-  "PA014": {
-    "verdict": "retired",
-    "reason": "Perde nos 3 ativos (PF 0,38 a 0,59) com cerca de 600 trades por ano: sobretudo taxas.",
-    "applied_params": {}
-  },
-  "PA015": {
-    "verdict": "retired",
-    "reason": "Perde nos 3 ativos (PF 0,50 a 0,65) com cerca de 380 a 400 trades por ano.",
-    "applied_params": {}
-  },
-  "SC003": {
-    "verdict": "retired",
-    "reason": "Perde nos 3 ativos (PF 0,36 a 0,58) com cerca de 850 a 980 trades por ano: sobretudo taxas.",
-    "applied_params": {}
-  },
-  "SC005": {
-    "verdict": "retired",
-    "reason": "Perde nos 3 ativos (PF 0,44 a 0,75) e fora da amostra (PF 0,40 a 0,53).",
-    "applied_params": {}
-  },
-  "PA008": {
-    "verdict": "retired",
-    "reason": "Nunca opera (0 trades): o código define o range de abertura pelas primeiras velas da janela (não pelo horário de Nova York) e o reteste exige fechar acima e abaixo da mesma linha ao mesmo tempo, o que é impossível. Precisa ser reescrita.",
     "applied_params": {}
   },
   "PA005": {
     "verdict": "watch",
     "applied_params": {},
     "reason": "Opera pouco (cerca de 6 trades por ano). PF 1,20 no BTC e 1,27 na SOL, mas com p5 abaixo de 0,35 e a ETH perde (PF 0,27): amostra pequena e sem consistência. Sem walk-forward."
-  },
-  "MR003": {
-    "verdict": "retired",
-    "reason": "Perde nos 3 ativos (PF 0,17 a 0,36) e fora da amostra (PF 0,13 a 0,28), com cerca de 100 trades por ano.",
-    "applied_params": {}
-  },
-  "PA010": {
-    "verdict": "retired",
-    "reason": "Perde de forma grave (PF 0,25 a 0,45) com cerca de 1700 trades por ano: sobretudo taxas.",
-    "applied_params": {}
-  },
-  "PA013": {
-    "verdict": "retired",
-    "reason": "Perde nos 3 ativos (PF 0,13 a 0,90, p5 abaixo de 0,11). O PF 0,90 da ETH são 24 trades.",
-    "applied_params": {}
-  },
-  "PA016": {
-    "verdict": "retired",
-    "reason": "Nunca opera (0 trades): só emite sinal de venda a descoberto (reversão de topo) e em spot SELL é saída de posição, então nunca há entrada. Precisa ser reescrita para o lado comprado.",
-    "applied_params": {}
-  },
-  "SC001": {
-    "verdict": "retired",
-    "reason": "Perde nos 3 ativos (PF 0,41 a 0,78) e fora da amostra (PF 0,32 a 0,69).",
-    "applied_params": {}
-  },
-  "SC004": {
-    "verdict": "retired",
-    "reason": "Perde de forma grave (PF 0,17 a 0,35) com mais de 1100 trades por ano: sobretudo taxas.",
-    "applied_params": {}
-  },
-  "RG002": {
-    "verdict": "insufficient",
-    "applied_params": {},
-    "timeframe": "—",
-    "reason": "Depende de dados que só existem ao vivo e não têm histórico para reproduzir no backtest: o grafo de correlação entre ativos montado ao vivo. O backtest pula esta estratégia.",
-    "caveats": [
-      "Não foi medida: o backtest só reproduz candles de preço e esta estratégia usa o grafo de correlação entre ativos montado ao vivo.",
-      "Para estudá-la seria preciso gravar esses dados ao vivo por meses antes de qualquer backtest.",
-      "Sem veredito: nada nesta página indica que ela ganha ou perde."
-    ]
-  },
-  "NW001": {
-    "verdict": "insufficient",
-    "applied_params": {},
-    "timeframe": "—",
-    "reason": "Depende de dados que só existem ao vivo e não têm histórico para reproduzir no backtest: o grafo de ativos montado ao vivo. O backtest pula esta estratégia.",
-    "caveats": [
-      "Não foi medida: o backtest só reproduz candles de preço e esta estratégia usa o grafo de ativos montado ao vivo.",
-      "Para estudá-la seria preciso gravar esses dados ao vivo por meses antes de qualquer backtest.",
-      "Sem veredito: nada nesta página indica que ela ganha ou perde."
-    ]
-  },
-  "RG003": {
-    "verdict": "insufficient",
-    "applied_params": {},
-    "timeframe": "—",
-    "reason": "Depende de dados que só existem ao vivo e não têm histórico para reproduzir no backtest: o snapshot de opções (GEX) da Deribit. O backtest pula esta estratégia.",
-    "caveats": [
-      "Não foi medida: o backtest só reproduz candles de preço e esta estratégia usa o snapshot de opções (GEX) da Deribit.",
-      "Para estudá-la seria preciso gravar esses dados ao vivo por meses antes de qualquer backtest.",
-      "Sem veredito: nada nesta página indica que ela ganha ou perde."
-    ]
-  },
-  "SC002": {
-    "verdict": "insufficient",
-    "applied_params": {},
-    "timeframe": "—",
-    "reason": "Depende de dados que só existem ao vivo e não têm histórico para reproduzir no backtest: os saldos de grandes carteiras (market players). O backtest pula esta estratégia.",
-    "caveats": [
-      "Não foi medida: o backtest só reproduz candles de preço e esta estratégia usa os saldos de grandes carteiras (market players).",
-      "Para estudá-la seria preciso gravar esses dados ao vivo por meses antes de qualquer backtest.",
-      "Sem veredito: nada nesta página indica que ela ganha ou perde."
-    ]
-  },
-  "IF001": {
-    "verdict": "insufficient",
-    "applied_params": {},
-    "timeframe": "—",
-    "reason": "Depende de dados que só existem ao vivo e não têm histórico para reproduzir no backtest: eventos on-chain ao vivo. O backtest pula esta estratégia.",
-    "caveats": [
-      "Não foi medida: o backtest só reproduz candles de preço e esta estratégia usa eventos on-chain ao vivo.",
-      "Para estudá-la seria preciso gravar esses dados ao vivo por meses antes de qualquer backtest.",
-      "Sem veredito: nada nesta página indica que ela ganha ou perde."
-    ]
-  },
-  "IF002": {
-    "verdict": "insufficient",
-    "applied_params": {},
-    "timeframe": "—",
-    "reason": "Depende de dados que só existem ao vivo e não têm histórico para reproduzir no backtest: preços de corretoras descentralizadas (DEX) ao vivo. O backtest pula esta estratégia.",
-    "caveats": [
-      "Não foi medida: o backtest só reproduz candles de preço e esta estratégia usa preços de corretoras descentralizadas (DEX) ao vivo.",
-      "Para estudá-la seria preciso gravar esses dados ao vivo por meses antes de qualquer backtest.",
-      "Sem veredito: nada nesta página indica que ela ganha ou perde."
-    ]
-  },
-  "PA009": {
-    "verdict": "insufficient",
-    "applied_params": {},
-    "timeframe": "2m",
-    "reason": "É desenhada para gráfico de 2 minutos e a base não tem candles de 2m. Não há histórico para backtest.",
-    "caveats": [
-      "Não foi medida: sem candles de 2 minutos na base.",
-      "Para estudá-la seria preciso coletar esse histórico (a OKX só entrega janelas curtas de 2m).",
-      "Sem veredito: nada nesta página indica que ela ganha ou perde."
-    ]
-  },
-  "PA012": {
-    "verdict": "insufficient",
-    "applied_params": {},
-    "timeframe": "1m",
-    "reason": "É desenhada para gráfico de 1 minuto e a base só tem cerca de 0,3 ano de candles de 1m, pouco para concluir (e inclui poucos trades).",
-    "caveats": [
-      "Não foi medida: histórico de 1m de apenas cerca de 0,3 ano.",
-      "Com mais histórico (os candles de 1m acumulam ao vivo) ela pode ser estudada.",
-      "Sem veredito: nada nesta página indica que ela ganha ou perde."
-    ]
-  },
-  "RG004": {
-    "verdict": "retired",
-    "reason": "Nunca opera (0 trades em 4 anos nos 3 ativos). O critério C4 exige probabilidade de transição de Markov de 55% e relação risco-retorno de 2 contra a resistência mais próxima, e essa combinação nunca se realiza (também não em testes com dados sintéticos). Precisa ser reescrita.",
-    "applied_params": {}
-  },
-  "MR002": {
-    "verdict": "retired",
-    "reason": "Perde nos 3 ativos (PF 0,41 a 0,59) e fora da amostra (0,33 a 0,48), com cerca de 1200 trades por ano: sobretudo taxas.",
-    "applied_params": {}
-  },
-  "PA006": {
-    "verdict": "retired",
-    "reason": "Perde nos 3 ativos (PF 0,06 a 0,80) e fora da amostra (PF 0 em 2 a 7 trades), com só 5 a 8 trades por ano: sem amostra e sem vantagem.",
-    "applied_params": {}
   },
   "TF002": {
     "verdict": "watch",
@@ -341,16 +113,6 @@
       "Valores em US$ do backtest (taxa 0,1% por lado e slippage 0,05%); não garantem resultado futuro."
     ],
     "reason": "Perde no BTC e na ETH (PF 0,72 e 0,80, com 73 e 91 trades); só a SOL tem PF 1,42, e fora da amostra BTC 0,31 e SOL 0,90. Sem consistência."
-  },
-  "TF016": {
-    "verdict": "retired",
-    "applied_params": {},
-    "reason": "Perde nos 3 ativos (PF 0,45 a 0,52) e fora da amostra (0,24 a 0,62), com cerca de 43 trades por ano."
-  },
-  "IF003": {
-    "verdict": "retired",
-    "applied_params": {},
-    "reason": "Perde de forma grave (PF 0,26 a 0,46) com mais de 800 trades por ano: sobretudo taxas."
   },
   "T000": {
     "verdict": "insufficient",

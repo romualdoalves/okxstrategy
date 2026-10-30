@@ -16,34 +16,16 @@ import AssetPriceCard    from '../components/AssetPriceCard'
 import AiUsageNotice     from '../components/AiUsageNotice'
 
 const CHART_SUBTITLE = {
-  TF001: 'EMA 21/55 + VWAP',
   TF002: 'RSI + MA200',
   TF013: 'Bollinger Bands',
   TF003: 'MACD + Trend MA',
-  TF004: 'SuperTrend',
   TF005: 'Joe Di Napoli',
-  TF011: 'EMA Fast + Slow (CFM)',
-  PA002: 'ABCD + EMA21',
   TF007: 'Multi-TF EMA 4H/1H + MACD',
   MR001: 'Mean Reversion EMA',
   TF008: 'EMA 21 Semanal',
-  PA001: 'Pivot Sniper + EMA21/50',
-  PA003: 'OTR Value Zones',
-  SC001: 'Opening Range High/Low',
   TF010: 'Stochastic Reversal',
   PA004: 'Three Line Bar + EMA200',
-  MR002: 'Double Bollinger Bands',
-  MR005: 'Bollinger Triple Threat',
   PA005: 'Liquidity Sweep',
-  TF012: 'Liquidity Clusters',
-  MR003: 'Warrior Trading Reversal',
-  MR004: 'Hilega Milega RSI',
-  RG002: 'Graph Regime EMA Fast/Slow',
-  SC003: 'Whale Flow VWAP + VAH/VAL',
-  IF001: 'Onchain Whale Context',
-  IF003: 'Event-Driven Flow',
-  NW001: 'Influencers and Followers',
-  RG001: 'Markov Regime + EMA21',
 }
 
 function useElapsed(startedAt) {

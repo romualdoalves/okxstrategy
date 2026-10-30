@@ -42,7 +42,10 @@ def map_timeframe_for_history(timeframe: str) -> str:
         "1h": "1H", "2h": "2H", "4h": "4H", "6h": "6H", "12h": "12H",
         "1d": "1D", "1w": "1W",
     }
-    return tf_map.get(tf.lower(), "15m")
+    if tf.lower() in tf_map:
+        return tf_map[tf.lower()]
+    # Antes caía em "15m" em silêncio: um bot de 2m rodaria em candles de 15m achando que eram de 2m.
+    raise ValueError(f"Timeframe desconhecido: {timeframe!r}")
 
 
 def map_timeframe_for_ws_channel(timeframe: str) -> str:

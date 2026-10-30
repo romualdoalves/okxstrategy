@@ -19,14 +19,6 @@ class StrategyOptimizer:
         
         # Define o espaço de busca para cada estratégia
         self.search_space = {
-            "TF001": {
-                "ema_fast": [13, 21, 34],
-                "ema_slow": [55, 89],
-                "atr_mult_sl": [1.2, 1.5, 2.0],
-                "tp1_pct": [1.5, 2.0, 3.0],
-                "entry_mode": [0, 1],
-                "cross_window": [1, 3, 5],
-            },
             "TF002": {
                 "rsi_oversold": [25, 30, 35],
                 "rsi_overbought": [65, 70, 75],
@@ -38,12 +30,6 @@ class StrategyOptimizer:
                 "macd_slow": [21, 26, 34],
                 "macd_signal": [7, 9],
                 "trend_ma": [100, 200],
-            },
-            "TF004": {
-                "atr_period": [10, 14],
-                "multiplier": [2.0, 3.0, 4.0],
-                "rsi_min": [45, 50, 55],
-                "sl_mult": [2.0, 2.5, 3.0],
             },
             "TF005": {
                 "ema_trend_len": [34, 50, 89, 144],
@@ -82,17 +68,6 @@ class StrategyOptimizer:
                 "ema_slow": [144, 200],
                 "tp_rr": [1.5, 2.0, 3.0],
             },
-            "TF011": {
-                "chop_max": [45.0, 50.0, 55.0],
-                "vol_mult": [1.0, 1.2, 1.5],
-                "min_gap_pct": [0.03, 0.05, 0.1],
-                "sl_mult": [2.0, 2.5, 3.0],
-            },
-            "TF012": {
-                "magnitude_length": [10, 14, 21],
-                "smoothing_length": [5, 9, 13],
-                "threshold_extreme": [1.2, 1.5, 2.0],
-            },
             "TF013": {
                 "bb_period": [20, 30, 50],
                 "bb_std": [1.8, 2.0, 2.5],
@@ -102,13 +77,6 @@ class StrategyOptimizer:
             "TF014": {
                 "ema_macro_period": [10, 20],
                 "ema_micro_period": [34, 50, 89],
-                "sl_mult": [1.5, 2.0, 2.5],
-                "tp1_rr": [1.5, 2.0, 3.0],
-            },
-            "TF016": {
-                "dominance_threshold": [100.0, 120.0, 150.0],
-                "ema_fast": [9, 13],
-                "ema_slow": [21, 34],
                 "sl_mult": [1.5, 2.0, 2.5],
                 "tp1_rr": [1.5, 2.0, 3.0],
             },
@@ -136,49 +104,6 @@ class StrategyOptimizer:
                 "buy_zone_pct": [4.0, 7.0, 10.0],
                 "sl_mult": [2.0, 2.5, 3.0],
             },
-            "MR002": {
-                "outer_length": [4, 6, 8],
-                "outer_std": [3.0, 4.0, 5.0],
-                "inner_length": [20, 30],
-                "inner_std": [1.8, 2.0, 2.5],
-                "rr_ratio": [2.0, 3.0],
-            },
-            "MR003": {
-                "bb_length": [20, 30],
-                "bb_std": [1.8, 2.0, 2.5],
-                "rsi_period": [9, 14, 21],
-                "ema_fast": [5, 9, 13],
-            },
-            "MR004": {
-                "rsi_period": [7, 9, 14],
-                "ema_rsi": [2, 3, 5],
-                "wma_rsi": [14, 21, 30],
-            },
-            "MR005": {
-                "rsi_length": [9, 14, 21],
-                "bb_length": [20, 30, 50],
-                "bb_std": [1.8, 2.0, 2.5],
-                "squeeze_perc": [10, 20, 30],
-                "rr_ratio": [2.0, 2.5, 3.0],
-            },
-            "PA001": {
-                "ema_period": [21, 50, 100],
-                "pivot_lookback": [3, 4, 5],
-                "ema_proximity_mult": [0.8, 1.0, 1.3],
-                "tp_rr": [2.0, 3.0, 4.0],
-            },
-            "PA002": {
-                "ema_period": [13, 21, 34],
-                "min_ema_slope_pct": [0.04, 0.08, 0.12],
-                "abcd_tolerance": [0.15, 0.25, 0.35],
-                "min_rr": [1.0, 1.2, 1.5],
-            },
-            "PA003": {
-                "range_lookback": [50, 80, 120],
-                "edge_zone_pct": [15.0, 20.0, 25.0],
-                "min_rr": [1.5, 2.0, 2.5],
-                "min_range_atr": [1.5, 2.0, 3.0],
-            },
             "PA004": {
                 "ema_trend": [100, 200],
                 "rr_trend": [1.0, 1.5],
@@ -191,68 +116,11 @@ class StrategyOptimizer:
                 "wick_ratio": [0.4, 0.5, 0.6],
                 "rr_ratio": [2.0, 3.0, 4.0],
             },
-            "PA006": {
-                "htf_swing_lookback": [15, 20, 30],
-                "wick_ratio": [0.45, 0.55, 0.65],
-                "choch_lookback": [20, 30, 40],
-                "tp1_rr": [1.2, 1.5, 2.0],
-            },
-            "PA007": {
-                "ema_fast": [13, 20, 34],
-                "ema_slow": [50, 89],
-                "zone_tolerance_pct": [2.0, 2.5, 3.0],
-                "min_criteria_to_trade": [2, 3],
-                "require_zone_or_choch": [1],
-                "sl_mult": [1.5, 2.0, 2.5],
-                "tp1_rr": [1.5, 2.0, 3.0],
-            },
-            "PA008": {
-                "orb_minutes": [15, 30, 45],
-                "max_volatility_range_pct": [1.0, 2.0, 3.0],
-                "sl_mult": [1.5, 2.0, 2.5],
-                "tp1_rr": [1.5, 2.0, 3.0],
-            },
-            "SC001": {
-                "atr_mult_threshold": [0.15, 0.20, 0.30],
-                "rejection_ratio": [1.5, 2.0, 2.5],
-                "tp_rr": [1.5, 2.0, 3.0],
-            },
-            "SC002": {
-                "min_body_break_pct": [0.01, 0.02, 0.05],
-                "vwap_rejection_max_dist_pct": [0.5, 0.8, 1.2],
-                "min_volume_ratio": [0.8, 1.0, 1.2],
-                "rr_ratio": [1.2, 1.5, 2.0],
-            },
-            "SC003": {
-                "window": [14, 20, 30],
-                "std_dev": [1.5, 2.0, 2.5],
-                "vol_threshold": [1.2, 1.5, 2.0],
-            },
-            "RG001": {
-                "window": [14, 20, 30],
-                "threshold": [0.03, 0.05, 0.08],
-                "min_train": [120, 180, 252],
-                "tp1_pct": [2.0, 3.0, 5.0],
-            },
             "RG005": {
                 "lookback": [14, 20, 30],
                 "bull_threshold": [3.0, 5.0, 8.0],
                 "bear_threshold": [-3.0, -5.0, -8.0],
                 "sl_mult": [1.5, 2.0, 3.0],
-            },
-            "RG004": {
-                "location_z": [0.25, 0.35, 0.5],
-                "expansion_threshold": [1.2, 1.5, 2.0],
-                "prob_threshold": [0.52, 0.55, 0.6],
-                "tp1_rr": [1.5, 2.0, 3.0],
-            },
-            "IF003": {
-                "atr_multiplier": [0.10, 0.15, 0.25],
-                "vol_window": [80, 100, 150],
-                "poc_tolerance": [0.006, 0.008, 0.010],
-                "extended_poc_tolerance": [0.010, 0.012, 0.015],
-                "min_criteria_to_trade": [2, 3],
-                "rr_ratio": [1.5, 2.0, 3.0],
             },
             "S006": {
                 "outer_length": [14, 20, 26],

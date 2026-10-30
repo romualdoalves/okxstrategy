@@ -316,20 +316,20 @@ def result_with(trades_pct, total_profit, pf, n_candles=1200):
 def test_build_row_and_rank_keep_non_qualifying_strategies_out_of_the_top():
     good, cs = result_with([1.3] * 20, 26.0, 2.4, n_candles=500)       # operações espalhadas por todo o período
     weak, _ = result_with([-0.5, 0.2] * 10, -4.0, 0.5, n_candles=500)
-    row_good = svc.build_row("TF001", "SOL-USDT", "15m", good, cs)
+    row_good = svc.build_row("TF002", "SOL-USDT", "15m", good, cs)
     row_weak = svc.build_row("TF002", "SOL-USDT", "15m", weak, cs)
     assert row_good["qualifies"] is True and row_good["unmet"] == [] and row_good["chance_pct"] == 100.0
     assert row_good["gross_chance_pct"] == 100.0 and row_good["windows_illusory"] == 0
     assert row_weak["qualifies"] is False and row_weak["unmet"] and row_weak["chance_pct"] == 0.0
     top, closest = svc.rank([row_good, row_weak, dict(row_good, strategy_id="X", qualifies=False, unmet=["x"], chance_pct=1.0)])
-    assert [r["strategy_id"] for r in top] == ["TF001"]
+    assert [r["strategy_id"] for r in top] == ["TF002"]
     assert all(not r["qualifies"] for r in closest)
 
 
 def test_build_row_returns_none_without_enough_data_or_on_engine_errors():
     cs = hourly_candles(50)
-    assert svc.build_row("TF001", "SOL-USDT", "15m", {"closed_trades": [], "trades_count": 0}, cs) is None
-    assert svc.build_row("TF001", "SOL-USDT", "15m", {"error": "x"}, hourly_candles(500)) is None
+    assert svc.build_row("TF002", "SOL-USDT", "15m", {"closed_trades": [], "trades_count": 0}, cs) is None
+    assert svc.build_row("TF002", "SOL-USDT", "15m", {"error": "x"}, hourly_candles(500)) is None
 
 
 # ── top 5 dinâmico ───────────────────────────────────────────────────────────────────────────────────────────────
@@ -448,9 +448,9 @@ def test_bots_list_returns_the_goal_even_without_a_running_bot():
     for model in (BotModel, TradeModel):
         model.__table__.create(engine)
     db = sessionmaker(bind=engine)()
-    db.add(BotModel(id=1, name="META 1% · TF001", strategy_id="TF001", symbol="SOL-USDT", goal_pct=1.0,
+    db.add(BotModel(id=1, name="META 1% · TF002", strategy_id="TF002", symbol="SOL-USDT", goal_pct=1.0,
                     goal_window_hours=24.0, goal_started_at=T0, goal_ended_at=T0 + timedelta(hours=2), goal_outcome="stop_loss"))
-    db.add(BotModel(id=2, name="comum", strategy_id="TF001", symbol="XRP-USDT"))
+    db.add(BotModel(id=2, name="comum", strategy_id="TF002", symbol="XRP-USDT"))
     db.commit()
     by_id = {b["id"]: b for b in bots_router.list_bots(db)}
     assert by_id[1]["goal"]["outcome"] == "stop_loss" and by_id[1]["goal"]["done"] is True
@@ -476,7 +476,7 @@ def test_full_scan_uses_only_free_top5_assets_loads_only_what_it_needs_and_ranks
     top = ["BTC-USDT", "ETH-USDT", "SOL-USDT", "XRP-USDT", "ZEC-USDT"]
     monkeypatch.setattr(svc, "fetch_top_spot_assets", fake_top(top))
     monkeypatch.setattr(svc, "_used_symbols", lambda: {"BTC-USDT", "ETH-USDT"})
-    monkeypatch.setattr(svc, "candidate_strategies", lambda: [("TF001", "15m"), ("MR002", "15m"), ("TF008", "1D")])
+    monkeypatch.setattr(svc, "candidate_strategies", lambda: [("TF002", "15m"), ("TF005", "15m"), ("TF008", "1D")])
     loads = []
 
     async def fake_load(symbol, tfs, limits=None):
@@ -487,7 +487,7 @@ def test_full_scan_uses_only_free_top5_assets_loads_only_what_it_needs_and_ranks
     weak, _ = result_with([-0.5, 0.2] * 10, -4.0, 0.5, n_candles=500)
 
     async def fake_run(sid, candles, extra, params):
-        return good if sid == "TF001" else weak
+        return good if sid == "TF002" else weak
     monkeypatch.setattr(svc, "run_strict_async", fake_run)
     monkeypatch.setattr(svc, "_state", svc._fresh_state())
 
@@ -498,8 +498,8 @@ def test_full_scan_uses_only_free_top5_assets_loads_only_what_it_needs_and_ranks
     assert [sym for sym, _, _ in loads] == free                      # nunca carrega ativo com bot nem fora do top 5
     assert loads[0][2]["15m"] == 3000 and loads[0][2]["1W"] == svc.EXTRA_CAP    # só as velas necessárias
     assert st["progress"]["done"] == st["progress"]["total"] == 9
-    assert [r["strategy_id"] for r in st["top"]] == ["TF001"] * 3 and all(r["symbol"] in free for r in st["top"])
-    assert all(r["strategy_id"] != "TF001" for r in st["closest"]) and len(st["closest"]) == 3
+    assert [r["strategy_id"] for r in st["top"]] == ["TF002"] * 3 and all(r["symbol"] in free for r in st["top"])
+    assert all(r["strategy_id"] != "TF002" for r in st["closest"]) and len(st["closest"]) == 3
     assert st["qualified"] == 3 and st["evaluated"] == 9
 
 

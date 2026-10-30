@@ -133,7 +133,7 @@ class OrderPathBase(unittest.TestCase):
 
     def make_bot(self, bot_id=1, symbol=SYMBOL, stop_loss=-50.0):
         cfg = SimpleNamespace(
-            id=bot_id, name=f"bot{bot_id}", strategy_id="TF001", exchange="okx", symbol=symbol,
+            id=bot_id, name=f"bot{bot_id}", strategy_id="TF002", exchange="okx", symbol=symbol,
             timeframe="15m", demo=True, stake_usd=100.0, leverage=1, stop_loss_usd=stop_loss,
             strategy_params={}, active=True, baseline_balance=0.0,
         )

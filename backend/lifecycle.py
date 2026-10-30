@@ -24,7 +24,7 @@ log = logging.getLogger("main")
 def normalize_bots(db) -> None:
     """
     Ajustes idempotentes aplicados a todos os bots a cada startup:
-      - IDs legados da Fábrica antiga (F001/F002) -> taxonomia semântica;
+      - ID legado da Fábrica antiga (F001) -> taxonomia semântica;
       - símbolos spot (remove -SWAP/-FUTURES);
       - stake fixo de US$100 e alavancagem 1x (política do projeto, ver SKILL.md).
     O timeframe NÃO é tocado: ele é escolhido na criação/edição do bot e precisa sobreviver a restarts
@@ -32,7 +32,6 @@ def normalize_bots(db) -> None:
     """
     from sqlalchemy import text
     db.execute(text("UPDATE bots SET strategy_id = 'TF014' WHERE strategy_id = 'F001'"))
-    db.execute(text("UPDATE bots SET strategy_id = 'PA007' WHERE strategy_id = 'F002'"))
     db.execute(text("UPDATE bots SET symbol = REPLACE(symbol, '-SWAP', '') WHERE symbol LIKE '%-SWAP'"))
     db.execute(text("UPDATE bots SET symbol = REPLACE(symbol, '-FUTURES', '') WHERE symbol LIKE '%-FUTURES'"))
     db.execute(text("UPDATE bots SET leverage = 1 WHERE leverage IS NULL OR leverage <> 1"))
@@ -66,7 +65,16 @@ async def startup():
         log.info("Normalização de IDs, símbolos, stakes e alavancagem concluída.")
 
         active = db.query(BotModel).filter(BotModel.active == True).all()
+        from .strategies.registry import REGISTRY
         for bot in active:
+            if bot.strategy_id not in REGISTRY:
+                # Estratégia excluída do app: o bot não pode rodar. Fica desativado (nada é fechado na corretora:
+                # se havia posição aberta, feche-a manualmente na OKX).
+                bot.active = False
+                db.commit()
+                log.error("Bot %d (%s) DESATIVADO: a estratégia %s foi excluída do app. "
+                          "Confira na OKX se há posição aberta.", bot.id, bot.symbol, bot.strategy_id)
+                continue
             try:
                 manager.start_bot(bot)
                 log.info("Bot %d re-iniciado automaticamente.", bot.id)

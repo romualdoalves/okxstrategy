@@ -370,16 +370,13 @@ Migrations adicionais são executadas via lista `migrations` em `database.py` us
 
 | Prefixo | Categoria | Exemplos |
 |---------|-----------|---------|
-| **TF** | Trend Following | TF001 EMA+VWAP, TF003 MACD, TF005 Di Napoli |
-| **MR** | Mean Reversion | MR001 ByeBot, MR004 Hilega Milega |
-| **PA** | Price Action | PA001 Pivot Sniper, PA002 ABCD, PA003 OTR |
-| **SC** | Scalping | SC001 Pattern Scalp, SC003 Whale Flow VWAP |
-| **RG** | Regime | RG001 Markov, RG002 Graph Regime |
-| **IF** | Information | IF001 Onchain Whale, IF003 Event-Driven Flow |
-| **NW** | Network | NW001 Influencers & Followers |
+| **TF** | Trend Following | TF002 RSI+MA, TF003 MACD, TF005 Di Napoli, TF008, TF009 |
+| **MR** | Mean Reversion | MR001 ByeBot, MR007 |
+| **PA** | Price Action | PA004 Three Line Bar, PA005 Liquidity Sweep |
+| **RG** | Regime | RG005 |
 | **T** | Test | T000 |
 
-- Prefixos F, FX, B, A, S, I, M **não existem mais**.
+- Prefixos F, FX, B, A, S, I, M **não existem mais**. SC, IF e NW também não: em 2026-10-30 foram excluídas 38 estratégias (perdiam em todos os ativos, não operavam ou dependiam de dados ao vivo que o backtest não testa). O git guarda o histórico.
 - Arquivos: `backend/strategies/factory/[a-z]{2}[0-9]{3}.py`
 - O código de TODAS as estratégias vive em `backend/strategies/factory/*.py`, versionado no git (fonte única). Não há volume Docker nem cópia do código no banco (`strategies.code_py` é legado e não é mais gravado).
 - A Fábrica grava o arquivo no container para uso imediato; para levá-lo ao git: `bash scripts/migrate_factory_to_git.sh` (no VPS). O `deploy.sh` ABORTA se houver estratégia só no container.

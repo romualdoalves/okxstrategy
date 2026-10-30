@@ -43,7 +43,7 @@ def test_parse_baseline():
     b = R.parse_baseline((R._SRC / "baseline.txt").read_text(encoding="utf-8"))
     assert b["MR004"]["BTC-USDT"]["trades"] == 1622 and b["MR004"]["BTC-USDT"]["tf"] == "1H"
     assert b["PA008"]["SOL-USDT"]["trades"] == 0 and b["SC005"]["SOL-USDT"]["oos_pf"] == 0.528
-    assert json.loads((R._DIR / "PA008.json").read_text(encoding="utf-8"))["timeframe"] == "15m"
+    assert json.loads((R._DIR / "TF008.json").read_text(encoding="utf-8"))["timeframe"] == "1D"
 
 
 def test_unknown_strategy_has_no_study():
@@ -76,7 +76,7 @@ def test_strategy_list_carries_verdict():
     app = FastAPI()
     app.include_router(strategies.router)
     by_id = {s["id"]: s for s in TestClient(app).get("/api/strategies").json()}
-    assert by_id["TF001"]["study_verdict"] == "retired" and by_id["TF009"]["study_verdict"] == "candidate"
+    assert by_id["TF003"]["study_verdict"] == "retired" and by_id["TF009"]["study_verdict"] == "candidate"
     # toda estratégia do registro tem veredito: nova estratégia sem estudo derruba este teste de propósito
     sem = [i for i, v in by_id.items() if v["study_verdict"] == "none"]
     assert not sem, f"sem estudo: {sem}"
@@ -91,7 +91,7 @@ def test_creating_bot_with_retired_strategy_is_blocked_unless_forced():
     app.include_router(bots.router)
     app.dependency_overrides[get_db] = lambda: None
     c = TestClient(app)
-    body = {"name": "x", "strategy_id": "TF001", "symbol": "BTC-USDT", "timeframe": "1D"}
+    body = {"name": "x", "strategy_id": "TF003", "symbol": "BTC-USDT", "timeframe": "1D"}
     r = c.post("/api/bots", json=body)
     assert r.status_code == 409 and "aposentada" in r.json()["detail"]
     # com force_retired o bloqueio do estudo não dispara (a falha, se houver, vem de etapas seguintes)
@@ -103,7 +103,7 @@ def test_creating_bot_with_retired_strategy_is_blocked_unless_forced():
 
 
 def test_insufficient_data_reports_have_reason_and_no_tables():
-    for sid in ("RG002", "RG003", "SC002", "IF001", "IF002", "NW001", "PA009", "PA012"):
+    for sid in ("T000",):
         r = R.load_study(sid)
         assert r["verdict"] == "insufficient" and r["verdict_label"] == "Dados insuficientes"
         assert not r["walkforward"] and not r["baseline"] and r["caveats"] and r["reason"]

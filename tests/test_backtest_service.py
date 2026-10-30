@@ -79,8 +79,8 @@ def test_the_frontend_no_longer_has_its_own_copy_of_the_scoring():
 # ── o serviço é o mesmo caminho para todos ──────────────────────────────────────────────────────────────────────
 def test_service_result_matches_the_engine_exactly(inline_worker):
     cs = synthetic_candles(700, seed=2)
-    direct = BacktestEngine("TF001").run_strict_sync(cs)
-    via = run(svc.run_one("TF001", "BTC-USDT", "1h", {"1h": cs}))
+    direct = BacktestEngine("TF003").run_strict_sync(cs)
+    via = run(svc.run_one("TF003", "BTC-USDT", "1h", {"1h": cs}))
     for key in ("total_profit", "trades_count", "profit_factor", "max_drawdown", "win_rate", "final_balance"):
         assert via[key] == direct[key], key
     assert via["backtest_mode"] == "strict" and via["candles_count"] == 700
@@ -88,8 +88,8 @@ def test_service_result_matches_the_engine_exactly(inline_worker):
 
 def test_scanner_and_bot_detail_agree_and_only_detail_keeps_the_trades(inline_worker):
     cs = synthetic_candles(700, seed=3)
-    scan = run(svc.run_one("TF001", "BTC-USDT", "1h", {"1h": cs}, detail=False))
-    bot = run(svc.run_one("TF001", "BTC-USDT", "1h", {"1h": cs}, detail=True))
+    scan = run(svc.run_one("TF003", "BTC-USDT", "1h", {"1h": cs}, detail=False))
+    bot = run(svc.run_one("TF003", "BTC-USDT", "1h", {"1h": cs}, detail=True))
     assert scan["recommendation"] == bot["recommendation"]            # mesmo veredito e mesma pontuação
     assert scan["total_profit"] == bot["total_profit"]
     assert "trades" not in scan and "closed_trades" not in scan and "assumptions" not in scan
@@ -98,8 +98,8 @@ def test_scanner_and_bot_detail_agree_and_only_detail_keeps_the_trades(inline_wo
 
 def test_bot_params_reach_the_engine(inline_worker):
     cs = synthetic_candles(700, seed=4)
-    run(svc.run_one("TF001", "BTC-USDT", "1h", {"1h": cs}, params={"ema_fast": 21, "ema_slow": 89}))
-    assert inline_worker[-1]["params"] == {"ema_fast": 21, "ema_slow": 89}
+    run(svc.run_one("TF003", "BTC-USDT", "1h", {"1h": cs}, params={"macd_fast": 8, "macd_slow": 21}))
+    assert inline_worker[-1]["params"] == {"macd_fast": 8, "macd_slow": 21}
 
 
 def test_missing_extra_timeframe_is_na_and_never_runs_the_engine(inline_worker):
@@ -181,9 +181,9 @@ def test_scanner_runs_only_the_strategies_the_user_ticked(monkeypatch):
 
     monkeypatch.setattr(scanner_router, "load_candles_for", fake_load)
     monkeypatch.setattr(scanner_router, "run_one", fake_run_one)
-    req = scanner_router.CategoryBacktestRequest(category="TF", symbol="BTC-USDT", include_strategies=["TF008", "TF001"])
+    req = scanner_router.CategoryBacktestRequest(category="TF", symbol="BTC-USDT", include_strategies=["TF008", "TF003"])
     out = run(scanner_router.run_category_backtest(req))
-    assert sorted(calls) == ["TF001", "TF008"] and out["total"] == 2
+    assert sorted(calls) == ["TF003", "TF008"] and out["total"] == 2
     # sem o filtro continua rodando a categoria inteira
     calls.clear()
     run(scanner_router._run_category_backtest_core("TF", "BTC-USDT"))
@@ -198,7 +198,7 @@ def test_scanner_with_nothing_ticked_is_a_clear_404(monkeypatch):
 
 def test_engine_closed_trades_carry_gross_net_and_peak(inline_worker):
     cs = synthetic_candles(900, seed=11)
-    res = BacktestEngine("TF001").run_strict_sync(cs)
+    res = BacktestEngine("TF003").run_strict_sync(cs)
     assert res["closed_trades"]
     for t in res["closed_trades"]:
         assert t["gross_profit_pct"] - t["profit_pct"] == pytest.approx(t["fees"])         # stake 100: bruto = líquido + taxas

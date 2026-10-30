@@ -101,8 +101,8 @@ export default function Chart({ candles = [], indicators = {}, strategyId = '', 
       })
     }
 
-    const showEmaVwap = strategyId === 'TF001'
-    const showEma21 = strategyId === 'PA002' || strategyId === 'PA001' || strategyId === 'RG001'
+    const showEmaVwap = false
+    const showEma21 = false
 
     setSeriesVisible(chartRef.current, ema21Ref, showEmaVwap || showEma21, {
       color: '#00bcd4', lineWidth: 1, title: showEma21 ? 'EMA21' : 'C1 EMA21',
@@ -113,7 +113,7 @@ export default function Chart({ candles = [], indicators = {}, strategyId = '', 
     setSeriesVisible(chartRef.current, vwapRef, showEmaVwap, {
       color: '#9c27b0', lineWidth: 1, title: 'C2 VWAP', lineStyle: 2,
     })
-    setSeriesVisible(chartRef.current, ema50Ref, strategyId === 'PA001', {
+    setSeriesVisible(chartRef.current, ema50Ref, false, {
       color: '#ff9800', lineWidth: 2, title: 'C1 EMA50',
     })
 
@@ -276,14 +276,6 @@ function getStrategyOverlays(strategyId, indicators = {}) {
       : []
   }
 
-  if (strategyId === 'TF001') { // EMA + VWAP
-    return [
-      ...line('ema_fast', 'C2 EMA21', '#00bcd4', 2, 1),
-      ...line('ema_slow', 'C1 EMA55', '#ff9800', 2, 2),
-      ...line('vwap',     'C2 VWAP',  '#9c27b0', 2, 1),
-    ]
-  }
-
   if (strategyId === 'TF013') { // Bollinger
     return [
       ...line('bb_upper', 'C1 BB superior', '#26a69a'),
@@ -298,29 +290,6 @@ function getStrategyOverlays(strategyId, indicators = {}) {
 
   if (strategyId === 'TF003') { // MACD
     return line('trend_ma', 'C3 Trend MA', '#f59e0b', 2, 2)
-  }
-
-  if (strategyId === 'PA003') { // Value Zones (OTR)
-    return [
-      ...line('range_high', 'C1 Topo OTR', '#ef5350', 2, 2),
-      ...line('range_low',  'C1 Fundo OTR', '#26a69a', 2, 2),
-    ]
-  }
-
-  if (strategyId === 'TF011') { // CFM
-    return [
-      ...line('ema_slow', 'C1 EMA Slow', '#ff9800', 2, 2),
-      ...line('ema_fast', 'C2 EMA Fast', '#00bcd4', 2, 2),
-    ]
-  }
-
-  if (strategyId === 'PA002') { // ABCD
-    return [
-      ...line('a_price', 'C3 Topo A (Alvo)', '#26a69a', 2, 2),
-      ...line('b_price', 'C1 Fundo B', '#f59e0b'),
-      ...line('c_price', 'C1 Topo C', '#9ca3af'),
-      ...line('d_price', 'C1 Fundo D (Stop)', '#ef5350', 2, 2),
-    ]
   }
 
   if (strategyId === 'TF007') { // Multi-TF
@@ -338,55 +307,12 @@ function getStrategyOverlays(strategyId, indicators = {}) {
     ]
   }
 
-  if (strategyId === 'TF012') { // Liquidity Clusters
-    return line('ema200', 'C1 EMA200', '#f59e0b', 2, 2)
-  }
-
-  if (strategyId === 'MR003') { // Warrior Reversal
-    return [
-      ...line('bb_upper', 'C1 BB Superior', '#ef5350', 2, 1),
-      ...line('bb_mid',   'C2 BB Média',    '#9ca3af', 3, 1),
-      ...line('bb_lower', 'C1 BB Inferior', '#26a69a', 2, 1),
-      ...line('ema9',     'C3 EMA9',        '#f59e0b', 2, 1),
-    ]
-  }
-
   if (strategyId === 'MR001') { // Mean Reversion
     return line('ema', 'C1 EMA Base', '#f59e0b', 2, 2)
   }
 
   if (strategyId === 'TF008') { // Cycle Shift
     return line('ema_21_w', 'C1 EMA 21 Semanal', '#f59e0b', 1, 2)
-  }
-
-  if (strategyId === 'PA001') { // Pivot Sniper
-    return line('sr_level', 'C1 Pivot Sniper', '#ff9800', 1, 2)
-  }
-
-  if (strategyId === 'SC001') { // Pattern Scalp
-    return [
-      ...line('open_high', 'C1 Opening High', '#ef5350', 2, 1),
-      ...line('open_low',  'C1 Opening Low',  '#26a69a', 2, 1),
-    ]
-  }
-
-  if (strategyId === 'RG002') { // Graph Regime
-    return [
-      ...line('ema_fast', 'C1 EMA Fast', '#ef5350', 2, 1),
-      ...line('ema_slow', 'C2 EMA Slow', '#26a69a', 2, 1),
-    ]
-  }
-
-  if (strategyId === 'SC003') { // Whale Flow
-    return [
-      ...line('vah', 'C1 VAH Inst.', '#ef5350', 2, 2),
-      ...line('val', 'C1 VAL Inst.', '#26a69a', 2, 2),
-      ...line('vwap', 'POC Equilíbrio', '#9c27b0', 3, 1),
-    ]
-  }
-
-  if (strategyId === 'TF004') { // SuperTrend
-    return line('supertrend', 'SuperTrend Stop', '#00bcd4', 2, 2)
   }
 
   if (strategyId === 'TF005') { // Joe Di Napoli
@@ -408,23 +334,6 @@ function getStrategyOverlays(strategyId, indicators = {}) {
       ...line('ema_trend', 'C2 EMA200',  '#f59e0b', 2, 2),
       ...line('c3_high',   'C1 High C3', '#26a69a', 2, 1),
       ...line('c1_low',    'C1 Low C1',  '#ef5350', 2, 1),
-    ]
-  }
-
-  if (strategyId === 'MR002') { // Double Bollinger
-    return [
-      ...line('outer_u', 'BB 4σ Superior', '#ef5350', 2, 1),
-      ...line('inner_u', 'BB 2σ Superior', '#ef5350', 3, 1),
-      ...line('inner_l', 'BB 2σ Inferior', '#26a69a', 3, 1),
-      ...line('outer_l', 'BB 4σ Inferior', '#26a69a', 2, 1),
-    ]
-  }
-
-  if (strategyId === 'MR005') { // Bollinger Triple Threat
-    return [
-      ...line('bb_u', 'C1 BB Superior', '#26a69a'),
-      ...line('bb_m', 'C2 BB Media',    '#9ca3af', 3),
-      ...line('bb_l', 'C1 BB Inferior', '#ef5350'),
     ]
   }
 
