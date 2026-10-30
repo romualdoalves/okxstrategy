@@ -14,14 +14,15 @@ const outFile = path.join(root, '.tmp_scanner_state.bundle.mjs')
 
 const STRATEGIES = ['TF001', 'TF002', 'TF003', 'MR001', 'MR002', 'MR003', 'MR004', 'MR005', 'PA001', 'PA005', 'IF001'].map(id => ({ id, name: id + ' nome' }))
 const BOTS = [{ id: 186, symbol: 'DOT-USDT', strategy_id: 'TF001' }]
+const TOP_ASSETS = { assets: ['BTC-USDT', 'ETH-USDT', 'SOL-USDT', 'HYPE-USDT', 'ZEC-USDT'].map(symbol => ({ symbol })) }
 
 const stubs = {
   'react-router-dom': `export const useNavigate = () => () => {}`,
   '@tanstack/react-query': `
-    const DATA = { strategies: globalThis.__STRATEGIES, bots: globalThis.__BOTS }
+    const DATA = { strategies: globalThis.__STRATEGIES, bots: globalThis.__BOTS, 'top-assets': globalThis.__TOP_ASSETS }
     export const useQuery = ({ queryKey }) => ({ data: DATA[queryKey[0]], isLoading: false })
     export const useQueryClient = () => ({ invalidateQueries: () => {}, setQueryData: () => {} })`,
-  '../api': `export const getStrategies = () => {}; export const getBots = () => {}; export const createBot = () => {}`,
+  '../api': `export const getStrategies = () => {}; export const getBots = () => {}; export const createBot = () => {}; export const getTopAssets = () => {}`,
   '../auth': `export const authFetch = () => {}`,
 }
 
@@ -43,6 +44,7 @@ function render(category, symbol) {
   }).then(async () => {
     globalThis.__STRATEGIES = STRATEGIES
     globalThis.__BOTS = BOTS
+    globalThis.__TOP_ASSETS = TOP_ASSETS
     const mod = await import('file:///' + outFile.split(String.fromCharCode(92)).join('/') + '?v=' + Math.random())
     return renderToStaticMarkup(React.createElement(mod.default))
   })
