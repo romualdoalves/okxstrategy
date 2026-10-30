@@ -23,6 +23,7 @@ import Integrity        from './pages/Integrity'
 import ErrorBoundary   from './components/ErrorBoundary'
 import ToastContainer  from './components/ToastContainer'
 import OkxConnectModal from './components/OkxConnectModal'
+import VersionBox from './components/VersionBox'
 import { disconnectOkxAccount, getOkxStatus, getHealth } from './api'
 import { toast } from './hooks/useToast'
 
@@ -114,22 +115,16 @@ function AppShell() {
           <TrendingUp size={22} className="text-accent shrink-0" />
           <div className="flex flex-col">
             <span className="font-bold text-base tracking-tight leading-tight">{t('app.brand')}</span>
-            {(loadedVersion || healthData?.version) && (
-              <span
-                className={`text-[10px] font-mono leading-tight tracking-wider ${versionStale ? 'text-yellow-400' : 'text-muted/50'}`}
-                title={versionStale
-                  ? `Esta aba roda v${loadedVersion}; o servidor já está em v${serverVersion}. Atualize a página.`
-                  : 'Versão desta aba = versão do servidor'}
-              >
-                v{loadedVersion ?? healthData.version}
-                {!versionStale && healthData?.timestamp && ` • ${new Date(healthData.timestamp * 1000).toLocaleString(lang, {
-                  month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-                })}`}
-                {versionStale && ` ≠ servidor v${serverVersion}`}
-              </span>
-            )}
           </div>
         </div>
+
+        {/* Quadro de versão: hash desta aba, status x servidor e data/hora da publicação */}
+        <VersionBox
+          loadedVersion={loadedVersion}
+          serverVersion={serverVersion}
+          timestamp={healthData?.timestamp}
+          stale={versionStale}
+        />
 
         {/* Nav */}
         <nav className="flex-1 p-3 space-y-1">
