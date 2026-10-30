@@ -167,3 +167,30 @@ def test_scanner_only_orchestrates_and_delegates_every_run_to_the_service(monkey
     assert calls and all(c[1] == "ETH-USDT" for c in calls)
     assert out["total"] >= len(calls)                                  # + as N/A de contexto externo
     assert len({c[0] for c in calls}) == len(calls)                    # cada estratégia roda uma vez
+
+
+def test_scanner_runs_only_the_strategies_the_user_ticked(monkeypatch):
+    calls = []
+
+    async def fake_load(symbol, timeframes):
+        return {tf: ["candles"] for tf in timeframes}
+
+    async def fake_run_one(sid, symbol, tf, cache, **kw):
+        calls.append(sid)
+        return {"strategy_id": sid, "recommendation": {"verdict": "CUIDADO", "score": 5.0}}
+
+    monkeypatch.setattr(scanner_router, "load_candles_for", fake_load)
+    monkeypatch.setattr(scanner_router, "run_one", fake_run_one)
+    req = scanner_router.CategoryBacktestRequest(category="TF", symbol="BTC-USDT", include_strategies=["TF008", "TF001"])
+    out = run(scanner_router.run_category_backtest(req))
+    assert sorted(calls) == ["TF001", "TF008"] and out["total"] == 2
+    # sem o filtro continua rodando a categoria inteira
+    calls.clear()
+    run(scanner_router._run_category_backtest_core("TF", "BTC-USDT"))
+    assert len(calls) > 2
+
+
+def test_scanner_with_nothing_ticked_is_a_clear_404(monkeypatch):
+    with pytest.raises(HTTPException) as e:
+        run(scanner_router._run_category_backtest_core("TF", "BTC-USDT", include_strategies=[]))
+    assert e.value.status_code == 404

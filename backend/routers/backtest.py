@@ -30,6 +30,8 @@ class CategoryBacktestRequest(BaseModel):
     category: str
     symbol: str
     exclude_strategies: list[str] = []
+    # Se informado, roda SÓ estas estratégias da categoria (as que o usuário marcou na tela).
+    include_strategies: Optional[list[str]] = None
     # Se verdadeiro, o scan da categoria para assim que uma estratégia for "adequada para iniciar"
     # (veredito INICIAR com robustez aprovada); as demais que ainda não começaram são canceladas.
     stop_when_suitable: bool = False
@@ -75,6 +77,7 @@ async def run_category_backtest(req: CategoryBacktestRequest):
         category=req.category,
         symbol=req.symbol,
         exclude_strategies=req.exclude_strategies,
+        include_strategies=req.include_strategies,
         stop_when_suitable=req.stop_when_suitable,
     )
 
@@ -84,6 +87,7 @@ async def _run_category_backtest_core(
     symbol: str,
     exclude_strategies: list[str] | None = None,
     stop_when_suitable: bool = False,
+    include_strategies: list[str] | None = None,
 ) -> dict:
     """
     Núcleo do backtest de categoria (endpoint /api/backtest/category). Só orquestra: carregamento de candles,
@@ -94,6 +98,9 @@ async def _run_category_backtest_core(
     exclude_strategies = exclude_strategies or []
     prefix = category.upper()
     strategy_ids = [sid for sid in REGISTRY if sid.upper().startswith(prefix) and sid not in exclude_strategies]
+    if include_strategies is not None:
+        wanted = set(include_strategies)
+        strategy_ids = [sid for sid in strategy_ids if sid in wanted]
     if not strategy_ids:
         raise HTTPException(404, f"Nenhuma estratégia encontrada para categoria '{prefix}'")
 

@@ -26,10 +26,11 @@ const stubs = {
   '../auth': `export const authFetch = () => {}`,
 }
 
-function render(category, symbol) {
-  const src = fs.readFileSync(pagePath, 'utf8')
+function render(category, symbol, { nonePicked = false } = {}) {
+  let src = fs.readFileSync(pagePath, 'utf8')
     .replace("useState('TF')", `useState(${JSON.stringify(category)})`)
     .replace("const [symbol, setSymbol]     = useState('')", `const [symbol, setSymbol]     = useState(${JSON.stringify(symbol)})`)
+  if (nonePicked) src = src.replace('useState(() => new Set(categoryStrategies.map(st => st.id)))', 'useState(() => new Set())')
   fs.writeFileSync(tmpPage, src)
   return build({
     entryPoints: [tmpPage], bundle: true, platform: 'node', format: 'esm', outfile: outFile, write: true,
@@ -58,30 +59,33 @@ try {
   console.log('Estado 1: categoria MR + Todos os ativos (o caso que quebrou)')
   const h1 = await render('MR', '__ALL_ASSETS__'); const t1 = text(h1)
   check('renderiza sem exceção', true)
-  check('mostra "Todos os ativos (7)" (8 ativos menos o que já tem bot... DOT não está na lista: 8)', /Todos os ativos \(\d+\)/.test(t1))
+  check('mostra "Todos os ativos (N)"', /Todos os ativos \(\d+\)/.test(t1))
   check('mostra a estimativa de tempo', t1.includes('Estimativa grosseira'))
-  check('botão de executar fala em "Todos os Ativos"', t1.includes('Executar MR em Todos os Ativos'))
-  check('sem mensagem de combinação proibida', !t1.includes('não é permitido'))
-  check('botão "Todas" (categorias) fica desabilitado', /<button[^>]*disabled[^>]*>\s*Todas/.test(h1))
+  check('botão de executar fala em "Todos os Ativos" com a contagem de estratégias', t1.includes('Executar 5 estratégia(s) em Todos os Ativos'))
 
-  console.log('Estado 2: Todas as categorias + Todos os ativos (proibido)')
-  const h2 = await render('ALL', '__ALL_ASSETS__'); const t2 = text(h2)
-  check('mostra o aviso de combinação não permitida', t2.includes('Todas as categorias + Todos os ativos não é permitido'))
-  check('botão de executar fica desabilitado', /<button[^>]*disabled[^>]*class="btn[^"]*"|<button[^>]*class="btn[^"]*"[^>]*disabled/.test(h2))
-  check('botão "Todos os ativos" fica desabilitado', /<button[^>]*disabled[^>]*>\s*Todos os ativos/.test(h2))
+  console.log('Estado 2: categoria MR + um ativo (fluxo normal)')
+  const h2 = await render('MR', 'BTC-USDT'); const t2 = text(h2)
+  check('botão de executar com a contagem de estratégias marcadas', t2.includes('Executar 5 estratégia(s) selecionada(s)'))
+  check('sem estimativa nem aviso', !t2.includes('Estimativa grosseira') && !t2.includes('não é permitido'))
+  check('lista as estratégias da categoria com checkbox', t2.includes('MR001') && t2.includes('MR005') && (h2.match(/type="checkbox"/g) || []).length >= 6)
+  check('mostra "5 de 5 selecionadas" e os atalhos', t2.includes('5 de 5 selecionadas') && t2.includes('Selecionar todas') && t2.includes('Limpar'))
 
-  console.log('Estado 3: categoria MR + um ativo (fluxo normal)')
-  const h3 = await render('MR', 'BTC-USDT'); const t3 = text(h3)
-  check('botão de executar normal', t3.includes('Executar Backtest da Categoria'))
-  check('sem estimativa nem aviso', !t3.includes('Estimativa grosseira') && !t3.includes('não é permitido'))
+  console.log('Estado 3: o que foi removido não aparece')
+  check('o título do bloco de ativos é "Top 5 Ativos"', t2.includes('Top 5 Ativos'))
+  check('explica que são os 5 de maior volume em 24h', t2.includes('maior volume em 24h'))
+  check('sem a categoria "Todas"', !t2.includes('Todas as categorias') && !/>\s*Todas\s*</.test(h2))
+  check('sem a opção "Outro"', !t2.includes('Outro') && !h2.includes('placeholder='))
+  check('mostra os 5 ativos do ranking numerados', ['#1', '#5', 'BTC-USDT', 'ZEC-USDT'].every(x => t2.includes(x)))
 
-  console.log('Estado 4: Todas as categorias + um ativo (fluxo normal)')
-  const t4 = text(await render('ALL', 'ETH-USDT'))
-  check('botão de executar "Todas as Categorias"', t4.includes('Executar Todas as Categorias'))
+  console.log('Estado 4: nenhuma estratégia marcada')
+  const h4 = await render('MR', 'BTC-USDT', { nonePicked: true }); const t4 = text(h4)
+  check('mostra "0 de 5 selecionadas"', t4.includes('0 de 5 selecionadas'))
+  check('botão de executar fica desabilitado', /<button[^>]*disabled[^>]*class="btn[^"]*"|<button[^>]*class="btn[^"]*"[^>]*disabled/.test(h4))
 
   console.log('Estado 5: tela inicial (TF, nenhum ativo)')
   const t5 = text(await render('TF', ''))
   check('renderiza a tela inicial', t5.includes('Scanner de Backtest'))
+  check('TF mostra as 3 estratégias marcadas', t5.includes('3 de 3 selecionadas'))
 } catch (e) {
   failures++
   console.log('  FALHA exceção ao renderizar:', e.message)

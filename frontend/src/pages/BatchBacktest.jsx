@@ -18,7 +18,8 @@ const CATEGORIES = [
 
 // Reserva se a OKX estiver inacessível; o universo real é o top 5 SPOT por volume (getTopAssets)
 const FALLBACK_SYMBOLS = ['BTC-USDT', 'ETH-USDT', 'SOL-USDT', 'BNB-USDT', 'XRP-USDT']
-const ALL_ASSETS = '__ALL_ASSETS__'          // opção "Todos os ativos" (só com uma categoria específica)
+const ALL_ASSETS = '__ALL_ASSETS__'          // opção "Todos os ativos" (os livres, sem bot, do top 5)
+const prefixOf = id => (id || '').match(/^([A-Z]+)/i)?.[1]?.toUpperCase()
 const SECONDS_PER_STRATEGY = 15              // referência medida: ~15 s por estratégia (2 workers)
 const CONSISTENT_MIN_ASSETS = 3              // aprovada em >= 3 ativos = "consistente"
 
@@ -460,21 +461,43 @@ export default function BatchBacktest() {
   const { data: topData }         = useQuery({ queryKey: ['top-assets'], queryFn: getTopAssets, staleTime: 60_000 })
   const SYMBOLS = topData?.assets?.map(a => a.symbol) ?? FALLBACK_SYMBOLS
 
-  const strategyCounts = strategies.reduce((acc, s) => {
-    const prefix = (s.id || '').match(/^([A-Z]+)/i)?.[1]?.toUpperCase()
+  const strategyCounts = strategies.reduce((acc, st) => {
+    const prefix = prefixOf(st.id)
     if (prefix) acc[prefix] = (acc[prefix] || 0) + 1
     return acc
   }, {})
+  const categoryStrategies = strategies
+    .filter(st => prefixOf(st.id) === category)
+    .sort((a, b) => a.id.localeCompare(b.id))
+  // Estratégias marcadas da categoria: começam todas marcadas (e voltam a todas ao trocar de categoria)
+  const [pickedIds, setPickedIds] = useState(() => new Set(categoryStrategies.map(st => st.id)))
+  const botStrategyIds = new Set(bots.map(b => b.strategy_id))
+  const usingTopAssets = Boolean(topData?.assets?.length)               // false = OKX inacessível, lista reserva
 
   const usedSymbols = new Set(bots.map(b => b.symbol))
   const isAllAssets = symbol === ALL_ASSETS
   const freeAssets = SYMBOLS.filter(s => !usedSymbols.has(s))          // ativos sem bot (os únicos que dá para operar)
-  const comboForbidden = category === 'ALL' && isAllAssets             // demora demais: proibido
-  const estimateMin = isAllAssets && category !== 'ALL'
-    ? Math.max(1, Math.round(((strategyCounts[category] || 0) * freeAssets.length * SECONDS_PER_STRATEGY) / 60))
+  const pickedCount = pickedIds.size
+  const estimateMin = isAllAssets
+    ? Math.max(1, Math.round((pickedCount * freeAssets.length * SECONDS_PER_STRATEGY) / 60))
     : null
   const selectedList = Object.values(selectedRows)
 
+
+  // Ao escolher a categoria (ou quando a lista de estratégias chega), todas as dela vêm marcadas.
+  useEffect(() => {
+    setPickedIds(new Set(categoryStrategies.map(st => st.id)))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [category, strategies.length])
+
+  function toggleStrategy(id) {
+    setPickedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   useEffect(() => {
     if (!loading) return undefined
@@ -512,16 +535,12 @@ export default function BatchBacktest() {
     setBulkMessage(null)
     setError(null)
     try {
-      if (category === 'ALL' && symbol === ALL_ASSETS) {
-        throw new Error('Todas as categorias + Todos os ativos não é permitido (levaria horas). Escolha uma categoria ou um ativo.')
+      if (pickedIds.size === 0) {
+        throw new Error('Selecione ao menos uma estratégia para executar.')
       }
       const assetMode = symbol === ALL_ASSETS
-      // unidade de scan: um ativo (modo "Todos os ativos") ou uma categoria (modo "Todas as categorias")
-      const categoriesToScan = assetMode
-        ? freeAssets
-        : category === 'ALL'
-        ? CATEGORIES.map(c => c.id).filter(cat => (strategyCounts[cat] || 0) > 0)
-        : [category]
+      // unidade de scan: um ativo (modo "Todos os ativos") ou a categoria escolhida
+      const categoriesToScan = assetMode ? freeAssets : [category]
       if (!categoriesToScan.length) {
         throw new Error(assetMode ? 'Nenhum ativo livre (sem bot) para escanear.' : 'Nenhuma estratégia elegível para escanear.')
       }
@@ -542,7 +561,7 @@ export default function BatchBacktest() {
         const sym = assetMode ? unit : symbol          // ativo da requisição
         setCategoryProgress(unit, 'running', { error: '' })
         const scan = await requestCategoryScan(
-          { category: cat, symbol: sym, ...(stopWhenSuitable ? { stop_when_suitable: true } : {}) },
+          { category: cat, symbol: sym, include_strategies: [...pickedIds], ...(stopWhenSuitable ? { stop_when_suitable: true } : {}) },
           3,
         )
         if (!scan.ok) {
@@ -722,24 +741,7 @@ export default function BatchBacktest() {
         {/* Category selector */}
         <div>
           <label className="text-xs text-muted uppercase tracking-wider mb-2 block">Categoria</label>
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
-            <button
-              onClick={() => !isAllAssets && setCategory('ALL')}
-              disabled={isAllAssets}
-              title={isAllAssets
-                ? 'Não combina com "Todos os ativos" (levaria horas). Escolha um ativo para usar todas as categorias.'
-                : 'Executa todas as categorias disponíveis para o ativo selecionado'}
-              className={`px-3 py-2 rounded-lg text-sm font-bold border transition-all ${
-                isAllAssets
-                  ? 'opacity-35 cursor-not-allowed bg-white/3 border-white/8 text-muted'
-                  : category === 'ALL'
-                  ? 'bg-accent/20 border-accent/50 text-accent'
-                  : 'bg-white/5 border-white/10 text-muted hover:text-white hover:border-white/20'
-              }`}
-            >
-              Todas
-              <div className="text-[9px] font-normal opacity-70 truncate">Todas as categorias</div>
-            </button>
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
             {CATEGORIES.map(cat => {
               const count    = strategyCounts[cat.id] ?? 0
               const catBots  = bots.filter(b => (b.strategy_id || '').startsWith(cat.id))
@@ -777,27 +779,87 @@ export default function BatchBacktest() {
             })}
           </div>
           {category && (
-            <p className="text-xs text-muted mt-2">
-              {category === 'ALL'
-                ? 'Executa todas as categorias disponíveis para o ativo selecionado.'
-                : CATEGORIES.find(c => c.id === category)?.description}
-            </p>
+            <p className="text-xs text-muted mt-2">{CATEGORIES.find(c => c.id === category)?.description}</p>
+          )}
+
+          {categoryStrategies.length > 0 && (
+            <div className="mt-3 rounded-lg border border-white/10 bg-white/[0.03] p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                <span className="text-xs text-muted uppercase tracking-wider">Estratégias de {category}</span>
+                <div className="flex items-center gap-3 text-[11px]">
+                  <span className="text-muted">{pickedCount} de {categoryStrategies.length} selecionadas</span>
+                  <button
+                    type="button"
+                    onClick={() => setPickedIds(new Set(categoryStrategies.map(st => st.id)))}
+                    disabled={loading}
+                    className="text-accent hover:underline disabled:opacity-50"
+                  >
+                    Selecionar todas
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPickedIds(new Set())}
+                    disabled={loading}
+                    className="text-muted hover:text-white hover:underline disabled:opacity-50"
+                  >
+                    Limpar
+                  </button>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1.5 max-h-60 overflow-y-auto pr-1">
+                {categoryStrategies.map(st => {
+                  const checked = pickedIds.has(st.id)
+                  return (
+                    <label
+                      key={st.id}
+                      title={st.description || st.name}
+                      className={`flex items-center gap-2 rounded-md border px-2 py-1.5 text-xs cursor-pointer select-none transition-colors ${
+                        checked ? 'border-accent/40 bg-accent/10 text-white' : 'border-white/10 bg-white/5 text-muted hover:text-white'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleStrategy(st.id)}
+                        disabled={loading}
+                        className="accent-[rgb(var(--accent-rgb))]"
+                      />
+                      <span className="font-mono font-bold shrink-0">{st.id}</span>
+                      <span className="truncate text-[11px] opacity-80">{(st.name || '').replace(new RegExp('^' + st.id + '\\s*[-–]\\s*'), '')}</span>
+                      {botStrategyIds.has(st.id) && (
+                        <span className="ml-auto shrink-0 text-[9px] font-bold text-green-400/80">bot</span>
+                      )}
+                    </label>
+                  )
+                })}
+              </div>
+            </div>
           )}
         </div>
 
         {/* Symbol */}
         <div className="flex flex-wrap items-end gap-3">
           <div className="flex-1 min-w-[160px]">
-            <label className="text-xs text-muted uppercase tracking-wider mb-2 block">Ativo</label>
+            <label className="text-xs text-muted uppercase tracking-wider mb-0.5 block">
+              {usingTopAssets ? 'Top 5 Ativos' : 'Ativos (lista reserva — OKX indisponível)'}
+            </label>
+            <p className="text-[11px] text-muted/70 mb-2">
+              {usingTopAssets
+                ? 'Os 5 pares spot X-USDT de maior volume em 24h na OKX (sem stablecoins). Ativos que já têm bot ficam desabilitados.'
+                : 'Não foi possível consultar o ranking da OKX; usando uma lista reserva.'}
+            </p>
             <div className="flex gap-2 flex-wrap">
-              {SYMBOLS.map(s => {
+              {SYMBOLS.map((s, idx) => {
                 const inUse = usedSymbols.has(s)
+                const info = topData?.assets?.find(a => a.symbol === s)
                 return (
                   <button
                     key={s}
                     onClick={() => !inUse && setSymbol(s)}
                     disabled={inUse}
-                    title={inUse ? 'Já existe um bot usando este ativo' : undefined}
+                    title={inUse
+                      ? 'Já existe um bot usando este ativo'
+                      : info ? `#${idx + 1} em volume · US$ ${(info.volume_usd_24h / 1e6).toFixed(0)} mi em 24h · ${info.change_24h_pct >= 0 ? '+' : ''}${info.change_24h_pct}%` : undefined}
                     className={`px-2.5 py-1 rounded text-xs font-mono border transition-all ${
                       inUse
                         ? 'opacity-35 cursor-not-allowed bg-white/3 border-white/8 text-muted line-through'
@@ -806,18 +868,16 @@ export default function BatchBacktest() {
                         : 'bg-white/5 border-white/10 text-muted hover:text-white'
                     }`}
                   >
-                    {s}
+                    <span className="opacity-50 mr-1">#{idx + 1}</span>{s}
                   </button>
                 )
               })}
               <button
                 onClick={() => setSymbol(ALL_ASSETS)}
-                disabled={category === 'ALL' || !freeAssets.length}
-                title={category === 'ALL'
-                  ? 'Não combina com "Todas as categorias" (levaria horas). Escolha uma categoria específica.'
-                  : `Roda a categoria em ${freeAssets.length} ativos sem bot e compara a consistência entre eles`}
+                disabled={!freeAssets.length}
+                title={`Roda as estratégias marcadas nos ${freeAssets.length} ativos do top 5 que não têm bot e compara a consistência entre eles`}
                 className={`px-2.5 py-1 rounded text-xs font-bold border transition-all ${
-                  category === 'ALL' || !freeAssets.length
+                  !freeAssets.length
                     ? 'opacity-35 cursor-not-allowed bg-white/3 border-white/8 text-muted'
                     : isAllAssets
                     ? 'bg-accent/20 border-accent/50 text-accent'
@@ -826,21 +886,10 @@ export default function BatchBacktest() {
               >
                 Todos os ativos ({freeAssets.length})
               </button>
-              <input
-                value={SYMBOLS.includes(symbol) || isAllAssets ? '' : symbol}
-                onChange={e => setSymbol(e.target.value.toUpperCase())}
-                placeholder="Outro (ex: LINK-USDT)"
-                className="px-2.5 py-1 rounded text-xs font-mono bg-white/5 border border-white/10 text-white placeholder-muted focus:outline-none focus:border-accent/50 w-36"
-              />
             </div>
-            {comboForbidden && (
-              <p className="text-[11px] text-red-300 mt-1.5">
-                Todas as categorias + Todos os ativos não é permitido (levaria horas). Escolha uma categoria ou um ativo.
-              </p>
-            )}
-            {isAllAssets && !comboForbidden && (
+            {isAllAssets && (
               <p className="text-[11px] text-muted mt-1.5">
-                {category} em {freeAssets.length} ativos sem bot ({freeAssets.map(a => a.replace('-USDT', '')).join(', ')}).
+                {pickedCount} estratégia(s) de {category} em {freeAssets.length} ativos sem bot ({freeAssets.map(a => a.replace('-USDT', '')).join(', ')}).
                 {estimateMin != null && ` Estimativa grosseira: ~${estimateMin} min (referência de ${SECONDS_PER_STRATEGY} s por estratégia).`}
               </p>
             )}
@@ -864,14 +913,18 @@ export default function BatchBacktest() {
 
           <button
             onClick={run}
-            disabled={loading || !symbol || comboForbidden || (isAllAssets && !freeAssets.length)}
+            disabled={loading || !symbol || pickedCount === 0 || (isAllAssets && !freeAssets.length)}
             className="btn flex items-center gap-2 bg-accent text-black font-bold hover:bg-accent/90 shadow-[0_0_20px_rgba(var(--accent-rgb),0.3)] disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading
               ? <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
               : <Play size={15} />
             }
-            {loading ? 'Executando…' : isAllAssets ? `Executar ${category} em Todos os Ativos` : category === 'ALL' ? 'Executar Todas as Categorias' : 'Executar Backtest da Categoria'}
+            {loading
+              ? 'Executando…'
+              : isAllAssets
+              ? `Executar ${pickedCount} estratégia(s) em Todos os Ativos`
+              : `Executar ${pickedCount} estratégia(s) selecionada(s)`}
           </button>
         </div>
       </div>
@@ -886,7 +939,7 @@ export default function BatchBacktest() {
         <div className="card p-5 mb-6 space-y-4">
           <div className="flex items-center gap-2 text-muted">
             <div className="w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-            <p className="text-sm">Executando backtest para {isAllAssets ? `a categoria ${category} em ${freeAssets.length} ativos` : category === 'ALL' ? 'todas as categorias' : `todas as estratégias ${category}`}…</p>
+            <p className="text-sm">Executando backtest de {pickedCount} estratégia(s) {isAllAssets ? `de ${category} em ${freeAssets.length} ativos` : `de ${category}`}…</p>
           </div>
           <p className="text-xs text-muted">Isso pode levar alguns segundos</p>
 
