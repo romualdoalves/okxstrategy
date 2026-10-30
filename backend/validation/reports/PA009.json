@@ -1,7 +1,7 @@
 {
  "strategy_id": "PA009",
  "timeframe": "2m",
- "generated_at": "2026-10-29",
+ "generated_at": "2026-10-30",
  "verdict": "insufficient",
  "verdict_label": "Dados insuficientes",
  "reason": "É desenhada para gráfico de 2 minutos e a base não tem candles de 2m. Não há histórico para backtest.",

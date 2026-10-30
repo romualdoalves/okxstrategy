@@ -296,5 +296,20 @@
       "Com mais histórico (os candles de 1m acumulam ao vivo) ela pode ser estudada.",
       "Sem veredito: nada nesta página indica que ela ganha ou perde."
     ]
+  },
+  "RG004": {
+    "verdict": "retired",
+    "reason": "Nunca opera (0 trades em 4 anos nos 3 ativos). O critério C4 exige probabilidade de transição de Markov de 55% e relação risco-retorno de 2 contra a resistência mais próxima, e essa combinação nunca se realiza (também não em testes com dados sintéticos). Precisa ser reescrita.",
+    "applied_params": {}
+  },
+  "MR002": {
+    "verdict": "retired",
+    "reason": "Perde nos 3 ativos (PF 0,41 a 0,59) e fora da amostra (0,33 a 0,48), com cerca de 1200 trades por ano: sobretudo taxas.",
+    "applied_params": {}
+  },
+  "PA006": {
+    "verdict": "retired",
+    "reason": "Perde nos 3 ativos (PF 0,06 a 0,80) e fora da amostra (PF 0 em 2 a 7 trades), com só 5 a 8 trades por ano: sem amostra e sem vantagem.",
+    "applied_params": {}
   }
 }

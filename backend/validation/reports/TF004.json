@@ -1,7 +1,7 @@
 {
  "strategy_id": "TF004",
  "timeframe": "1D",
- "generated_at": "2026-10-29",
+ "generated_at": "2026-10-30",
  "verdict": "retired",
  "verdict_label": "Aposentada",
  "reason": "Reprovada no baseline 1D. Sem walk-forward.",

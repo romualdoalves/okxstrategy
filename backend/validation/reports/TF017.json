@@ -1,7 +1,7 @@
 {
  "strategy_id": "TF017",
  "timeframe": "1D",
- "generated_at": "2026-10-29",
+ "generated_at": "2026-10-30",
  "verdict": "watch",
  "verdict_label": "Em observação",
  "reason": "Só o BTC se sustenta (PF 2,54, p5 1,11, fora da amostra 1,97). Na ETH e na SOL o PF fora da amostra é 0,62 e 0,31 (7 e 5 trades) e o p5 fica abaixo de 1. Os candidatos de otimização são inconsistentes (sem planalto), então o padrão foi mantido. Perde pouco em 2022 (-6 a -21). Em observação.",

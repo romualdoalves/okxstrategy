@@ -1,7 +1,7 @@
 {
  "strategy_id": "MR003",
  "timeframe": "5m",
- "generated_at": "2026-10-29",
+ "generated_at": "2026-10-30",
  "verdict": "retired",
  "verdict_label": "Aposentada",
  "reason": "Perde nos 3 ativos (PF 0,17 a 0,36) e fora da amostra (PF 0,13 a 0,28), com cerca de 100 trades por ano.",

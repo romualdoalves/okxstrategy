@@ -1,7 +1,7 @@
 {
  "strategy_id": "PA016",
  "timeframe": "5m",
- "generated_at": "2026-10-29",
+ "generated_at": "2026-10-30",
  "verdict": "retired",
  "verdict_label": "Aposentada",
  "reason": "Nunca opera (0 trades): só emite sinal de venda a descoberto (reversão de topo) e em spot SELL é saída de posição, então nunca há entrada. Precisa ser reescrita para o lado comprado.",

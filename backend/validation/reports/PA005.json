@@ -1,7 +1,7 @@
 {
  "strategy_id": "PA005",
  "timeframe": "1H",
- "generated_at": "2026-10-29",
+ "generated_at": "2026-10-30",
  "verdict": "watch",
  "verdict_label": "Em observação",
  "reason": "Opera pouco (cerca de 6 trades por ano). PF 1,20 no BTC e 1,27 na SOL, mas com p5 abaixo de 0,35 e a ETH perde (PF 0,27): amostra pequena e sem consistência. Sem walk-forward.",

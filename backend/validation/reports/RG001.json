@@ -1,7 +1,7 @@
 {
  "strategy_id": "RG001",
  "timeframe": "1D",
- "generated_at": "2026-10-29",
+ "generated_at": "2026-10-30",
  "verdict": "retired",
  "verdict_label": "Aposentada",
  "reason": "Perde em todos os ativos (PF 0,07 a 0,36; só 5 a 14% de acertos, cerca de 13 trades por ano): excesso de operações sem vantagem.",

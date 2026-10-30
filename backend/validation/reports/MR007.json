@@ -1,7 +1,7 @@
 {
  "strategy_id": "MR007",
  "timeframe": "1D",
- "generated_at": "2026-10-29",
+ "generated_at": "2026-10-30",
  "verdict": "watch",
  "verdict_label": "Em observação",
  "reason": "Só vale para o BTC (a lei de potência é calibrada para ele). Em 8 anos: 17 trades, PF 5,03, lucro de US$ 682, mas cerca de 70% do lucro vem de 2020 e fora da amostra são só 4 trades (PF 0,51). Compra os fundos de 2018 e 2020 e perde em 2022 (-33). Fica 70% do tempo comprada, então se parece com segurar o BTC: amostra pequena demais para concluir.",

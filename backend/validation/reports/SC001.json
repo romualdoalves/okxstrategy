@@ -1,7 +1,7 @@
 {
  "strategy_id": "SC001",
  "timeframe": "5m",
- "generated_at": "2026-10-29",
+ "generated_at": "2026-10-30",
  "verdict": "retired",
  "verdict_label": "Aposentada",
  "reason": "Perde nos 3 ativos (PF 0,41 a 0,78) e fora da amostra (PF 0,32 a 0,69).",

@@ -1,7 +1,7 @@
 {
  "strategy_id": "PA013",
  "timeframe": "5m",
- "generated_at": "2026-10-29",
+ "generated_at": "2026-10-30",
  "verdict": "retired",
  "verdict_label": "Aposentada",
  "reason": "Perde nos 3 ativos (PF 0,13 a 0,90, p5 abaixo de 0,11). O PF 0,90 da ETH são 24 trades.",

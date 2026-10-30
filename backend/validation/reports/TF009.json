@@ -1,7 +1,7 @@
 {
  "strategy_id": "TF009",
  "timeframe": "1D",
- "generated_at": "2026-10-29",
+ "generated_at": "2026-10-30",
  "verdict": "candidate",
  "verdict_label": "Candidata",
  "reason": "Baseline 1D mais robusto (PF fora da amostra 1,53 / 3,94 / 2,45). A otimização piorou fora da amostra, então o padrão foi mantido. Perde em 2022 (-31 a -41).",

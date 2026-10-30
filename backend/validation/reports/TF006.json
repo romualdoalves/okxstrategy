@@ -1,7 +1,7 @@
 {
  "strategy_id": "TF006",
  "timeframe": "1D",
- "generated_at": "2026-10-29",
+ "generated_at": "2026-10-30",
  "verdict": "watch",
  "verdict_label": "Em observação",
  "reason": "Poucos trades (0 a 7 por ano) e a SOL sem nenhum trade fora da amostra. Amostra insuficiente para concluir.",

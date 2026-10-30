@@ -1,7 +1,7 @@
 {
  "strategy_id": "TF007",
  "timeframe": "1D",
- "generated_at": "2026-10-29",
+ "generated_at": "2026-10-30",
  "verdict": "watch",
  "verdict_label": "Em observação",
  "reason": "Sem trades até 2023 em 1D; só opera de 2024 em diante. Não é testável nesta janela.",

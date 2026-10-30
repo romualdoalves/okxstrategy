@@ -1,7 +1,7 @@
 {
  "strategy_id": "PA008",
  "timeframe": "15m",
- "generated_at": "2026-10-29",
+ "generated_at": "2026-10-30",
  "verdict": "retired",
  "verdict_label": "Aposentada",
  "reason": "Nunca opera (0 trades): o código define o range de abertura pelas primeiras velas da janela (não pelo horário de Nova York) e o reteste exige fechar acima e abaixo da mesma linha ao mesmo tempo, o que é impossível. Precisa ser reescrita.",

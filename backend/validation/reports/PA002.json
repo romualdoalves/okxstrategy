@@ -1,7 +1,7 @@
 {
  "strategy_id": "PA002",
  "timeframe": "15m",
- "generated_at": "2026-10-29",
+ "generated_at": "2026-10-30",
  "verdict": "retired",
  "verdict_label": "Aposentada",
  "reason": "Perde nos 3 ativos (PF 0,05 a 0,61) e quase não opera (3 a 7 trades por ano).",

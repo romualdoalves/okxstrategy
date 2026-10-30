@@ -1,7 +1,7 @@
 {
  "strategy_id": "TF003",
  "timeframe": "1D",
- "generated_at": "2026-10-29",
+ "generated_at": "2026-10-30",
  "verdict": "retired",
  "verdict_label": "Aposentada",
  "reason": "Perde na maioria dos anos, com 40 a 120 trades por ano: excesso de operações sem vantagem.",

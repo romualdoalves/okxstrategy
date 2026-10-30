@@ -1,7 +1,7 @@
 {
  "strategy_id": "MR005",
  "timeframe": "15m",
- "generated_at": "2026-10-29",
+ "generated_at": "2026-10-30",
  "verdict": "retired",
  "verdict_label": "Aposentada",
  "reason": "Perde de forma grave (PF 0,32 a 0,54) com mais de 900 trades por ano: sobretudo taxas.",

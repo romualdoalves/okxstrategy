@@ -1,7 +1,7 @@
 {
  "strategy_id": "MR001",
  "timeframe": "15m",
- "generated_at": "2026-10-29",
+ "generated_at": "2026-10-30",
  "verdict": "retired",
  "verdict_label": "Aposentada",
  "reason": "Quase não opera (4 a 30 trades em 4 anos) e perde no BTC e na ETH; o PF 1,10 da SOL não se repete fora da amostra (5 trades, nenhum ganho).",

@@ -1,7 +1,7 @@
 {
  "strategy_id": "RG005",
  "timeframe": "1D",
- "generated_at": "2026-10-29",
+ "generated_at": "2026-10-30",
  "verdict": "candidate",
  "verdict_label": "Candidata",
  "reason": "Walk-forward positivo nos 3 ativos (PF fora da amostra 1,81 / 2,42 / 1,36 com 23 a 32 trades). Com o stop de 3 ATR, o baseline tem PF 3,6 / 4,2 / 3,2 e fora da amostra 1,61 / 1,44 (BTC e ETH; a SOL tem só 4 trades). Ganha em 2020, 2021 e 2023, mas perde em 2022 (-29 a -50): não protege no mercado de baixa.",

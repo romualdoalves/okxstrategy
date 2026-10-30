@@ -1,7 +1,7 @@
 {
  "strategy_id": "PA004",
  "timeframe": "15m",
- "generated_at": "2026-10-29",
+ "generated_at": "2026-10-30",
  "verdict": "retired",
  "verdict_label": "Aposentada",
  "reason": "Perde nos 3 ativos (PF 0,23 a 0,55) com poucos trades; o PF 3,59 fora da amostra na SOL são só 6 trades.",

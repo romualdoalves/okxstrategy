@@ -1,7 +1,7 @@
 {
  "strategy_id": "TF014",
  "timeframe": "1D",
- "generated_at": "2026-10-29",
+ "generated_at": "2026-10-30",
  "verdict": "watch",
  "verdict_label": "Em observação",
  "reason": "Sem consistência: PF 1,31 / 1,60 / 1,12 com p5 abaixo de 1 nos 3 ativos, e fora da amostra o BTC fica em 0,67 (13 trades). Perde em 2022 (-29 a -44) e a otimização só melhora o BTC, então o padrão foi mantido. Em observação até haver mais dados.",

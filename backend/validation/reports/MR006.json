@@ -1,7 +1,7 @@
 {
  "strategy_id": "MR006",
  "timeframe": "15m",
- "generated_at": "2026-10-29",
+ "generated_at": "2026-10-30",
  "verdict": "retired",
  "verdict_label": "Aposentada",
  "reason": "Perde nos 3 ativos (PF 0,47 a 0,58) e fora da amostra (PF 0,25 a 0,61).",

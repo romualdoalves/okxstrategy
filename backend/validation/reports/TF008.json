@@ -1,7 +1,7 @@
 {
  "strategy_id": "TF008",
  "timeframe": "1D",
- "generated_at": "2026-10-29",
+ "generated_at": "2026-10-30",
  "verdict": "candidate",
  "verdict_label": "Candidata",
  "reason": "Único com ganho consistente fora da amostra nos 3 ativos e que ficou fora da queda de 2022 (0 a 1 trade). Lucra em 2019, 2020, 2021 e 2024.",

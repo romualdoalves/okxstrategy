@@ -1,7 +1,7 @@
 {
  "strategy_id": "RG002",
  "timeframe": "—",
- "generated_at": "2026-10-29",
+ "generated_at": "2026-10-30",
  "verdict": "insufficient",
  "verdict_label": "Dados insuficientes",
  "reason": "Depende de dados que só existem ao vivo e não têm histórico para reproduzir no backtest: o grafo de correlação entre ativos montado ao vivo. O backtest pula esta estratégia.",

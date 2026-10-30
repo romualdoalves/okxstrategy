@@ -1,7 +1,7 @@
 {
  "strategy_id": "RG003",
  "timeframe": "—",
- "generated_at": "2026-10-29",
+ "generated_at": "2026-10-30",
  "verdict": "insufficient",
  "verdict_label": "Dados insuficientes",
  "reason": "Depende de dados que só existem ao vivo e não têm histórico para reproduzir no backtest: o snapshot de opções (GEX) da Deribit. O backtest pula esta estratégia.",

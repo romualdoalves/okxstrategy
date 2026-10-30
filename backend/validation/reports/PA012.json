@@ -1,7 +1,7 @@
 {
  "strategy_id": "PA012",
  "timeframe": "1m",
- "generated_at": "2026-10-29",
+ "generated_at": "2026-10-30",
  "verdict": "insufficient",
  "verdict_label": "Dados insuficientes",
  "reason": "É desenhada para gráfico de 1 minuto e a base só tem cerca de 0,3 ano de candles de 1m, pouco para concluir (e inclui poucos trades).",

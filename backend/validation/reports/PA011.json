@@ -1,7 +1,7 @@
 {
  "strategy_id": "PA011",
  "timeframe": "1H",
- "generated_at": "2026-10-29",
+ "generated_at": "2026-10-30",
  "verdict": "retired",
  "verdict_label": "Aposentada",
  "reason": "Perde nos 3 ativos (PF 0,67 a 0,73, probabilidade de PF acima de 1 de no máximo 4%) e também fora da amostra.",

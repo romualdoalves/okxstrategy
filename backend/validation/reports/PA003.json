@@ -1,7 +1,7 @@
 {
  "strategy_id": "PA003",
  "timeframe": "15m",
- "generated_at": "2026-10-29",
+ "generated_at": "2026-10-30",
  "verdict": "retired",
  "verdict_label": "Aposentada",
  "reason": "Perde nos 3 ativos (PF 0,55 a 0,63) com cerca de 270 a 350 trades por ano.",
