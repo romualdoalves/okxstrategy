@@ -1,15 +1,11 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { getBot, getStrategies, updateBot, rankAssets, stopBot, optimizeBotParams, getBots } from '../api'
+import { getBot, getStrategies, updateBot, rankAssets, stopBot, optimizeBotParams, getBots, getTopAssets } from '../api'
 import { ArrowLeft, Save, Loader2, Sparkles, List, CheckCircle2, AlertTriangle, Wand2 } from 'lucide-react'
 import { useLanguage } from '../i18n/LanguageContext'
 import AiUsageNotice from '../components/AiUsageNotice'
 
-const SYMBOLS    = [
-  'AAPL', 'MSFT', 'NVDA', 'AMZN', 'META', 'TSLA', 'GOOGL', 'NFLX', 'AMD',
-  'BTC/USD', 'ETH/USD', 'LTC/USD', 'BCH/USD', 'SOL/USD', 'UNI/USD', 'LINK/USD', 'DOGE/USD'
-]
 const TIMEFRAMES = ['1m','5m','15m','1h','4h','1D']
 const MEDALS     = ['🥇','🥈','🥉','','','','','','','']
 const FIXED_STAKE_USD = 100
@@ -81,6 +77,10 @@ export default function EditBot() {
     queryFn:  getBots,
   })
   const usedSymbols = new Set(allBots.filter(b => b.id !== parseInt(id)).map(b => b.symbol))
+
+  // Top 5 SPOT da OKX por volume (dinâmico): único universo oferecido, além do ativo que o bot já tem
+  const { data: topData } = useQuery({ queryKey: ['top-assets'], queryFn: getTopAssets, staleTime: 60_000 })
+  const topSymbols = topData?.assets?.map(a => a.symbol) ?? []
 
   const [form, setForm] = useState(null)
   const [assetMode, setAssetMode] = useState('manual')
@@ -193,17 +193,10 @@ export default function EditBot() {
             <div className="space-y-3">
               <AiUsageNotice consumesTokens={false} text="Escolha automática de ativo usa ranking local de mercado. Não consome tokens de IA." />
               <select className="input" value={form.symbol} onChange={e => setField('symbol', e.target.value)}>
-                <optgroup label="Ações (Stocks)">
-                  {[['AAPL','Apple'],['MSFT','Microsoft'],['NVDA','NVIDIA'],['AMZN','Amazon'],['META','Meta Platforms'],['TSLA','Tesla'],['GOOGL','Alphabet'],['NFLX','Netflix'],['AMD','Advanced Micro Devices']].map(([sym, name]) => (
+                <optgroup label="OKX Spot — Top 5 por volume 24h">
+                  {[...new Set([...topSymbols, form.symbol])].map(sym => (
                     <option key={sym} value={sym} disabled={usedSymbols.has(sym)}>
-                      {sym} ({name}){usedSymbols.has(sym) ? ' — em uso' : ''}
-                    </option>
-                  ))}
-                </optgroup>
-                <optgroup label="Criptomoedas (Crypto)">
-                  {[['BTC/USD','Bitcoin'],['ETH/USD','Ethereum'],['LTC/USD','Litecoin'],['BCH/USD','Bitcoin Cash'],['SOL/USD','Solana'],['UNI/USD','Uniswap'],['LINK/USD','Chainlink'],['DOGE/USD','Dogecoin']].map(([sym, name]) => (
-                    <option key={sym} value={sym} disabled={usedSymbols.has(sym)}>
-                      {sym} ({name}){usedSymbols.has(sym) ? ' — em uso' : ''}
+                      {sym}{usedSymbols.has(sym) ? ' — em uso' : (topSymbols.includes(sym) ? '' : ' — fora do top 5 (atual do bot)')}
                     </option>
                   ))}
                 </optgroup>

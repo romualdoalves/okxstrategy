@@ -26,38 +26,10 @@ router = APIRouter()
 log = logging.getLogger("main")
 
 
-_cached_commit_hash = None
-
-_cached_commit_timestamp = None
-
 @router.get("/api/health")
 def health_check():
-    global _cached_commit_hash, _cached_commit_timestamp
-    if not _cached_commit_hash:
-        try:
-            with open('.git/HEAD', 'r') as f:
-                ref = f.read().strip()
-            if ref.startswith('ref: '):
-                with open(f".git/{ref[5:]}", 'r') as f:
-                    _cached_commit_hash = f.read().strip()[:7]
-            else:
-                _cached_commit_hash = ref[:7]
-                
-            with open('.git/logs/HEAD', 'r') as f:
-                lines = f.readlines()
-                if lines:
-                    last_line = lines[-1].strip()
-                    parts = last_line.split('\t')[0].split(' ')
-                    _cached_commit_timestamp = int(parts[-2])
-        except Exception:
-            _cached_commit_hash = "unknown"
-            _cached_commit_timestamp = None
-            
-    return {
-        "ok": True, 
-        "version": _cached_commit_hash,
-        "timestamp": _cached_commit_timestamp
-    }
+    from ..version import get_commit_info
+    return {"ok": True, **get_commit_info()}
 
 @router.head("/api/health")
 def health_check_head():

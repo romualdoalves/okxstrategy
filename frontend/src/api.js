@@ -116,6 +116,8 @@ export const factoryDisable  = (id) => req(`/strategy-factory/strategies/${id}`,
 // Mercado
 export const rankAssets  = (strategyId, timeframe) =>
   req(`/market/rank-assets?strategy_id=${strategyId}&timeframe=${timeframe}`)
+// Top 5 pares SPOT X-USDT da OKX por volume em 24h (dinâmico; é o único universo de ativos do app)
+export const getTopAssets = () => req('/market/top-assets')
 export const getSymbolTradability = (symbols = [], demo = true) => {
   const csv = symbols.join(',')
   return req(`/market/symbol-tradability?symbols=${encodeURIComponent(csv)}&demo=${demo}`)

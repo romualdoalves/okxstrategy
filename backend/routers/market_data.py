@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from ..database import HistoricCandleModel, MarketDataSyncJobModel, SessionLocal, TrackedSymbolModel
 from ..exchanges.factory import get_ranked_assets_universe
+from ..exchanges.okx_universe import fetch_top_spot_assets
 from ..market_data_service import MarketDataService
 
 router = APIRouter(prefix="/market-data", tags=["Market Data"])
@@ -196,8 +197,9 @@ def get_tracked_symbols(db: Session = Depends(get_db)):
 
 
 @router.get("/available-symbols")
-def get_available_symbols(db: Session = Depends(get_db)):
-    raw = list(get_ranked_assets_universe() or [])
+async def get_available_symbols(db: Session = Depends(get_db)):
+    # Universo = top 5 SPOT por volume na OKX (dinâmico); a lista fixa só entra se a OKX estiver inacessível.
+    raw = [a["symbol"] for a in await fetch_top_spot_assets()] or list(get_ranked_assets_universe() or [])
     # Inclui também ativos já rastreados para não perder opções em cenários parciais.
     tracked = db.query(TrackedSymbolModel.symbol).all()
     raw.extend([row[0] for row in tracked if row and row[0]])
@@ -274,7 +276,7 @@ async def bootstrap_defaults(
     db: Session = Depends(get_db),
     svc: MarketDataService = Depends(get_service),
 ):
-    base_symbols = req.symbols or get_ranked_assets_universe()
+    base_symbols = req.symbols or [a["symbol"] for a in await fetch_top_spot_assets()] or get_ranked_assets_universe()
     symbols = []
     for sym in base_symbols:
         norm = _norm_symbol(sym)

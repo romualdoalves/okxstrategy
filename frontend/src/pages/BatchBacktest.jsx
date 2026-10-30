@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ScanSearch, Play, HelpCircle, ChevronDown, ChevronUp, PlusCircle, CheckSquare, Square, ShieldCheck, AlertTriangle, Clock } from 'lucide-react'
 import BacktestLikert from '../components/BacktestLikert'
-import { getStrategies, getBots, createBot } from '../api'
+import { getStrategies, getBots, createBot, getTopAssets } from '../api'
 import { authFetch } from '../auth'
 
 const CATEGORIES = [
@@ -16,7 +16,8 @@ const CATEGORIES = [
   { id: 'NW', label: 'Network',          description: 'Relações entre ativos (Influencers & Followers)' },
 ]
 
-const SYMBOLS = ['BTC-USDT', 'ETH-USDT', 'SOL-USDT', 'BNB-USDT', 'XRP-USDT', 'DOGE-USDT', 'ADA-USDT', 'AVAX-USDT']
+// Reserva se a OKX estiver inacessível; o universo real é o top 5 SPOT por volume (getTopAssets)
+const FALLBACK_SYMBOLS = ['BTC-USDT', 'ETH-USDT', 'SOL-USDT', 'BNB-USDT', 'XRP-USDT']
 const ALL_ASSETS = '__ALL_ASSETS__'          // opção "Todos os ativos" (só com uma categoria específica)
 const SECONDS_PER_STRATEGY = 15              // referência medida: ~15 s por estratégia (2 workers)
 const CONSISTENT_MIN_ASSETS = 3              // aprovada em >= 3 ativos = "consistente"
@@ -456,6 +457,8 @@ export default function BatchBacktest() {
 
   const { data: strategies = [] } = useQuery({ queryKey: ['strategies'], queryFn: getStrategies })
   const { data: bots = [] }       = useQuery({ queryKey: ['bots'],       queryFn: getBots       })
+  const { data: topData }         = useQuery({ queryKey: ['top-assets'], queryFn: getTopAssets, staleTime: 60_000 })
+  const SYMBOLS = topData?.assets?.map(a => a.symbol) ?? FALLBACK_SYMBOLS
 
   const strategyCounts = strategies.reduce((acc, s) => {
     const prefix = (s.id || '').match(/^([A-Z]+)/i)?.[1]?.toUpperCase()

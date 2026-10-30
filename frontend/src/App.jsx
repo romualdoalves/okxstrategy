@@ -46,6 +46,13 @@ function AppShell() {
     retry: false,
   })
 
+  // Versão com que ESTA aba foi carregada (o servidor injeta no index.html) x versão que o servidor roda agora.
+  const loadedVersion = (typeof document !== 'undefined' && document.querySelector('meta[name="app-version"]')?.content) || null
+  const serverVersion = healthData?.version ?? null
+  const versionStale = Boolean(
+    loadedVersion && serverVersion && loadedVersion !== 'unknown' && serverVersion !== 'unknown' && loadedVersion !== serverVersion
+  )
+
   async function handleOkxButton() {
     if (!okxStatus?.configured) {
       setShowOkxModal(true)
@@ -107,12 +114,18 @@ function AppShell() {
           <TrendingUp size={22} className="text-accent shrink-0" />
           <div className="flex flex-col">
             <span className="font-bold text-base tracking-tight leading-tight">{t('app.brand')}</span>
-            {healthData?.version && (
-              <span className="text-[10px] text-muted/50 font-mono leading-tight tracking-wider">
-                v{healthData.version}
-                {healthData.timestamp && ` • ${new Date(healthData.timestamp * 1000).toLocaleString(lang, { 
-                  month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' 
+            {(loadedVersion || healthData?.version) && (
+              <span
+                className={`text-[10px] font-mono leading-tight tracking-wider ${versionStale ? 'text-yellow-400' : 'text-muted/50'}`}
+                title={versionStale
+                  ? `Esta aba roda v${loadedVersion}; o servidor já está em v${serverVersion}. Atualize a página.`
+                  : 'Versão desta aba = versão do servidor'}
+              >
+                v{loadedVersion ?? healthData.version}
+                {!versionStale && healthData?.timestamp && ` • ${new Date(healthData.timestamp * 1000).toLocaleString(lang, {
+                  month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
                 })}`}
+                {versionStale && ` ≠ servidor v${serverVersion}`}
               </span>
             )}
           </div>
@@ -209,6 +222,21 @@ function AppShell() {
 
       {/* Main */}
       <main className="flex-1 overflow-y-auto bg-surface">
+        {versionStale && (
+          <div className="sticky top-0 z-40 flex items-center justify-between gap-3 border-b border-yellow-400/30 bg-yellow-400/15 px-4 py-2 text-xs text-yellow-100">
+            <span>
+              <strong>Nova versão disponível.</strong> Esta aba roda v{loadedVersion}, o servidor já está em v{serverVersion}.
+              Os números exibidos podem estar desatualizados.
+            </span>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="shrink-0 rounded-md border border-yellow-300/40 px-3 py-1 font-semibold hover:bg-yellow-300/20"
+            >
+              Atualizar agora
+            </button>
+          </div>
+        )}
         <ErrorBoundary>
           <Routes>
             <Route path="/"               element={<Dashboard />} />
