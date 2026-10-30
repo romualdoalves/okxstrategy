@@ -421,12 +421,7 @@ class EntryMixin:
                     self._peak_price = bar.close
 
         # Cálculo de Lucro Garantido (Sombra) — só existe depois que o trailing ativa
-        guaranteed_pnl = 0.0
-        if self._direction != 0 and self._ts_algo_id:
-            # Cálculo do lucro garantido baseado no stop real confirmado pela exchange
-            if self._sl_price > 0:
-                diff = (self._sl_price - self._entry_price) / self._entry_price * self._direction
-                guaranteed_pnl = max(0, diff) * 100
+        guaranteed_pnl = self._profit_view(self._candles[-1].close if self._candles else 0.0)["guaranteed_pnl"]
 
         # Broadcast de indicadores
         await self._broadcast({

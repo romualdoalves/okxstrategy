@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Play, Square, ChevronRight, Activity, AlertTriangle, TrendingUp, Star, Zap, Clock, Bookmark, RefreshCw } from 'lucide-react'
+import { Play, Square, ChevronRight, Activity, AlertTriangle, TrendingUp, Star, Zap, Clock, Bookmark, RefreshCw, CheckCircle2, Lock } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { startBot, stopBot, switchBotSymbol, liquidateBot, recaptureBaseline, getStrategies } from '../api'
 import { useLanguage } from '../i18n/LanguageContext'
@@ -28,6 +28,9 @@ function fmtShortTimestamp(iso) {
   const time = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
   return `${date} ${time}`
 }
+
+const fmtPx = n => Number(n).toLocaleString('pt-BR', { maximumFractionDigits: 6 })
+const fmtSigned = n => `${n > 0 ? '+' : ''}${Number(n).toFixed(2)}%`
 
 const DOT_COLOR = {
   green:  'bg-bull',
@@ -57,9 +60,15 @@ export default function BotCard({ bot, liveStatus }) {
   const priceChange = bot.market_data?.change_24h ?? 0
   const isPositioned = Math.abs(direction) > 0
   
-  const unrealizedPct = isPositioned && lastPrice && rt.entry_price
+  // Bruto = só a variação de preço. Líquido = já descontadas as taxas de entrada e saída (calculado no backend).
+  const grossPct = isPositioned && lastPrice && rt.entry_price
     ? direction * ((lastPrice - rt.entry_price) / rt.entry_price) * 100
     : null
+  const netPct = isPositioned && rt.unrealized_net_pct != null ? rt.unrealized_net_pct : null
+  const unrealizedPct = netPct ?? grossPct
+  const pctIsNet = netPct !== null
+  const profitLock = isPositioned ? rt.profit_lock : null
+  const trailing = isPositioned ? rt.trailing : null
 
   const startedAt   = rt.started_at ?? null
   const cycle       = rt.execution_cycle ?? {}
@@ -228,6 +237,11 @@ export default function BotCard({ bot, liveStatus }) {
                 {unrealizedPct > 0 ? '+' : ''}{unrealizedPct.toFixed(2)}%
               </span>
             )}
+            {unrealizedPct !== null && (
+              <span className="text-[9px] font-normal text-muted/70">
+                {pctIsNet ? `líquido · bruto ${fmtSigned(grossPct ?? 0)}` : 'bruto (sem taxas)'}
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -268,11 +282,95 @@ export default function BotCard({ bot, liveStatus }) {
         )
       })()}
 
+      {/* Trailing stop sem degraus (padrão): arma no TP1 da estratégia; mostra o estado real */}
+      {isPositioned && !profitLock?.enabled && (
+        <div className="mb-3 rounded-lg border border-white/8 bg-white/4 p-2.5 text-[11px]">
+          <span className="flex items-center gap-1 text-[10px] text-muted uppercase font-bold tracking-wider mb-1">
+            <Lock size={10} /> Trailing stop
+          </span>
+          {trailing ? (
+            <div className="space-y-0.5">
+              <p className={trailing.armed ? 'text-accent/90 font-semibold' : 'text-muted'}>
+                {trailing.armed
+                  ? 'ALCANÇADO · TP1 atingido, trailing nativo da OKX ativo'
+                  : 'Ainda não alcançado · aguardando o TP1'}
+              </p>
+              <p className="text-muted">
+                Arma em <span className="font-mono text-white/80">{fmtPx(trailing.arm_price)}</span>{' '}
+                ({fmtSigned(trailing.arm_pct)} sobre a entrada)
+              </p>
+              <p className="text-muted">
+                Distância do trailing: <span className="text-white/80 font-semibold">{trailing.callback_pct}%</span>{' '}
+                <span className="text-muted/70">
+                  ({trailing.callback_source === 'strategy' ? 'definida pela estratégia' : '1,5×ATR, limitado a 0,5%–5%'})
+                </span>
+              </p>
+              {trailing.stop_price && (
+                <p className="text-muted">
+                  {trailing.armed ? 'Stop atual' : 'Stop inicial'}{' '}
+                  <span className="font-mono text-white/80">{fmtPx(trailing.stop_price)}</span>{' '}
+                  <span className={trailing.stop_pct_net > 0 ? 'text-bull font-semibold' : 'text-muted/70'}>
+                    (se executado: {fmtSigned(trailing.stop_pct_net)} líq.)
+                  </span>
+                </p>
+              )}
+            </div>
+          ) : (
+            <p className="text-muted">Dados do trailing indisponíveis (aguardando status do bot).</p>
+          )}
+        </div>
+      )}
+
+      {/* Trailing stop por degraus: cada degrau alcançado, o stop atual e o próximo gatilho */}
+      {profitLock?.enabled && (
+        <div className="mb-3 rounded-lg border border-white/8 bg-white/4 p-2.5">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="flex items-center gap-1 text-[10px] text-muted uppercase font-bold tracking-wider">
+              <Lock size={10} /> Trailing stop · degraus de +{profitLock.step_pct}%
+            </span>
+            <span className="text-[10px] text-muted">
+              {profitLock.reached} alcançado{profitLock.reached === 1 ? '' : 's'}
+            </span>
+          </div>
+          {profitLock.steps.length === 0 ? (
+            <p className="text-[11px] text-muted">
+              Nenhum degrau ainda · stop inicial em <span className="font-mono text-white/80">{fmtPx(rt.sl_price ?? 0)}</span>
+            </p>
+          ) : (
+            <ul className="space-y-1">
+              {profitLock.steps.map(st => (
+                <li key={st.step} className="flex items-center gap-1.5 text-[11px]">
+                  <CheckCircle2 size={11} className="shrink-0 text-bull" />
+                  <span className="text-white/80">+{st.trigger_pct}% alcançado</span>
+                  <span className="text-muted">→ stop</span>
+                  <span className="font-mono text-white/80">{fmtPx(st.stop_price)}</span>
+                  <span className={`font-semibold ${st.stop_pct_net > 0 ? 'text-bull' : 'text-white/70'}`}>
+                    ({st.stop_pct_net > 0 ? 'garante ' : 'sem prejuízo '}{fmtSigned(st.stop_pct_net)} líq.)
+                  </span>
+                  {st.reached_at && (
+                    <span className="ml-auto text-[9px] text-muted/70">{fmtShortTimestamp(st.reached_at)}</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          {!rt.tp1_done && profitLock.next && (
+            <p className="mt-1.5 text-[10px] text-muted">
+              Próximo: +{profitLock.next.trigger_pct}% (preço {fmtPx(profitLock.next.trigger_price)}) → stop em{' '}
+              <span className="font-mono">{fmtPx(profitLock.next.stop_price)}</span>
+            </p>
+          )}
+          {rt.tp1_done && (
+            <p className="mt-1.5 text-[10px] text-accent/80">TP1 atingido · trailing nativo da OKX ativo</p>
+          )}
+        </div>
+      )}
+
       {/* Guaranteed Profit Stars */}
       {rt.guaranteed_pnl > 0 && (
         <div className="mb-4 p-2 rounded-lg bg-accent/5 border border-accent/10 flex items-center justify-between animate-in fade-in slide-in-from-bottom-1 duration-500">
           <div className="flex flex-col">
-            <span className="text-[10px] text-muted uppercase font-bold tracking-wider">Lucro Garantido</span>
+            <span className="text-[10px] text-muted uppercase font-bold tracking-wider">Lucro Garantido (líquido)</span>
             <span className="text-xs font-bold text-accent">+{rt.guaranteed_pnl.toFixed(2)}%</span>
           </div>
           <div className="flex gap-0.5">

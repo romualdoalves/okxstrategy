@@ -50,6 +50,8 @@ class BotInstance(OrderGateMixin, EntryMixin, PositionMixin, AccountingMixin, St
         self._tp1_price   = 0.0
         self._sl_price    = 0.0
         self._tp1_done    = False
+        self._lock_retry_at = 0.0     # monotonic: não repetir a trava de lucro a cada tick se a OKX recusar
+        self._lock_events: dict = {}  # degrau -> horário ISO em que foi alcançado (só desta sessão do processo)
         self._ts_pct      = 0.0       # distância do trailing definida pela estratégia (0 = ATR)
         self._sl_algo_id  : Optional[str] = None
         self._ts_algo_id  : Optional[str] = None
@@ -580,6 +582,7 @@ class BotInstance(OrderGateMixin, EntryMixin, PositionMixin, AccountingMixin, St
 
         # Verifica TP1 em tempo real (mesmo em candle aberto), agora com ATR fresco
         if self._direction != 0 and not self._tp1_done:
+            await self._check_profit_lock(bar.close, exchange)
             await self._check_tp1(bar.close, exchange)
 
         if not closed:
@@ -663,6 +666,10 @@ class BotInstance(OrderGateMixin, EntryMixin, PositionMixin, AccountingMixin, St
                 "tp1_price":   0.0,
                 "tp1_done":    False,
                 "guaranteed_pnl": 0.0,
+                "profit_lock": {"enabled": False, "steps": []},
+                "trailing": None,
+                "unrealized_net_usd": 0.0,
+                "unrealized_net_pct": 0.0,
                 "daily_pnl":   round(self._daily_pnl, 2),
                 "wins":        self._wins,
                 "losses":      self._losses,
@@ -680,10 +687,8 @@ class BotInstance(OrderGateMixin, EntryMixin, PositionMixin, AccountingMixin, St
         # então diff seria negativo e garantido seria 0. Mas se o sync sobrescreveu
         # _entry_price com um contexto diferente, diff pode ser positivo erroneamente.
         # Garantir que somente o trailing stop ativo gere guaranteed_pnl > 0.
-        guaranteed_pnl = 0.0
-        if self._direction != 0 and self._sl_price > 0 and self._tp1_done:
-            diff = (self._sl_price - self._entry_price) / self._entry_price * self._direction
-            guaranteed_pnl = max(0, diff) * 100
+        # Agora LÍQUIDO de taxas e também válido nos degraus da trava de lucro (antes do TP1): ver _profit_view.
+        pv = self._profit_view(last_price)
 
         return {
             "bot_id":      self.config.id,
@@ -696,7 +701,11 @@ class BotInstance(OrderGateMixin, EntryMixin, PositionMixin, AccountingMixin, St
             "sl_price":    self._sl_price,
             "tp1_price":   self._tp1_price,
             "tp1_done":    self._tp1_done,
-            "guaranteed_pnl": round(guaranteed_pnl, 2),
+            "guaranteed_pnl": pv["guaranteed_pnl"],
+            "profit_lock": pv["profit_lock"],
+            "trailing": self._trailing_view(last_price),
+            "unrealized_net_usd": pv["unrealized_net_usd"],
+            "unrealized_net_pct": pv["unrealized_net_pct"],
             "daily_pnl":   round(self._daily_pnl, 2),
             "wins":        self._wins,
             "losses":      self._losses,

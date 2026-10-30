@@ -4,6 +4,7 @@ from typing import Optional
 
 from .candle_store import observed_step_ms, timeframe_ms
 from .backtest_stats import robust_summary
+from .profit_lock import capped_callback, ratchet_stop, stop_is_tighter
 from .stop_policy import cap_initial_stop
 from .strategies.base import STRATEGY_WINDOW, Signal
 from .strategies.registry import get_strategy
@@ -99,6 +100,7 @@ class BacktestEngine:
         fee_rate: float = STRICT_FEE_RATE,
         slippage_rate: float = STRICT_SLIPPAGE_RATE,
         legacy_lookahead: bool = False,
+        profit_lock: bool = True,
     ):
         """
         Backtest estrito para o Scanner: usa compute_with_context(), simula SPOT
@@ -118,6 +120,8 @@ class BacktestEngine:
         trailing_exits = 0
         signal_exits = 0
         tp1_hits = 0
+        lock_exits = 0
+        lock_moves = 0
 
         coverage = {
             "mode": "strict",
@@ -172,7 +176,7 @@ class BacktestEngine:
             return {"extra_candles": out}
 
         def close_position(exit_price: float, idx: int, reason: str, exit_type: str):
-            nonlocal position, signal_exits, stop_exits, trailing_exits
+            nonlocal position, signal_exits, stop_exits, trailing_exits, lock_exits
             if not position:
                 return
             entry_value = position["qty"] * position["entry_price"]
@@ -211,6 +215,8 @@ class BacktestEngine:
                 stop_exits += 1
             elif exit_type == "trailing":
                 trailing_exits += 1
+            elif exit_type == "lock":
+                lock_exits += 1
             position = None
 
         for i in range(warmup, len(candles)):
@@ -225,15 +231,30 @@ class BacktestEngine:
                 high = float(bar.high or current_price)
 
                 if low <= position["stop_price"]:
-                    exit_px = position["stop_price"] * (1 - slippage_rate)
-                    close_position(exit_px, i, "Stop Loss simulado", "trailing" if position.get("trailing_active") else "stop")
+                    fill_px = position["stop_price"]
+                    if position.get("locked") and not position.get("trailing_active"):
+                        # A trava sobe no fim do candle anterior: se este abre abaixo dela, a ordem a mercado
+                        # executa na abertura (pior que o stop), não no preço do stop.
+                        fill_px = min(fill_px, float(bar.open or fill_px))
+                    exit_px = fill_px * (1 - slippage_rate)
+                    if position.get("trailing_active"):
+                        close_position(exit_px, i, "Stop Loss simulado", "trailing")
+                    elif position.get("locked"):
+                        close_position(exit_px, i, "Trava de lucro simulada", "lock")
+                    else:
+                        close_position(exit_px, i, "Stop Loss simulado", "stop")
                 else:
                     if not position["tp1_done"] and high >= position["tp1_price"]:
                         position["tp1_done"] = True
                         position["trailing_active"] = True
                         position["peak_price"] = max(position["peak_price"], high)
+                        # Mesmo limite do bot: o trailing nunca fica abaixo do stop já travado.
+                        position["ts_pct"] = capped_callback(
+                            position["ts_pct"], position["stop_price"], position["peak_price"],
+                            position["entry_price"], 1)
                         position["stop_price"] = max(
                             position["entry_price"],
+                            position["stop_price"],
                             position["peak_price"] * (1 - position["ts_pct"]),
                         )
                         tp1_hits += 1
@@ -253,6 +274,15 @@ class BacktestEngine:
                         if low <= position["stop_price"]:
                             exit_px = position["stop_price"] * (1 - slippage_rate)
                             close_position(exit_px, i, "Trailing Stop simulado", "trailing")
+                    elif position is not None and profit_lock:
+                        # Trava de lucro em degraus (profit_lock.py). O stop novo vale a partir do PRÓXIMO candle:
+                        # não se sabe se a máxima veio antes ou depois da mínima dentro do candle.
+                        position["max_high"] = max(position["max_high"], high)
+                        locked_stop = ratchet_stop(position["entry_price"], position["max_high"], 1)
+                        if locked_stop is not None and stop_is_tighter(locked_stop, position["stop_price"], 1):
+                            position["stop_price"] = locked_stop
+                            position["locked"] = True
+                            lock_moves += 1
 
             try:
                 ctx = context_until(int(getattr(bar, "epoch", 0) or 0))
@@ -280,6 +310,8 @@ class BacktestEngine:
                             "tp1_done": False,
                             "trailing_active": False,
                             "peak_price": entry_price,
+                            "max_high": entry_price,
+                            "locked": False,
                         }
                         self.events.append({
                             "type": "ENTRY LONG",
@@ -345,6 +377,8 @@ class BacktestEngine:
             "ignored_sell_signals": ignored_sell_signals,
             "stop_exits": stop_exits,
             "trailing_exits": trailing_exits,
+            "lock_exits": lock_exits,
+            "lock_moves": lock_moves,
             "signal_exits": signal_exits,
             "tp1_hits": tp1_hits,
             "open_position": open_position,

@@ -177,14 +177,14 @@ async def get_active_performance(db: Session = Depends(get_db)):
         else:
             continue
 
-        # PnL % Garantido (prioriza o cálculo dinâmico do robô/sombra)
-        guaranteed_pnl_pct = status.get("guaranteed_pnl", 0.0)
+        # P&L LÍQUIDO de taxas (entrada + saída), como se fechasse agora: é o que sobra de verdade.
+        # A OKX informa o P&L bruto; o robô calcula o líquido com a mesma regra do stop/backtest.
+        if status.get("unrealized_net_usd") is not None and entry_price > 0:
+            pnl_usd = status.get("unrealized_net_usd", pnl_usd)
+            pnl_pct = status.get("unrealized_net_pct", pnl_pct)
 
-        # Fallback se o robô não reportar (ex: robô ainda no SL fixo)
-        if guaranteed_pnl_pct == 0 and sl_price > 0 and entry_price > 0:
-            diff = (sl_price - entry_price) / entry_price * direction
-            if diff > 0:
-                guaranteed_pnl_pct = diff * 100
+        # Lucro garantido LÍQUIDO (calculado pelo robô a partir do stop real)
+        guaranteed_pnl_pct = status.get("guaranteed_pnl", 0.0)
 
         guaranteed_pnl_usd = (guaranteed_pnl_pct / 100) * FIXED_STAKE_USD
 

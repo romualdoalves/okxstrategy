@@ -109,12 +109,17 @@ async def monitor_bots():
         pnl_pct = 0.0
         pnl_usd = 0.0
         if direction != 0 and entry > 0 and last > 0:
-            pnl_pct = (last - entry) / entry * direction * 100
-            base_qty = float(st.get("size", 0) or 0)
-            if base_qty > 0:
-                pnl_usd = base_qty * (last - entry) * direction
+            # P&L líquido de taxas (calculado pelo robô); o bruto só como último recurso.
+            if st.get("unrealized_net_usd") is not None:
+                pnl_usd = float(st.get("unrealized_net_usd") or 0.0)
+                pnl_pct = float(st.get("unrealized_net_pct") or 0.0)
             else:
-                pnl_usd = FIXED_STAKE_USD * pnl_pct / 100
+                pnl_pct = (last - entry) / entry * direction * 100
+                base_qty = float(st.get("size", 0) or 0)
+                if base_qty > 0:
+                    pnl_usd = base_qty * (last - entry) * direction
+                else:
+                    pnl_usd = FIXED_STAKE_USD * pnl_pct / 100
 
         pos = exchange_pos.get(bot_id)
         okx_size = 0.0
@@ -197,6 +202,8 @@ async def monitor_bots():
             "pnl_pct": round(pnl_pct, 2),
             "pnl_usd": round(pnl_usd, 2),
             "guaranteed_pnl": st.get("guaranteed_pnl", 0),
+            "profit_lock": st.get("profit_lock"),
+            "trailing": st.get("trailing"),
             "daily_pnl": st.get("daily_pnl", 0),
             "wins": st.get("wins", 0),
             "losses": st.get("losses", 0),

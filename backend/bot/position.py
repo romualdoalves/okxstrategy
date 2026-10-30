@@ -5,12 +5,15 @@ Gestão da posição aberta: breakeven, TP1/trailing, saída, liquidação e con
 from __future__ import annotations
 
 import asyncio
+import time
 from typing import Optional
 from datetime import datetime, timedelta, timezone
 
 from ..exchanges.base import BaseExchange
 from ..database import SessionLocal, TradeModel
 from ..notifications import build_exit_msg, build_order_confirmed_msg
+from ..profit_lock import (capped_callback, net_pct_at_stop, net_unrealized, ratchet_stop, step_of_stop,
+                           steps_view, stop_is_tighter)
 from .common import log
 
 
@@ -25,6 +28,94 @@ class PositionMixin:
             return self._ts_pct
         atr_cb = (self._current_atr * 1.5) / price if price and self._current_atr else 0.0
         return max(0.005, min(0.05, atr_cb))
+
+    async def _check_profit_lock(self, price: float, exchange: BaseExchange):
+        """Antes do TP1: a cada +0,5% alcançado o stop sobe um degrau (1º degrau = breakeven líquido de custos).
+        Regra e backtest em profit_lock.py. O stop só avança; reiniciar o bot não regride (compara com _sl_price)."""
+        if self._tp1_done or self._direction == 0 or self._entry_price <= 0:
+            return
+        extreme = max(self._peak_price or price, price) if self._direction == 1 else min(self._peak_price or price, price)
+        target = ratchet_stop(self._entry_price, extreme, self._direction)
+        if target is None or not stop_is_tighter(target, self._sl_price, self._direction):
+            return
+        now = time.monotonic()
+        if now < getattr(self, "_lock_retry_at", 0.0):
+            return
+        self._lock_retry_at = now + 30   # se a OKX recusar, tenta de novo em 30s, não a cada tick
+
+        target = round(target, 8)
+        close_side = "sell" if self._direction == 1 else "buy"
+        old_sl_algo_id = self._sl_algo_id
+        # Cria o novo stop ANTES de cancelar o antigo: nunca fica sem proteção.
+        new_id = await exchange.place_stop_loss(self.config.symbol, close_side, self._sz, target)
+        if not new_id:
+            err = getattr(exchange, "last_order_error", None) or {}
+            self._record_order_rejection(
+                side=close_side, order_type="profit_lock",
+                reason=err.get("message", "Stop de trava de lucro recusado pela exchange."),
+                status="warning", raw_payload=err,
+            )
+            log.warning("[Bot %d] Trava de lucro recusada em %.8f: %s (stop anterior mantido).",
+                        self.config.id, target, err.get("message", err))
+            return
+        if old_sl_algo_id:
+            try:
+                if not await exchange.cancel_algo(self.config.symbol, old_sl_algo_id):
+                    log.warning("[Bot %d] Stop antigo %s não cancelado após a trava; verifique ordens pendentes.",
+                                self.config.id, old_sl_algo_id)
+            except Exception as cancel_err:
+                log.warning("[Bot %d] Falha ao cancelar o stop antigo após a trava: %s", self.config.id, cancel_err)
+        self._sl_algo_id = new_id
+        self._sl_price = target
+        self._persist_trailing_stop_level()
+        if getattr(self, "_lock_events", None) is None:
+            self._lock_events = {}
+        reached_iso = datetime.now(timezone.utc).isoformat()
+        for step_no in range(1, step_of_stop(self._entry_price, target, self._direction) + 1):
+            self._lock_events.setdefault(step_no, reached_iso)   # horário em que cada degrau foi alcançado
+        locked_pct = (target / self._entry_price - 1) * self._direction * 100
+        log.info("[Bot %d] TRAVA DE LUCRO: stop %s -> %.8f (%+.2f%% sobre a entrada).",
+                 self.config.id, old_sl_algo_id or "-", target, locked_pct)
+        await self._broadcast({"type": "trade", "bot_id": self.config.id, "event": "profit_lock",
+                               "price": price, "sl_price": target, "pnl": 0.0})
+
+    def _profit_view(self, last_price: float) -> dict:
+        """Números exibidos na tela, calculados num único lugar: P&L LÍQUIDO de taxas, degraus do trailing já
+        alcançados e lucro garantido líquido (o que sobra se o stop atual for executado)."""
+        out = {
+            "profit_lock": {"enabled": False, "steps": []},
+            "unrealized_net_usd": 0.0, "unrealized_net_pct": 0.0, "guaranteed_pnl": 0.0,
+        }
+        if self._direction == 0 or self._entry_price <= 0 or last_price <= 0:
+            return out
+        usd, pct = net_unrealized(self._entry_price, last_price, abs(float(self._sz or 0.0)), self._direction)
+        view = steps_view(self._entry_price, self._sl_price, self._direction, getattr(self, "_lock_events", None))
+        out.update(profit_lock=view, unrealized_net_usd=round(usd, 2), unrealized_net_pct=round(pct, 2))
+        if self._sl_price > 0 and (self._tp1_done or view.get("reached", 0) >= 1):
+            out["guaranteed_pnl"] = round(max(0.0, net_pct_at_stop(self._entry_price, self._sl_price, self._direction)), 2)
+        return out
+
+    def _trailing_view(self, last_price: float) -> dict | None:
+        """Parâmetros de trailing que o bot ADOTA nesta posição (os mesmos usados em _check_tp1), para o card:
+        onde o trailing arma, que distância usa e de onde ela vem, e o stop atual com o que ele garante."""
+        if self._direction == 0 or self._entry_price <= 0:
+            return None
+        d, entry = self._direction, self._entry_price
+        tp1 = self._tp1_price or entry * (1.02 if d == 1 else 0.98)   # mesmo fallback de _tp1_reached
+        if self._tp1_done and self._ts_callback_ratio > 0:
+            callback = self._ts_callback_ratio                          # distância efetivamente enviada à OKX
+        else:
+            callback = capped_callback(self._trailing_callback(last_price or entry), self._sl_price,
+                                       last_price or entry, entry, d)
+        return {
+            "armed": bool(self._tp1_done),
+            "arm_price": round(tp1, 8),
+            "arm_pct": round((tp1 / entry - 1) * d * 100, 2),
+            "callback_pct": round(callback * 100, 2),
+            "callback_source": "strategy" if self._ts_pct > 0 else "atr",   # ts_pct da estratégia | 1,5×ATR (0,5%–5%)
+            "stop_price": round(self._sl_price, 8) if self._sl_price > 0 else None,
+            "stop_pct_net": round(net_pct_at_stop(entry, self._sl_price, d), 2) if self._sl_price > 0 else None,
+        }
 
     def _tp1_reached(self, price: float) -> bool:
         tp1 = self._tp1_price or (self._entry_price * (1.02 if self._direction == 1 else 0.98))
@@ -47,7 +138,9 @@ class PositionMixin:
             # Ativa a Sombra Dinâmica (Trailing Stop 100% dinâmico) para toda a posição!
             # A distância é baseada no ATR (volatilidade real) mas limitada por faixa de
             # lucro: quanto mais a operação avança, mais apertada a sombra fica.
-            cb = self._trailing_callback(price)
+            # O trailing nunca pode ficar abaixo do stop já travado pela trava de lucro.
+            cb = capped_callback(self._trailing_callback(price), self._sl_price, price,
+                                 self._entry_price, self._direction)
 
             log.info("[Bot %d] DYNAMIC SHADOW TRIGGER ativado! Lucro: %.2f%%. Callback dinâmico: %.2f%%",
                      self.config.id, pnl_pct*100, cb*100)
@@ -83,9 +176,9 @@ class PositionMixin:
                 )
                 # Tenta fallback SL fixo
                 fallback_stop = (
-                    max(self._entry_price, price * (1 - cb))
+                    max(self._entry_price, self._sl_price, price * (1 - cb))
                     if self._direction == 1
-                    else min(self._entry_price, price * (1 + cb))
+                    else min(self._entry_price, self._sl_price or self._entry_price, price * (1 + cb))
                 )
                 fallback_id = await exchange.place_stop_loss(
                     self.config.symbol,
@@ -153,8 +246,9 @@ class PositionMixin:
                     f"🤖 Bot: {self.config.name} ({self.config.symbol})\n"
                     f"📈 Lucro Atual: +{pnl_pct*100:.2f}%\n"
                     f"🎯 Sombra (Trailing): {cb*100:.2f}% de distância da máxima\n\n"
-                    f"O Stop Loss inicial foi cancelado. Uma sombra dinâmica foi acoplada ao preço. "
-                    f"A partir de agora, é matematicamente impossível perder dinheiro nesta operação."
+                    f"O stop fixo foi substituído por um trailing stop dinâmico acoplado ao preço. "
+                    f"Stop atual: {self._sl_price:.4f} ({(self._sl_price / self._entry_price - 1) * self._direction * 100:+.2f}% "
+                    f"sobre a entrada, antes de taxas)."
                 )
                 asyncio.create_task(self._notifier.send(msg))
             except:
