@@ -73,9 +73,13 @@ class BotManager:
     async def liquidate_bot(self, bot_id: int):
         """Fecha a posição aberta de um bot específico."""
         inst = self._instances.get(bot_id)
-        if inst and inst._direction != 0 and inst.exchange:
-            log.info("Reset: Liquidando manualmente bot %d (%s)", bot_id, inst.config.symbol)
-            await inst.manual_liquidate(inst.exchange)
+        if not inst or not inst.exchange:
+            return False, "Bot não está em execução."
+        if inst._direction == 0:
+            return False, "O bot não tem posição aberta."
+        log.info("Reset: Liquidando manualmente bot %d (%s)", bot_id, inst.config.symbol)
+        ok = await inst.manual_liquidate(inst.exchange)
+        return bool(ok), (None if ok else (getattr(inst, "last_close_error", None) or "Falha ao fechar a posição."))
 
     async def liquidate_all(self, db: Session):
         """Para todos os bots, cancela ordens algo pendentes e fecha posições abertas."""
@@ -188,8 +192,7 @@ class BotManager:
                         continue
                     pos = await exchange.get_position(bot.config.symbol)
                     qty = abs(float(pos.size or 0.0)) if pos else 0.0
-                    baseline_qty = abs(float(getattr(bot.config, "baseline_balance", 0.0) or 0.0))
-                    net_qty = max(0.0, qty - baseline_qty)
+                    net_qty = bot._net_size(pos)
                     if bot._direction == 0:
                         if net_qty > 1e-9 and bot._is_spot_symbol(bot.config.symbol):
                             if not bot._can_adopt_spot_position(pos, context="reconcile_loop"):
@@ -224,7 +227,7 @@ class BotManager:
                                 bot.config.id, qty, bot.config.symbol, adopted_px,
                             )
                         continue
-                    if qty <= 0:
+                    if net_qty <= 0:
                         # Antes de fabricar um fechamento com pnl=0, tenta recuperar o fill
                         # real de saída na OKX — o WS pode só estar atrasado, e a posição já
                         # ter sido fechada com um preço/P&L real que não pode ser descartado.

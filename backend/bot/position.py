@@ -445,17 +445,30 @@ class PositionMixin:
         log.warning("[Bot %d] SW-TS: posição pode ainda estar aberta após saída", self.config.id)
 
     async def manual_liquidate(self, exchange: BaseExchange):
-        """Fecha a posição a mercado e confirma via REST polling OKX."""
-        if self._direction == 0: return
+        """Fecha a posição a mercado e confirma via REST polling OKX. True só se a OKX confirmou o fechamento."""
+        if self._direction == 0:
+            self.last_close_error = "O bot não tem posição aberta."
+            return False
 
+        # Preço de referência: ticker ao vivo (o último candle pode ser de horas atrás em timeframes altos).
         last_price = self._candles[-1].close if self._candles else self._entry_price
+        try:
+            live = (await exchange.get_ticker(self.config.symbol)).get("last")
+            if live:
+                last_price = float(live)
+        except Exception:
+            pass
         close_size = await self._close_size_from_exchange(exchange)
+        self.last_close_error = None
 
         try:
-            # 1. Tenta liquidação nativa na exchange
-            ord_id = await exchange.liquidate_position(self.config.symbol)
+            if self._is_spot_symbol(self.config.symbol):
+                # Spot: vende só o saldo LÍQUIDO do bot. A liquidação nativa vende o saldo total da moeda,
+                # o que levaria junto os holdings do usuário anteriores ao bot (baseline).
+                ord_id = None
+            else:
+                ord_id = await exchange.liquidate_position(self.config.symbol)
             if not ord_id:
-                # 2. Fallback para ordem contrária manual se a liquidação nativa falhar ou não for suportada
                 close_side = "sell" if self._direction > 0 else "buy"
                 ord_id = await exchange.market_order(
                     symbol=self.config.symbol,
@@ -466,25 +479,30 @@ class PositionMixin:
                 if not ord_id:
                     err = getattr(exchange, "last_order_error", None) or {"message": "Erro desconhecido ao liquidar."}
                     raise RuntimeError(f"Ordem de mercado falhou: {err.get('message')}")
-            
+
             self._exit_ord_id = ord_id
             log.info("[Bot %d] Liquidação manual enviada (ID: %s). Polling REST...", self.config.id, ord_id)
         except Exception as e:
-            log.warning("[Bot %d] Falha ao liquidar na exchange: %s", self.config.id, e)
-            self._save_trade({
-                "type": "exit", "event": "MANUAL_FAILED",
-                "exit_price": self._entry_price,
-                "pnl": 0.0, "peak_price": self._peak_price or None,
-            }, update_id=self._current_trade_id)
-            self._reset()
-            return
+            # A ordem NÃO foi aceita: a posição continua aberta na OKX. Não grava P&L nem zera o estado —
+            # antes isto registrava pnl=0 e o loop de reconciliação readotava o saldo com o preço atual
+            # como entrada, apagando o lucro real da tela.
+            log.error("[Bot %d] Falha ao liquidar na exchange; posição mantida: %s", self.config.id, e)
+            self.last_close_error = str(e)
+            await self._broadcast({
+                "type":     "order_error",
+                "bot_id":   self.config.id,
+                "bot_name": self.config.name,
+                "symbol":   self.config.symbol,
+                "error":    {"kind": "manual_close_failed", "message": str(e)},
+            })
+            return False
 
         # Polling REST até confirmar fechamento (mesmo padrão do _sw_exit).
         # WebSocket pode chegar primeiro — _on_position_closed guarda contra duplicação.
         for attempt in range(12):
             await asyncio.sleep(2)
             if self._direction == 0:
-                return  # already handled by WebSocket trade_updates
+                return True  # already handled by WebSocket trade_updates
             try:
                 if ord_id and attempt >= 1:
                     order = await exchange.get_order(ord_id)
@@ -492,7 +510,7 @@ class PositionMixin:
                         exit_price = float(order.get("filled_avg_price") or last_price)
                         filled_size = float(order.get("filled_size") or close_size)
                         if await self._confirm_flat_then_close(exit_price, filled_size, exchange):
-                            return
+                            return True
                         continue
                 pos = await exchange.get_position(self.config.symbol)
                 if pos is None or self._net_size(pos) <= 1e-9:
@@ -505,7 +523,9 @@ class PositionMixin:
                         except Exception:
                             pass
                     await self._on_position_closed(exit_price, close_size, exchange)
-                    return
+                    return True
             except Exception:
                 pass
         log.warning("[Bot %d] Liquidação manual: posição pode ainda estar aberta", self.config.id)
+        self.last_close_error = "Ordem enviada, mas a OKX ainda mostra posição aberta. Verifique antes de tentar de novo."
+        return False

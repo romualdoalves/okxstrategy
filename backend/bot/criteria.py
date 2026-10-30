@@ -11,6 +11,9 @@ from ..strategies.base import Signal
 from ..feeds.economic_calendar import calendar_feed
 from .common import log
 
+# Saldo spot líquido abaixo disto (em USD) é poeira/arredondamento, não posição do bot.
+DUST_USD = 1.0
+
 
 class OrderGateMixin:
     @staticmethod
@@ -29,7 +32,14 @@ class OrderGateMixin:
         desconta o baseline. Em derivativos é o próprio tamanho."""
         if not pos:
             return 0.0
-        return max(0.0, abs(float(getattr(pos, "size", 0.0) or 0.0)) - self._baseline_qty())
+        net = max(0.0, abs(float(getattr(pos, "size", 0.0) or 0.0)) - self._baseline_qty())
+        # Em spot, `saldo − baseline` deixa resíduos de arredondamento (ex.: 1e-8 BTC) que não são posição.
+        # Abaixo de DUST_USD não é negociável nem relevante: tratar como flat.
+        if net > 0 and self._is_spot_symbol(self.config.symbol):
+            px = abs(float(getattr(pos, "avg_price", 0.0) or 0.0))
+            if px > 0 and net * px < DUST_USD:
+                return 0.0
+        return net
 
     def _exchange_has_bot_position(self, pos) -> bool:
         """True se a OKX mostra uma posição que precisa ser tratada antes de uma nova entrada. Com posição
@@ -50,7 +60,7 @@ class OrderGateMixin:
 
         total_size   = abs(float(getattr(pos, "size", 0.0) or 0.0))
         baseline_qty = abs(float(getattr(self.config, "baseline_balance", 0.0) or 0.0))
-        net_size     = max(0.0, total_size - baseline_qty)
+        net_size     = self._net_size(pos)
 
         if net_size <= 1e-9:
             log.debug(
@@ -389,7 +399,7 @@ class OrderGateMixin:
                 pos = await exchange.get_position(self.config.symbol)
                 qty = abs(float(getattr(pos, "size", 0.0) or 0.0)) if pos else 0.0
                 baseline = abs(float(getattr(self.config, "baseline_balance", 0.0) or 0.0)) if self._is_spot_symbol(self.config.symbol) else 0.0
-                net = max(0.0, qty - baseline)
+                net = self._net_size(pos)
                 if net > 1e-9:
                     o8 = ("ABERTA", "red", f"OKX já possui posição aberta neste ativo (líquido: {net:.8f}).")
                 elif qty > 1e-9:

@@ -452,7 +452,9 @@ async def liquidate_bot_api(bot_id: int, db: Session = Depends(get_db)):
     bot = db.get(BotModel, bot_id)
     if not bot:
         raise HTTPException(404, "Bot não encontrado")
-    await manager.liquidate_bot(bot_id)
+    ok, error = await manager.liquidate_bot(bot_id)
+    if not ok:
+        raise HTTPException(409, error or "Falha ao fechar a posição; ela continua aberta na OKX.")
     return {"status": "liquidated", "bot_id": bot_id}
 
 @router.post("/api/bots/{bot_id}/switch-symbol")

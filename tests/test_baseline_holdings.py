@@ -86,3 +86,55 @@ def test_exit_not_confirmed_while_position_remains():
     bot = Bot(baseline=1.0, direction=1)
     assert run(bot._confirm_flat_then_close(80_000.0, 0.001, Ex([1.001]))) is False
     assert bot.closed == [] and abs(bot._sz - 0.001) < 1e-12
+
+
+def test_dust_residue_after_baseline_is_not_a_position():
+    # saldo total ≈ baseline: sobra de 1e-8 BTC (~US$ 0,001) é arredondamento, não posição
+    bot = Bot(baseline=0.05, direction=0)
+    pos = NS(size=0.05000001, side="long", avg_price=76_000.0)
+    assert bot._net_size(pos) == 0.0
+    assert bot._exchange_has_bot_position(pos) is False
+    assert bot._can_adopt_spot_position(pos, context="test") is False
+    # posição real (≈ US$ 100) continua contando
+    assert abs(bot._net_size(NS(size=0.05132, side="long", avg_price=76_000.0)) - 0.00132) < 1e-12
+
+
+class PosBot(criteria_mod.OrderGateMixin):
+    """Liquidação manual: ordem recusada não pode zerar P&L nem o estado."""
+    from backend.bot.position import PositionMixin as _P
+    manual_liquidate = _P.manual_liquidate
+
+    def __init__(self):
+        self.config = NS(id=1, symbol="BTC-USDT", baseline_balance=0.0, name="b")
+        self._direction, self._sz, self._entry_price = 1, 0.001, 76_000.0
+        self._candles, self.events = [], []
+
+    async def _broadcast(self, msg):
+        self.events.append(msg)
+
+    def _save_trade(self, *a, **k):
+        raise AssertionError("não deve gravar trade quando a ordem foi recusada")
+
+    def _reset(self):
+        raise AssertionError("não deve zerar o estado quando a ordem foi recusada")
+
+
+class FailingEx:
+    last_order_error = {"message": "OKX: insufficient balance"}
+
+    async def get_ticker(self, symbol):
+        return {"last": 76_500.0}
+
+    async def get_position(self, symbol):
+        return NS(size=0.001, side="long", avg_price=76_500.0)
+
+    async def market_order(self, **kw):
+        return None
+
+
+def test_failed_manual_close_keeps_position_and_pnl():
+    bot = PosBot()
+    assert run(bot.manual_liquidate(FailingEx())) is False
+    assert bot._direction == 1 and bot._entry_price == 76_000.0
+    assert "insufficient" in bot.last_close_error
+    assert bot.events[0]["error"]["kind"] == "manual_close_failed"

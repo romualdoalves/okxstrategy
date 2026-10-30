@@ -94,7 +94,11 @@ export default function BotCard({ bot, liveStatus }) {
   async function handleLiquidate(e) {
     e.stopPropagation()
     if (!confirm(t('bd.liquidate_confirm') || 'Fechar posição a mercado agora?')) return
-    await liquidateBot(bot.id)
+    try {
+      await liquidateBot(bot.id)
+    } catch (err) {
+      alert(`Não foi possível fechar a posição: ${err.message}\nA posição continua aberta na OKX.`)
+    }
     qc.invalidateQueries({ queryKey: ['bots'] })
   }
 
