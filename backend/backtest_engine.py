@@ -101,6 +101,7 @@ class BacktestEngine:
         slippage_rate: float = STRICT_SLIPPAGE_RATE,
         legacy_lookahead: bool = False,
         profit_lock: bool = True,
+        rearm_after_stop: bool = False,
     ):
         """
         Backtest estrito para o Scanner: usa compute_with_context(), simula SPOT
@@ -122,6 +123,8 @@ class BacktestEngine:
         tp1_hits = 0
         lock_exits = 0
         lock_moves = 0
+        rearm_blocked = False        # experimento: após stop/trava, só reentra depois que o sinal de compra desligar e ligar
+        reentries_blocked = 0
 
         coverage = {
             "mode": "strict",
@@ -176,7 +179,7 @@ class BacktestEngine:
             return {"extra_candles": out}
 
         def close_position(exit_price: float, idx: int, reason: str, exit_type: str):
-            nonlocal position, signal_exits, stop_exits, trailing_exits, lock_exits
+            nonlocal position, signal_exits, stop_exits, trailing_exits, lock_exits, rearm_blocked
             if not position:
                 return
             entry_value = position["qty"] * position["entry_price"]
@@ -217,6 +220,8 @@ class BacktestEngine:
                 trailing_exits += 1
             elif exit_type == "lock":
                 lock_exits += 1
+            if rearm_after_stop and exit_type in ("stop", "lock"):
+                rearm_blocked = True
             position = None
 
         for i in range(warmup, len(candles)):
@@ -293,8 +298,12 @@ class BacktestEngine:
                 # Contrato (spot long-only): SELL = sair da posição; nunca abre short.
                 exit_requested = result.signal == Signal.SELL
 
+                if result.signal != Signal.BUY:
+                    rearm_blocked = False                      # sinal desligou: a próxima compra é um novo gatilho
                 if position is None:
-                    if result.signal == Signal.BUY:
+                    if result.signal == Signal.BUY and rearm_blocked:
+                        reentries_blocked += 1
+                    elif result.signal == Signal.BUY:
                         atr = self._atr(current_slice, fallback_price=current_price)
                         sl_price, tp1_price, ts_pct = self._risk_from_result(result, current_price, 1, atr)
                         entry_price = current_price * (1 + slippage_rate)
@@ -379,6 +388,7 @@ class BacktestEngine:
             "trailing_exits": trailing_exits,
             "lock_exits": lock_exits,
             "lock_moves": lock_moves,
+            "reentries_blocked": reentries_blocked,
             "signal_exits": signal_exits,
             "tp1_hits": tp1_hits,
             "open_position": open_position,
