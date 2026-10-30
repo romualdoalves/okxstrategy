@@ -9,11 +9,6 @@ import StudyBadge from '../components/StudyBadge'
 
 const STUDY_ORDER = { candidate: 0, watch: 1, none: 2, insufficient: 2, retired: 3 }
 
-const SYMBOLS    = [
-  'BTC-USDT', 'ETH-USDT', 'SOL-USDT', 'XRP-USDT', 'BNB-USDT',
-  'DOGE-USDT', 'ADA-USDT', 'AVAX-USDT', 'LINK-USDT', 'LTC-USDT',
-  'DOT-USDT', 'UNI-USDT',
-]
 const TIMEFRAMES = ['1m','5m','15m','1h','4h','1D']
 const MEDALS     = ['🥇','🥈','🥉','','','','','','','']
 const FIXED_STAKE_USD = 100
@@ -89,6 +84,12 @@ function AssetCard({ asset, selected, onSelect, disabled, closedMarket, blockedR
         />
       </div>
 
+      {asset.volume_usd_24h != null && (
+        <p className="text-[11px] text-muted mt-1.5">
+          Vol 24h ${(asset.volume_usd_24h / 1e6).toFixed(1)}M · {asset.change_24h_pct >= 0 ? '+' : ''}{asset.change_24h_pct}%
+        </p>
+      )}
+
       {!details.error && !disabled && (
         <p className="text-xs text-muted mt-1.5">
           {details.metric === 'eigenvector_centrality'
@@ -141,19 +142,6 @@ export default function NewBot() {
     stop_loss_usd:   -50,
     strategy_params: {},
   })
-  const { data: tradabilityData } = useQuery({
-    queryKey: ['symbol-tradability', form.demo],
-    queryFn: () => getSymbolTradability(SYMBOLS, form.demo),
-    staleTime: 60_000,
-  })
-
-  const tradabilityRows = tradabilityData?.symbols ?? []
-  const tradabilityMap = new Map(tradabilityRows.map(r => [r.symbol, r]))
-  const blockedReasonFor = sym => {
-    const row = tradabilityMap.get(sym)
-    return row && row.tradable === false ? (row.reason || 'Par indisponível para negociação nesta conta.') : ''
-  }
-  const isBlockedSymbol = sym => Boolean(blockedReasonFor(sym))
   const [customParams, setCustomParams] = useState({})
   const [forceRetired, setForceRetired] = useState(false)
   const [error, setError]     = useState('')
@@ -164,6 +152,23 @@ export default function NewBot() {
   const [assetMode,    setAssetMode]    = useState(null)
   const [rankLoading,  setRankLoading]  = useState(false)
   const [ranking,      setRanking]      = useState(null)
+
+  // Top 5 SPOT da OKX por volume (dinâmico): é o único universo oferecido
+  const topSymbols = ranking?.assets?.map(a => a.symbol) ?? []
+  const { data: tradabilityData } = useQuery({
+    queryKey: ['symbol-tradability', form.demo, topSymbols.join(',')],
+    queryFn: () => getSymbolTradability(topSymbols, form.demo),
+    enabled: topSymbols.length > 0,
+    staleTime: 60_000,
+  })
+
+  const tradabilityRows = tradabilityData?.symbols ?? []
+  const tradabilityMap = new Map(tradabilityRows.map(r => [r.symbol, r]))
+  const blockedReasonFor = sym => {
+    const row = tradabilityMap.get(sym)
+    return row && row.tradable === false ? (row.reason || 'Par indisponível para negociação nesta conta.') : ''
+  }
+  const isBlockedSymbol = sym => Boolean(blockedReasonFor(sym))
 
   // Verificação de mercado aberto para ativos não-crypto
   const isCrypto = form.symbol.includes('/') || form.symbol.includes('-')
@@ -202,9 +207,11 @@ export default function NewBot() {
     }
   }, [form.strategy_id, strategies])
 
+  // Ao escolher estratégia/timeframe, os 5 melhores ativos aparecem automaticamente
   useEffect(() => {
     setAssetMode(null)
     setRanking(null)
+    if (form.strategy_id) fetchRanking()
   }, [form.strategy_id, form.timeframe])
 
   useEffect(() => { setForceRetired(false) }, [form.strategy_id])
@@ -357,25 +364,14 @@ export default function NewBot() {
             {assetMode === null && (
               <div className="space-y-3">
                 <p className="text-sm text-muted">{t('nb.auto_ask')}</p>
-                <AiUsageNotice consumesTokens={false} text={t('nb.local_ranking_notice')} />
-                <div className="flex gap-3">
-                  <button
-                    type="button"
-                    onClick={fetchRanking}
-                    className="btn-primary btn flex-1 flex items-center justify-center gap-2"
-                  >
-                    <Sparkles size={14} />
-                    {t('nb.auto_yes')}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAssetMode('manual')}
-                    className="btn-ghost btn flex-1 flex items-center justify-center gap-2"
-                  >
-                    <List size={14} />
-                    {t('nb.auto_no')}
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={fetchRanking}
+                  className="btn-primary btn w-full flex items-center justify-center gap-2"
+                >
+                  <Sparkles size={14} />
+                  {t('nb.auto_yes')}
+                </button>
               </div>
             )}
 
@@ -470,17 +466,10 @@ export default function NewBot() {
                   value={form.symbol}
                   onChange={e => setField('symbol', e.target.value)}
                 >
-                  <optgroup label="OKX Spot — sem alavancagem">
-                    {[
-                      ['BTC-USDT','Bitcoin'],['ETH-USDT','Ethereum'],
-                      ['SOL-USDT','Solana'],['XRP-USDT','Ripple'],
-                      ['BNB-USDT','BNB'],['DOGE-USDT','Dogecoin'],
-                      ['ADA-USDT','Cardano'],['AVAX-USDT','Avalanche'],
-                      ['LINK-USDT','Chainlink'],['LTC-USDT','Litecoin'],
-                      ['DOT-USDT','Polkadot'],['UNI-USDT','Uniswap'],
-                    ].map(([sym, name]) => (
+                  <optgroup label="OKX Spot — Top 5 por volume 24h">
+                    {[...new Set([...topSymbols, form.symbol])].map(sym => (
                       <option key={sym} value={sym} disabled={usedSymbols.has(sym) || isBlockedSymbol(sym)}>
-                        {sym} ({name}){usedSymbols.has(sym) ? ' — em uso' : isBlockedSymbol(sym) ? ' — bloqueado' : ''}
+                        {sym}{usedSymbols.has(sym) ? ' — em uso' : isBlockedSymbol(sym) ? ' — bloqueado' : ''}
                       </option>
                     ))}
                   </optgroup>
@@ -490,9 +479,6 @@ export default function NewBot() {
                     Par bloqueado pela corretora: {blockedReasonFor(form.symbol)}
                   </p>
                 )}
-                <p className="text-[10px] text-muted/60">
-                  Não encontrou? Digite diretamente no campo acima o instId spot OKX (ex: OP-USDT).
-                </p>
                 <button
                   type="button"
                   onClick={() => { setAssetMode(null); setRanking(null) }}

@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from fastapi import HTTPException
 
 from ..exchanges.factory import build_exchange, get_exchange_provider, get_ranked_assets_universe, map_timeframe_for_history
+from ..exchanges.okx_universe import fetch_top_spot_assets
 from ..common import _assert_spot_only, _get_symbol_tradability, _norm_symbol
 
 router = APIRouter()
@@ -166,13 +167,22 @@ async def market_symbol_tradability(symbols: str, demo: bool = True):
         "checked_at": datetime.now(timezone.utc).isoformat(),
     }
 
+@router.get("/api/market/top-assets")
+async def top_assets():
+    """Top 5 pares SPOT X-USDT da OKX por volume em 24h (sem stablecoins)."""
+    assets = await fetch_top_spot_assets()
+    if not assets:
+        raise HTTPException(503, "Não foi possível obter o ranking de volume da OKX")
+    return {"assets": assets, "source": "okx_spot_tickers"}
+
 @router.get("/api/market/rank-assets")
 async def rank_assets(strategy_id: str = "graph_regime", timeframe: str = "15m"):
     """Classifica os 5 ativos por adequação à estratégia e timeframe atuais."""
     import pandas as pd
     import pandas_ta as ta
 
-    RANK_ASSETS = get_ranked_assets_universe()
+    top = await fetch_top_spot_assets()
+    RANK_ASSETS = [a["symbol"] for a in top] or get_ranked_assets_universe()[:5]
     bar = map_timeframe_for_history(timeframe)
 
     ohlcv: dict[str, list] = {}
@@ -524,9 +534,14 @@ async def rank_assets(strategy_id: str = "graph_regime", timeframe: str = "15m")
     # ── Ranking final ─────────────────────────────────────────────────────────
     results.sort(key=lambda x: x["score"], reverse=True)
     rank_labels = {1: "Excelente", 2: "Bom", 3: "Moderado", 4: "Fraco", 5: "Fraco"}
+    top_info = {a["symbol"]: a for a in top}
     for i, r in enumerate(results):
         r["rank"]  = i + 1
         r["label"] = rank_labels.get(i + 1, "Fraco")
+        info = top_info.get(r["symbol"])
+        if info:
+            r["volume_usd_24h"] = info["volume_usd_24h"]
+            r["change_24h_pct"] = info["change_24h_pct"]
 
     return {
         "strategy_id": strategy_id,
