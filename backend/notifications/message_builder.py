@@ -344,11 +344,13 @@ def build_exit_msg(
     exit_reason:   str,       # "SL" | "TRAILING" | "MANUAL" | "WS_EXECUTION" etc.
     entry_price:   float,
     exit_price:    float,
-    pnl:           float,
+    pnl:           float,       # LÍQUIDO de taxas quando `gross_pnl` é informado
     daily_pnl:     float,
     stop_loss_usd: float,
     wins:          int,
     losses:        int,
+    gross_pnl:     float | None = None,
+    fees:          float = 0.0,
 ) -> str:
     dir_label = "LONG" if direction == "long" else "SHORT"
     emoji = "🔴" if pnl < 0 else "🟢"
@@ -363,6 +365,7 @@ def build_exit_msg(
         "DYNAMIC_SHADOW_TRIGGER": "Shadow Trailing Stop",
     }
     reason_label = reason_labels.get(exit_reason, exit_reason)
+    gross_line = f"🧾 *Bruto {_fmt_pnl(gross_pnl)} · taxas -${fees:.2f}*\n" if gross_pnl is not None else ""
 
     return (
         f"{_header(bot_name, demo)}\n"
@@ -373,7 +376,8 @@ def build_exit_msg(
         f"📋 *Motivo  :* `{reason_label}`\n"
         f"📍 *Entrada :* {_fmt_price(entry_price)}\n"
         f"🚪 *Saída   :* {_fmt_price(exit_price)}  `({pct:.2f}%)`\n"
-        f"💰 *P&L     :* `{_fmt_pnl(pnl)}`\n"
+        f"💰 *P&L líquido:* `{_fmt_pnl(pnl)}`\n"
+        f"{gross_line}"
         f"\n"
         f"💼 *Conta*\n"
         f"{_account_lines(daily_pnl, stop_loss_usd, wins, losses)}"

@@ -1,0 +1,421 @@
+{
+ "fee_rate": 0.004,
+ "measured_on": "2026-10-31",
+ "method": "motor estrito (slippage 0,05%), BTC/ETH/SOL, até 3.000 candles no timeframe validado, taxa de 0,40% por lado",
+ "strategies": {
+  "MR001-15m": {
+   "BTC-USDT": {
+    "trades": 0,
+    "profit_usd": 0.0,
+    "pf": 0.0,
+    "days": 30,
+    "tf": "15m"
+   },
+   "ETH-USDT": {
+    "trades": 0,
+    "profit_usd": 0.0,
+    "pf": 0.0,
+    "days": 30,
+    "tf": "15m"
+   },
+   "SOL-USDT": {
+    "trades": 0,
+    "profit_usd": 0.0,
+    "pf": 0.0,
+    "days": 30,
+    "tf": "15m"
+   }
+  },
+  "MR007-1D": {
+   "BTC-USDT": {
+    "trades": 17,
+    "profit_usd": 677.3,
+    "pf": 4.87,
+    "days": 2899,
+    "tf": "1D"
+   },
+   "ETH-USDT": {
+    "trades": 12,
+    "profit_usd": 1246.0,
+    "pf": 7.11,
+    "days": 2899,
+    "tf": "1D"
+   },
+   "SOL-USDT": {
+    "trades": 13,
+    "profit_usd": 1087.3,
+    "pf": 5.96,
+    "days": 2122,
+    "tf": "1D"
+   }
+  },
+  "PA004-15m": {
+   "BTC-USDT": {
+    "trades": 0,
+    "profit_usd": 0.0,
+    "pf": 0.0,
+    "days": 30,
+    "tf": "15m"
+   },
+   "ETH-USDT": {
+    "trades": 2,
+    "profit_usd": -3.8,
+    "pf": 0.0,
+    "days": 30,
+    "tf": "15m"
+   },
+   "SOL-USDT": {
+    "trades": 0,
+    "profit_usd": 0.0,
+    "pf": 0.0,
+    "days": 30,
+    "tf": "15m"
+   }
+  },
+  "PA005-1H": {
+   "BTC-USDT": {
+    "trades": 3,
+    "profit_usd": 21.7,
+    "pf": 6.52,
+    "days": 179,
+    "tf": "1H"
+   },
+   "ETH-USDT": {
+    "trades": 4,
+    "profit_usd": -10.8,
+    "pf": 0.0,
+    "days": 179,
+    "tf": "1H"
+   },
+   "SOL-USDT": {
+    "trades": 3,
+    "profit_usd": -9.0,
+    "pf": 0.0,
+    "days": 179,
+    "tf": "1H"
+   }
+  },
+  "RG005-1D": {
+   "BTC-USDT": {
+    "trades": 32,
+    "profit_usd": 466.5,
+    "pf": 3.81,
+    "days": 2899,
+    "tf": "1D"
+   },
+   "ETH-USDT": {
+    "trades": 28,
+    "profit_usd": 397.8,
+    "pf": 3.86,
+    "days": 2899,
+    "tf": "1D"
+   },
+   "SOL-USDT": {
+    "trades": 20,
+    "profit_usd": 382.6,
+    "pf": 3.06,
+    "days": 2122,
+    "tf": "1D"
+   }
+  },
+  "TF002-1D": {
+   "BTC-USDT": {
+    "trades": 16,
+    "profit_usd": -24.7,
+    "pf": 0.4,
+    "days": 2899,
+    "tf": "1D"
+   },
+   "ETH-USDT": {
+    "trades": 5,
+    "profit_usd": 20.4,
+    "pf": 7.0,
+    "days": 2899,
+    "tf": "1D"
+   },
+   "SOL-USDT": {
+    "trades": 5,
+    "profit_usd": 17.8,
+    "pf": 21.89,
+    "days": 2122,
+    "tf": "1D"
+   }
+  },
+  "TF003-1D": {
+   "BTC-USDT": {
+    "trades": 365,
+    "profit_usd": -500.8,
+    "pf": 0.28,
+    "days": 2899,
+    "tf": "1D"
+   },
+   "ETH-USDT": {
+    "trades": 445,
+    "profit_usd": -668.6,
+    "pf": 0.28,
+    "days": 2899,
+    "tf": "1D"
+   },
+   "SOL-USDT": {
+    "trades": 309,
+    "profit_usd": -195.2,
+    "pf": 0.72,
+    "days": 2122,
+    "tf": "1D"
+   }
+  },
+  "TF005-1D": {
+   "BTC-USDT": {
+    "trades": 227,
+    "profit_usd": -351.8,
+    "pf": 0.25,
+    "days": 2899,
+    "tf": "1D"
+   },
+   "ETH-USDT": {
+    "trades": 315,
+    "profit_usd": -467.4,
+    "pf": 0.32,
+    "days": 2899,
+    "tf": "1D"
+   },
+   "SOL-USDT": {
+    "trades": 239,
+    "profit_usd": -39.9,
+    "pf": 0.93,
+    "days": 2122,
+    "tf": "1D"
+   }
+  },
+  "TF006-1D": {
+   "BTC-USDT": {
+    "trades": 21,
+    "profit_usd": -2.9,
+    "pf": 0.98,
+    "days": 2899,
+    "tf": "1D"
+   },
+   "ETH-USDT": {
+    "trades": 14,
+    "profit_usd": 192.8,
+    "pf": 3.31,
+    "days": 2899,
+    "tf": "1D"
+   },
+   "SOL-USDT": {
+    "trades": 7,
+    "profit_usd": 118.8,
+    "pf": 3.39,
+    "days": 2122,
+    "tf": "1D"
+   }
+  },
+  "TF007-1D": {
+   "BTC-USDT": {
+    "trades": 7,
+    "profit_usd": -6.9,
+    "pf": 0.67,
+    "days": 2899,
+    "tf": "1D"
+   },
+   "ETH-USDT": {
+    "trades": 4,
+    "profit_usd": 5.9,
+    "pf": 1.36,
+    "days": 2899,
+    "tf": "1D"
+   },
+   "SOL-USDT": {
+    "trades": 5,
+    "profit_usd": 19.9,
+    "pf": 2.39,
+    "days": 2122,
+    "tf": "1D"
+   }
+  },
+  "TF008-1D": {
+   "BTC-USDT": {
+    "trades": 26,
+    "profit_usd": 247.2,
+    "pf": 3.23,
+    "days": 2899,
+    "tf": "1D"
+   },
+   "ETH-USDT": {
+    "trades": 31,
+    "profit_usd": 352.7,
+    "pf": 2.2,
+    "days": 2899,
+    "tf": "1D"
+   },
+   "SOL-USDT": {
+    "trades": 21,
+    "profit_usd": 528.9,
+    "pf": 4.16,
+    "days": 2122,
+    "tf": "1D"
+   }
+  },
+  "TF009-1D": {
+   "BTC-USDT": {
+    "trades": 31,
+    "profit_usd": 12.2,
+    "pf": 1.1,
+    "days": 2899,
+    "tf": "1D"
+   },
+   "ETH-USDT": {
+    "trades": 28,
+    "profit_usd": 116.8,
+    "pf": 2.02,
+    "days": 2899,
+    "tf": "1D"
+   },
+   "SOL-USDT": {
+    "trades": 21,
+    "profit_usd": 129.7,
+    "pf": 1.94,
+    "days": 2122,
+    "tf": "1D"
+   }
+  },
+  "TF010-1D": {
+   "BTC-USDT": {
+    "trades": 11,
+    "profit_usd": 64.6,
+    "pf": 1.69,
+    "days": 2899,
+    "tf": "1D"
+   },
+   "ETH-USDT": {
+    "trades": 13,
+    "profit_usd": 40.4,
+    "pf": 1.34,
+    "days": 2899,
+    "tf": "1D"
+   },
+   "SOL-USDT": {
+    "trades": 8,
+    "profit_usd": 72.1,
+    "pf": 1.83,
+    "days": 2122,
+    "tf": "1D"
+   }
+  },
+  "TF013-1D": {
+   "BTC-USDT": {
+    "trades": 73,
+    "profit_usd": -76.2,
+    "pf": 0.49,
+    "days": 2899,
+    "tf": "1D"
+   },
+   "ETH-USDT": {
+    "trades": 91,
+    "profit_usd": -88.7,
+    "pf": 0.57,
+    "days": 2899,
+    "tf": "1D"
+   },
+   "SOL-USDT": {
+    "trades": 86,
+    "profit_usd": 22.6,
+    "pf": 1.11,
+    "days": 2122,
+    "tf": "1D"
+   }
+  },
+  "TF014-1D": {
+   "BTC-USDT": {
+    "trades": 48,
+    "profit_usd": 23.6,
+    "pf": 1.13,
+    "days": 2899,
+    "tf": "1D"
+   },
+   "ETH-USDT": {
+    "trades": 46,
+    "profit_usd": 125.5,
+    "pf": 1.46,
+    "days": 2899,
+    "tf": "1D"
+   },
+   "SOL-USDT": {
+    "trades": 35,
+    "profit_usd": 4.7,
+    "pf": 1.02,
+    "days": 2122,
+    "tf": "1D"
+   }
+  },
+  "TF015-1D": {
+   "BTC-USDT": {
+    "trades": 42,
+    "profit_usd": 4.2,
+    "pf": 1.02,
+    "days": 2899,
+    "tf": "1D"
+   },
+   "ETH-USDT": {
+    "trades": 41,
+    "profit_usd": 74.5,
+    "pf": 1.34,
+    "days": 2899,
+    "tf": "1D"
+   },
+   "SOL-USDT": {
+    "trades": 28,
+    "profit_usd": 788.2,
+    "pf": 5.1,
+    "days": 2122,
+    "tf": "1D"
+   }
+  },
+  "TF017-1D": {
+   "BTC-USDT": {
+    "trades": 28,
+    "profit_usd": 146.6,
+    "pf": 2.28,
+    "days": 2899,
+    "tf": "1D"
+   },
+   "ETH-USDT": {
+    "trades": 26,
+    "profit_usd": 154.7,
+    "pf": 2.11,
+    "days": 2899,
+    "tf": "1D"
+   },
+   "SOL-USDT": {
+    "trades": 19,
+    "profit_usd": 43.7,
+    "pf": 1.32,
+    "days": 2122,
+    "tf": "1D"
+   }
+  },
+  "TF018-1D": {
+   "BTC-USDT": {
+    "trades": 34,
+    "profit_usd": 120.0,
+    "pf": 1.55,
+    "days": 2899,
+    "tf": "1D"
+   },
+   "ETH-USDT": {
+    "trades": 24,
+    "profit_usd": 27.1,
+    "pf": 1.11,
+    "days": 2899,
+    "tf": "1D"
+   },
+   "SOL-USDT": {
+    "trades": 19,
+    "profit_usd": -44.7,
+    "pf": 0.86,
+    "days": 2122,
+    "tf": "1D"
+   }
+  }
+ }
+}

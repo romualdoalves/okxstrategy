@@ -19,6 +19,7 @@ from pathlib import Path
 
 _DIR = Path(__file__).resolve().parent / "reports"
 _SRC = _DIR / "sources"
+STUDY_FEE_RATE = 0.001          # taxa por lado com que os estudos foram medidos (walk-forward e baseline)
 _FACTORY = Path(__file__).resolve().parent.parent / "strategies" / "factory"
 
 VERDICT_LABELS = {"candidate": "Candidata", "watch": "Em observação", "retired": "Aposentada",
@@ -138,6 +139,8 @@ def build_reports() -> list[str]:
     yearly, bh = parse_yearly((_SRC / "yearly_1d.txt").read_text(encoding="utf-8"))
     baseline = parse_baseline((_SRC / "baseline.txt").read_text(encoding="utf-8"))
     verdicts = json.loads((_SRC / "verdicts.json").read_text(encoding="utf-8"))
+    fc_path = _SRC / "fee_check.json"
+    fee_check = json.loads(fc_path.read_text(encoding="utf-8")) if fc_path.exists() else {}
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     written = []
     for sid, v in verdicts.items():
@@ -152,7 +155,13 @@ def build_reports() -> list[str]:
             "walkforward": wf.get(key, {}), "yearly": yearly.get(key, {}), "buy_hold": bh,
             "baseline": base,
             "caveats": v.get("caveats") or (CAVEATS if tf == "1D" else CAVEATS_INTRADAY),
+            # os estudos foram medidos com 0,10% por lado; a conta paga 0,40% (fee_model). A conferência com a taxa real
+            # (sources/fee_check.json) mostra como cada estratégia fica com ela.
+            "fee_rate_assumed": STUDY_FEE_RATE,
         }
+        if sid in fee_check.get("strategies", {}):
+            report["real_fee_check"] = {k: fee_check[k] for k in ("fee_rate", "measured_on", "method")}
+            report["real_fee_check"]["assets"] = fee_check["strategies"][sid]
         (_DIR / f"{sid}.json").write_text(json.dumps(report, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
         written.append(sid)
     return written
@@ -169,6 +178,12 @@ def load_study(sid: str) -> dict:
     report = json.loads(path.read_text(encoding="utf-8"))
     current = strategy_hash(sid)
     report["stale"] = bool(report.get("file_sha256") and current and report["file_sha256"] != current)
+    # Taxa do estudo x taxa real do app: se diferem, os números do estudo (PF, lucro) estão otimistas.
+    from .. import fee_model
+    assumed = report.get("fee_rate_assumed", STUDY_FEE_RATE)
+    report["fee_rate_assumed"] = assumed
+    report["fee_rate_current"] = fee_model.fee_rate()
+    report["fee_outdated"] = abs(assumed - fee_model.fee_rate()) > 1e-9
     return report
 
 
@@ -176,7 +191,7 @@ def study_summary(sid: str) -> dict:
     """Veredito resumido (sem as tabelas) para listas de estratégias."""
     r = load_study(sid)
     return {"study_verdict": r["verdict"], "study_label": r["verdict_label"], "study_stale": r["stale"],
-            "study_reason": r["reason"]}
+            "study_reason": r["reason"], "study_fee_outdated": r.get("fee_outdated", False)}
 
 
 def canonical_timeframe(tf: str) -> str:

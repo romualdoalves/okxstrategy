@@ -89,5 +89,34 @@
   "A janela contém um único mercado de baixa de verdade (2022); 2018 fica no período de aquecimento.",
   "Amostras pequenas (poucas dezenas de trades fora da amostra): os resultados são indícios, não prova.",
   "Valores em US$ do backtest (taxa 0,1% por lado e slippage 0,05%); não garantem resultado futuro."
- ]
+ ],
+ "fee_rate_assumed": 0.001,
+ "real_fee_check": {
+  "fee_rate": 0.004,
+  "measured_on": "2026-10-31",
+  "method": "motor estrito (slippage 0,05%), BTC/ETH/SOL, até 3.000 candles no timeframe validado, taxa de 0,40% por lado",
+  "assets": {
+   "BTC-USDT": {
+    "trades": 17,
+    "profit_usd": 677.3,
+    "pf": 4.87,
+    "days": 2899,
+    "tf": "1D"
+   },
+   "ETH-USDT": {
+    "trades": 12,
+    "profit_usd": 1246.0,
+    "pf": 7.11,
+    "days": 2899,
+    "tf": "1D"
+   },
+   "SOL-USDT": {
+    "trades": 13,
+    "profit_usd": 1087.3,
+    "pf": 5.96,
+    "days": 2122,
+    "tf": "1D"
+   }
+  }
+ }
 }

@@ -375,7 +375,9 @@ class PositionMixin:
             "bot_id":    self.config.id,
             "event":     "exit",
             "price":     price,
-            "pnl":       pnl,
+            "pnl":       pnl,                                     # bruto (preço)
+            "fees":      round(self._estimated_fees(), 4),
+            "net_pnl":   round(pnl - self._estimated_fees(), 4),   # o que a conta de fato ganhou ou perdeu
             "direction": 0
         })
 
@@ -387,7 +389,9 @@ class PositionMixin:
             exit_reason   = "WS_EXECUTION",
             entry_price   = entry_price_snap,
             exit_price    = price,
-            pnl           = pnl,
+            pnl           = pnl - self._estimated_fees(),
+            gross_pnl     = pnl,
+            fees          = self._estimated_fees(),
             daily_pnl     = self._daily_pnl,
             stop_loss_usd = self.config.stop_loss_usd,
             wins          = self._wins,

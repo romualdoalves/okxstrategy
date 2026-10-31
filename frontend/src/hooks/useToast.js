@@ -110,12 +110,12 @@ function handleWsEvent(msg, add) {
         })
       }
       if (msg.event === 'exit' || msg.event === 'stop') {
-        const pnl = msg.pnl ?? 0
+        const pnl = msg.net_pnl ?? msg.pnl ?? 0       // líquido de taxas (bruto só se o servidor não mandar o líquido)
         add({
           kind:    pnl >= 0 ? 'profit' : 'loss',
           title:   pnl >= 0 ? '💰 Trade Fechado (Lucro)' : '📉 Trade Fechado (Perda)',
           body:    `${botLabel(msg)} — ${msg.symbol ?? ''} @ $${Number(msg.price ?? 0).toFixed(2)}`,
-          detail:  `P&L: ${pnl >= 0 ? '+' : ''}$${Number(pnl).toFixed(2)}`,
+          detail:  `P&L líquido: ${pnl >= 0 ? '+' : ''}$${Number(pnl).toFixed(2)}${msg.fees != null ? `  (bruto ${msg.pnl >= 0 ? '+' : ''}$${Number(msg.pnl ?? 0).toFixed(2)}, taxas -$${Number(msg.fees).toFixed(2)})` : ''}`,
           duration: 10000,
         })
       }

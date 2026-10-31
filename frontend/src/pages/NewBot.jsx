@@ -333,6 +333,7 @@ export default function NewBot() {
                   verdict={selectedStrategy.study_verdict}
                   label={selectedStrategy.study_label}
                   stale={selectedStrategy.study_stale}
+                  feeOutdated={selectedStrategy.study_fee_outdated}
                 />
                 {selectedStrategy.study_verdict === 'retired' && (
                   <div className="rounded-lg border border-bear/30 bg-bear/10 p-3">

@@ -54,7 +54,7 @@ def wilson_lower_bound(p: float, n: float, z: float = 1.96) -> float:
 
 def net_equivalent_pct(target_gross: float = TARGET_PCT, fee: float | None = None) -> float:
     """Líquido aproximado de UMA operação que fecha exatamente na meta bruta (taxa por lado nas duas pernas).
-    Com taxa de 0,1% por lado, +1% bruto ≈ +0,80% líquido."""
+    Com a taxa real da conta (0,4% por lado), +1% bruto ≈ +0,20% líquido."""
     if fee is None:
         from .profit_lock import fee_rate
         fee = fee_rate()

@@ -31,10 +31,12 @@ def _workers() -> int:
         return 2
 
 
-def run_strict_job(strategy_id: str, candles: list, extra_candles: Optional[dict], params: Optional[dict] = None) -> dict:
-    """Executa um backtest estrito completo (roda no processo worker)."""
+def run_strict_job(strategy_id: str, candles: list, extra_candles: Optional[dict], params: Optional[dict] = None,
+                   fee_rate: Optional[float] = None) -> dict:
+    """Executa um backtest estrito completo (roda no processo worker). A taxa vem do processo principal: é lá que
+    ficam as medidas nos fills reais (o worker é um processo novo e não as conhece)."""
     from .backtest_engine import BacktestEngine
-    return BacktestEngine(strategy_id, params or None).run_strict_sync(candles, extra_candles=extra_candles)
+    return BacktestEngine(strategy_id, params or None).run_strict_sync(candles, extra_candles=extra_candles, fee_rate=fee_rate)
 
 
 def _get_pool() -> ProcessPoolExecutor:
@@ -53,10 +55,12 @@ def shutdown_pool() -> None:
 
 async def run_strict_async(strategy_id: str, candles: list, extra_candles: Optional[dict] = None,
                            params: Optional[dict] = None) -> dict:
+    from . import fee_model
+    fee = fee_model.fee_rate()
     loop = asyncio.get_running_loop()
     try:
-        return await loop.run_in_executor(_get_pool(), run_strict_job, strategy_id, candles, extra_candles, params)
+        return await loop.run_in_executor(_get_pool(), run_strict_job, strategy_id, candles, extra_candles, params, fee)
     except (BrokenProcessPool, OSError, RuntimeError) as exc:
         log.warning("Pool de backtest indisponível (%s); usando thread.", exc)
         shutdown_pool()
-        return await asyncio.to_thread(run_strict_job, strategy_id, candles, extra_candles, params)
+        return await asyncio.to_thread(run_strict_job, strategy_id, candles, extra_candles, params, fee)

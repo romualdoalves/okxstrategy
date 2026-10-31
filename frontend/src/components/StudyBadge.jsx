@@ -11,13 +11,14 @@ const BADGE_STYLE = {
 }
 
 // Etiqueta de veredito do estudo + botão (i) que abre o quadro completo.
-export default function StudyBadge({ strategyId, verdict = 'none', label = 'Sem estudo', stale = false }) {
+export default function StudyBadge({ strategyId, verdict = 'none', label = 'Sem estudo', stale = false, feeOutdated = false }) {
   const [open, setOpen] = useState(false)
   return (
     <>
       <span className="inline-flex items-center gap-1">
-        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${BADGE_STYLE[verdict] ?? BADGE_STYLE.none}`}>
-          {label}{stale ? ' (desatualizado)' : ''}
+        <span title={feeOutdated ? 'Estudo medido com taxa menor que a real da conta: abra o (i) para ver o resultado com a taxa real' : undefined}
+          className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${BADGE_STYLE[verdict] ?? BADGE_STYLE.none}`}>
+          {label}{stale ? ' (desatualizado)' : ''}{feeOutdated ? ' · taxa antiga' : ''}
         </span>
         <button
           type="button"

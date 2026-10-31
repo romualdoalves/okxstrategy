@@ -10,10 +10,10 @@ de +0,9% podia evaporar até o stop inicial (3 ATR abaixo). O stop só sobe, nun
 
 Compartilhado pelo bot (bot/position.py) e pelo backtest (backtest_engine.py) para o estudo medir o que roda ao
 vivo. Vale até o TP1; no TP1 o trailing nativo assume, com distância limitada para nunca afrouxar este stop.
-`OKX_LOCK_STEP_PCT` (fração; ex.: 0.005 = +0,5% por degrau) liga a regra e `OKX_FEE_RATE` (por lado, padrão 0.001)
-ajusta as taxas.
+`OKX_LOCK_STEP_PCT` (fração; ex.: 0.005 = +0,5% por degrau) liga a regra. A taxa por lado vem de fee_model.py (a medida
+nos fills reais da conta; `OKX_FEE_RATE` a sobrepõe).
 
-DESLIGADA POR PADRÃO. Backtest da TF008 (OKX spot, taxa 0,1%/lado, slippage 0,05%, saída da trava preenchida no pior
+DESLIGADA POR PADRÃO. Backtest da TF008 (OKX spot, taxa de 0,1%/lado, a assumida na época; a conta paga 0,4%, slippage 0,05%, saída da trava preenchida no pior
 entre stop e abertura), 1D, lucro em US$ por 100 de stake — sem trava -> com trava:
     BTC-USDT 3000 candles:  263 (PF 3,54) -> 25 (+0,5%) | 55 (1%) | 105 (2%) | 161 (4%) | 236 (8%)
     ETH-USDT 3000 candles:  372 (PF 2,31) -> 17 (+0,5%) | 27 (1%) |  84 (2%) | 196 (4%) | 213 (8%)
@@ -28,7 +28,7 @@ import math
 import os
 
 DEFAULT_STEP_PCT = 0.0          # desligada: ver o backtest acima
-DEFAULT_FEE_RATE = 0.001
+from .fee_model import DEFAULT_FEE_RATE      # noqa: E402  (a taxa por lado vive em fee_model: uma fonte para o app inteiro)
 EXIT_SLIPPAGE_RATE = 0.0005     # mesmo valor do backtest estrito
 MIN_STEP_MARGIN = 0.001         # o 1º degrau fica acima do breakeven líquido por pelo menos esta folga
 
@@ -41,7 +41,8 @@ def _env_float(name: str, default: float) -> float:
 
 
 def fee_rate() -> float:
-    return max(0.0, _env_float("OKX_FEE_RATE", DEFAULT_FEE_RATE))
+    from . import fee_model
+    return fee_model.fee_rate()
 
 
 def breakeven_stop(entry: float, direction: int = 1, *, fee: float | None = None,

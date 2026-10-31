@@ -31,8 +31,16 @@ class AccountingMixin:
             self._hold_reason = ""
             log.warning("[Bot %d] Circuit breaker diário liberado: bot retomado.", self.config.id)
 
-    def _record_pnl(self, pnl: float):
+    def _estimated_fees(self) -> float:
+        """Taxas estimadas de uma operação completa (compra + venda) no stake fixo, com a taxa real do app."""
+        from ..fee_model import fee_rate
+        return 2.0 * float(self.config.stake_usd or 100.0) * fee_rate()
+
+    def _record_pnl(self, pnl: float, fee: float | None = None):
+        """Registra o resultado de uma operação fechada. O P&L diário, o circuit breaker e vitórias/derrotas valem
+        LÍQUIDOS de taxas (o que a conta de fato ganhou ou perdeu), não o bruto de preço."""
         self._roll_day()
+        pnl = pnl - (self._estimated_fees() if fee is None else fee)
         self._daily_pnl += pnl
         if pnl > 0:
             self._wins += 1
@@ -215,10 +223,12 @@ class AccountingMixin:
             ).all()
             if closed:
                 self._pnl_day   = _current_day_start_utc()
-                self._daily_pnl = sum(t.pnl for t in closed
+                est = self._estimated_fees()
+                net = lambda t: t.pnl - (t.fee if t.fee is not None else est)       # líquido: taxa real, ou a estimada
+                self._daily_pnl = sum(net(t) for t in closed
                                       if t.timestamp and t.timestamp >= self._pnl_day)
-                self._wins      = sum(1 for t in closed if t.pnl > 0)
-                self._losses    = sum(1 for t in closed if t.pnl <= 0)
+                self._wins      = sum(1 for t in closed if net(t) > 0)
+                self._losses    = sum(1 for t in closed if net(t) <= 0)
                 log.info("[Bot %d] Recuperado do banco: P&L do dia %.2f (histórico %dW/%dL)",
                          self.config.id, self._daily_pnl, self._wins, self._losses)
                 if self._daily_pnl <= self.config.stop_loss_usd and not self._halted:

@@ -331,7 +331,7 @@ export default function Dashboard() {
     if (wsMsg.type === 'trade') {
       setLiveStatuses(prev => ({
         ...prev,
-        [wsMsg.bot_id]: { ...prev[wsMsg.bot_id], daily_pnl: (prev[wsMsg.bot_id]?.daily_pnl ?? 0) + (wsMsg.pnl ?? 0) },
+        [wsMsg.bot_id]: { ...prev[wsMsg.bot_id], daily_pnl: (prev[wsMsg.bot_id]?.daily_pnl ?? 0) + (wsMsg.net_pnl ?? wsMsg.pnl ?? 0) },
       }))
     }
     if (wsMsg.type === 'order_error') {

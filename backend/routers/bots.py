@@ -89,7 +89,7 @@ def get_performance_ranking(db: Session = Depends(get_db)):
     ).filter(
         TradeModel.type == "entry",
         TradeModel.exit_price.isnot(None),
-        TradeModel.pnl > 0,
+        TradeModel.pnl - func.coalesce(TradeModel.fee, 0.0) > 0,       # vitória = líquida de taxas
     ).group_by(TradeModel.bot_id).all()
     wins_map = {row[0]: row[1] for row in wins_rows}
     

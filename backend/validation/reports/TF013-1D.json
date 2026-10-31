@@ -93,5 +93,34 @@
   "Só o baseline com os parâmetros padrão foi medido em 1D (BTC e ETH desde 2018, SOL desde 2021), sem walk-forward.",
   "Amostra muito pequena: poucas operações em 8 anos, então os números são indícios, não prova.",
   "Valores em US$ do backtest (taxa 0,1% por lado e slippage 0,05%); não garantem resultado futuro."
- ]
+ ],
+ "fee_rate_assumed": 0.001,
+ "real_fee_check": {
+  "fee_rate": 0.004,
+  "measured_on": "2026-10-31",
+  "method": "motor estrito (slippage 0,05%), BTC/ETH/SOL, até 3.000 candles no timeframe validado, taxa de 0,40% por lado",
+  "assets": {
+   "BTC-USDT": {
+    "trades": 73,
+    "profit_usd": -76.2,
+    "pf": 0.49,
+    "days": 2899,
+    "tf": "1D"
+   },
+   "ETH-USDT": {
+    "trades": 91,
+    "profit_usd": -88.7,
+    "pf": 0.57,
+    "days": 2899,
+    "tf": "1D"
+   },
+   "SOL-USDT": {
+    "trades": 86,
+    "profit_usd": 22.6,
+    "pf": 1.11,
+    "days": 2122,
+    "tf": "1D"
+   }
+  }
+ }
 }

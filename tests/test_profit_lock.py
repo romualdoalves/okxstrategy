@@ -11,7 +11,7 @@ from backend.bot.position import PositionMixin
 @pytest.fixture(autouse=True)
 def _defaults(monkeypatch):
     monkeypatch.setenv("OKX_LOCK_STEP_PCT", "0.005")      # a regra vem desligada; os testes exercitam ela ligada
-    monkeypatch.delenv("OKX_FEE_RATE", raising=False)
+    monkeypatch.setenv("OKX_FEE_RATE", "0.001")          # os números destes testes foram calculados com 0,10% por lado
 
 
 ENTRY = 76_000.0

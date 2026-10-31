@@ -147,6 +147,8 @@ async def get_activities(date: Optional[str] = None, db: Session = Depends(get_d
     # a tela da OKX lista do mais recente para o mais antigo
     enriched_fills.sort(key=lambda r: r.get("transaction_time") or "", reverse=True)
     okx = summarize(enriched_fills)
+    from .. import fee_model
+    fee_model.observe(*fee_model.observed_rate(enriched_fills))      # a conciliação também atualiza a taxa real da conta
 
     # 6. Resumo da conta
     equity      = float(account.get("equity", 0))
@@ -197,6 +199,7 @@ async def get_activities(date: Optional[str] = None, db: Session = Depends(get_d
             # taxa efetiva cobrada pela OKX nos fills do dia contra a que o app assume nos cálculos
             "effective_fee_pct":   okx["effective_fee_pct"],
             "model_fee_pct":       round(fee_rate() * 100, 4),
+            "fee_source":          fee_model.source(),
             "fees_total_day":      okx["fees_total"],
             "unmatched_sells":     okx["unmatched_sells"],
             "unknown_fee_fills":   okx["unknown_fee_fills"],

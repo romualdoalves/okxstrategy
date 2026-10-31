@@ -176,8 +176,8 @@ export default function MetaHoje() {
   })
 
   const c = data?.criteria ?? {
-    target_pct: 1, net_equivalent_pct: 0.8, window_hours: 24, min_trades: 10, min_profit_factor: 1.2, min_chance_pct: 20,
-    top_n: 3, min_independent_windows: 10, fee_rate_pct: 0.1, exit_slippage_pct: 0.05, exit_margin_pct: 0.05,
+    target_pct: 1, net_equivalent_pct: 0.2, window_hours: 24, min_trades: 10, min_profit_factor: 1.2, min_chance_pct: 20,
+    top_n: 3, min_independent_windows: 10, fee_rate_pct: 0.4, exit_slippage_pct: 0.05, exit_margin_pct: 0.05,
     strategies_considered: 0, history_cap: { '1m': 3000, '5m': 3000, '15m': 3000, '1h': 4400 },
   }
   const netEq = String(c.net_equivalent_pct).replace('.', ',')

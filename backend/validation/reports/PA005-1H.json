@@ -94,5 +94,34 @@
   "Histórico disponível: 1H cerca de 4,5 anos, 15m cerca de 4,3 anos e 5m cerca de 1,9 ano.",
   "Valores em US$ do backtest (taxa 0,1% por lado e slippage 0,05%); a taxa pesa muito em quem opera centenas de vezes por ano.",
   "Não garantem resultado futuro."
- ]
+ ],
+ "fee_rate_assumed": 0.001,
+ "real_fee_check": {
+  "fee_rate": 0.004,
+  "measured_on": "2026-10-31",
+  "method": "motor estrito (slippage 0,05%), BTC/ETH/SOL, até 3.000 candles no timeframe validado, taxa de 0,40% por lado",
+  "assets": {
+   "BTC-USDT": {
+    "trades": 3,
+    "profit_usd": 21.7,
+    "pf": 6.52,
+    "days": 179,
+    "tf": "1H"
+   },
+   "ETH-USDT": {
+    "trades": 4,
+    "profit_usd": -10.8,
+    "pf": 0.0,
+    "days": 179,
+    "tf": "1H"
+   },
+   "SOL-USDT": {
+    "trades": 3,
+    "profit_usd": -9.0,
+    "pf": 0.0,
+    "days": 179,
+    "tf": "1H"
+   }
+  }
+ }
 }

@@ -361,7 +361,7 @@ class TestExitAndCircuitBreaker(OrderPathBase):
         self.sl_fill(bot, sl_id)
 
         self.assertEqual(bot._direction, 0)
-        self.assertAlmostEqual(bot._daily_pnl, SIZE * (49_000.0 - PRICE))     # -2,00
+        self.assertAlmostEqual(bot._daily_pnl, SIZE * (49_000.0 - PRICE) - 2 * 100.0 * 0.001)     # -2,00 de preço, menos as taxas estimadas (0,10% por lado nos testes)
         self.assertEqual((bot._wins, bot._losses), (0, 1))
         with self.db() as db:
             rows = {t.type: t for t in db.query(TradeModel).all()}

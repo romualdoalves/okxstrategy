@@ -181,6 +181,43 @@ export default function StudyModal({ strategyId, onClose }) {
               </div>
             )}
 
+            {data.fee_outdated && (
+              <div className="mt-3 rounded-lg border border-yellow-400/30 bg-yellow-400/10 p-3">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle size={14} className="mt-0.5 shrink-0 text-yellow-400" />
+                  <p className="text-[11px] text-yellow-100/85">
+                    As tabelas deste estudo foram medidas com taxa de <strong>{(data.fee_rate_assumed * 100).toFixed(2).replace('.', ',')}% por lado</strong>.
+                    A taxa que a conta paga (e que o app usa hoje) é de <strong>{(data.fee_rate_current * 100).toFixed(2).replace('.', ',')}%</strong>:
+                    os números abaixo são otimistas.
+                    {data.real_fee_check ? ' A conferência com a taxa real está logo a seguir.' : ' Esta estratégia ainda não foi reconferida com a taxa real.'}
+                  </p>
+                </div>
+                {data.real_fee_check && (
+                  <div className="mt-2 overflow-x-auto">
+                    <table className="w-full text-[11px]">
+                      <thead>
+                        <tr className="text-left text-muted">
+                          <th className="py-1 pr-3 font-medium">Ativo</th><th className="py-1 pr-3 font-medium">Operações</th>
+                          <th className="py-1 pr-3 font-medium">Lucro líquido (US$ por 100)</th><th className="py-1 font-medium">Profit Factor</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.entries(data.real_fee_check.assets || {}).map(([sym, a]) => (
+                          <tr key={sym} className="border-t border-white/10">
+                            <td className="py-1 pr-3 font-mono">{sym}</td>
+                            <td className="py-1 pr-3">{a.trades}</td>
+                            <td className={`py-1 pr-3 ${a.profit_usd > 0 ? 'text-bull' : a.profit_usd < 0 ? 'text-bear' : ''}`}>{a.trades ? a.profit_usd : '—'}</td>
+                            <td className={`py-1 ${a.pf >= 1 ? 'text-bull' : a.trades ? 'text-bear' : ''}`}>{a.trades ? String(a.pf).replace('.', ',') : '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    <p className="mt-1 text-[10px] text-muted">{data.real_fee_check.method} (medido em {data.real_fee_check.measured_on}).</p>
+                  </div>
+                )}
+              </div>
+            )}
+
             {data.verdict !== 'none' && (
               <>
                 {data.verdict !== 'insufficient' && Object.keys(data.baseline || {}).length > 0 && (

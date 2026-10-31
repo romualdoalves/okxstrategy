@@ -206,6 +206,7 @@ function StrategyCard({ strategy, sortBy, score, regime }) {
                 verdict={strategy.study_verdict}
                 label={strategy.study_label}
                 stale={strategy.study_stale}
+                feeOutdated={strategy.study_fee_outdated}
               />
             </div>
           </div>

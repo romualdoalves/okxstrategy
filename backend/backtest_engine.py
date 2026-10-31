@@ -13,7 +13,6 @@ log = logging.getLogger("backtest_engine")
 
 FIXED_STAKE_USD = 100.0
 INITIAL_BALANCE = 1000.0
-STRICT_FEE_RATE = 0.001
 STRICT_SLIPPAGE_RATE = 0.0005
 # Janela máxima de candles entregue à estratégia a cada passo. Mantém o custo linear no tamanho do
 # histórico (antes a janela crescia até 500 candles, que era o próprio limite de dados do scan).
@@ -97,7 +96,7 @@ class BacktestEngine:
         *,
         extra_candles: dict[str, list] | None = None,
         stake_usd: float = FIXED_STAKE_USD,
-        fee_rate: float = STRICT_FEE_RATE,
+        fee_rate: float | None = None,        # None = a taxa real do app (fee_model: medida nos fills da conta)
         slippage_rate: float = STRICT_SLIPPAGE_RATE,
         legacy_lookahead: bool = False,
         profit_lock: bool = True,
@@ -111,6 +110,9 @@ class BacktestEngine:
         abertura, com OHLC final). Existe só para medir o viés em comparações antes/depois.
         """
         stake_usd = FIXED_STAKE_USD
+        if fee_rate is None:
+            from . import fee_model
+            fee_rate = fee_model.fee_rate()
         self.balance = INITIAL_BALANCE
         self.events = []
         self.closed_trades = []

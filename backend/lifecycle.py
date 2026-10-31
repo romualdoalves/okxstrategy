@@ -92,6 +92,10 @@ async def startup():
     # Reconciliação periódica: detecta posições fechadas externamente na OKX
     asyncio.create_task(manager._reconcile_loop())
 
+    # Taxa efetiva da conta (medida nos fills reais): alimenta cards, trava, meta, backtest e Scanner
+    from . import fee_model
+    asyncio.create_task(fee_model.refresh_loop())
+
     # Sincronização de taxas de corretagem: preenche fee nos trades recentes sem dados
     async def _startup_fee_sync():
         await asyncio.sleep(10)   # aguarda exchange estar disponível

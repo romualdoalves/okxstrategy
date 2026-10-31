@@ -177,6 +177,7 @@ export default function BotCard({ bot, liveStatus }) {
               verdict={study?.study_verdict}
               label={study?.study_label}
               stale={study?.study_stale}
+              feeOutdated={study?.study_fee_outdated}
             />
           </div>
           <p className="text-xs text-muted truncate">
