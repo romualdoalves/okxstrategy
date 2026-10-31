@@ -2,12 +2,13 @@ import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Play, Square, ChevronRight, Activity, AlertTriangle, TrendingUp, Star, Zap, Clock, Bookmark, RefreshCw, CheckCircle2, Lock } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { startBot, stopBot, switchBotSymbol, liquidateBot, recaptureBaseline, getStrategies } from '../api'
+import { startBot, stopBot, switchBotSymbol, liquidateBot, recaptureBaseline, getStrategies, getFeeModel } from '../api'
 import { useLanguage } from '../i18n/LanguageContext'
 import StrategyChecklist, { getCriteriaCount } from './StrategyChecklist'
 import AssetPriceCard from './AssetPriceCard'
 import StudyBadge from './StudyBadge'
 import GoalLine from './GoalLine'
+import FeeCompare from './FeeCompare'
 
 const BOT_SOURCE_LABEL = { scanner: 'Scanner BT', goal: 'Meta 1%', bots: 'Bots', strategies: 'Estratégias' }
 import { useMarketStatus } from '../hooks/useMarketStatus'
@@ -133,6 +134,7 @@ export default function BotCard({ bot, liveStatus }) {
   }
 
   const { data: strategies = [] } = useQuery({ queryKey: ['strategies'], queryFn: getStrategies, staleTime: 5 * 60 * 1000 })
+  const { data: feeModel } = useQuery({ queryKey: ['fee-model'], queryFn: getFeeModel, staleTime: 5 * 60 * 1000 })   // bot parado: sem runtime
   const study = strategies.find(s => s.id === bot.strategy_id)
   const [capturingBaseline, setCapturingBaseline] = useState(false)
   async function handleRecaptureBaseline(e) {
@@ -276,6 +278,10 @@ export default function BotCard({ bot, liveStatus }) {
           </div>
         </div>
       </div>
+
+      {/* Taxa Real x Taxa Demo, com o cálculo das duas */}
+      <FeeCompare direction={direction} entry={rt.entry_price} last={lastPrice}
+        demoRate={rt.fee_rate ?? feeModel?.charged_rate ?? null} realRate={rt.fee_rate_reference ?? feeModel?.fee_rate ?? rt.fee_rate ?? null} />
 
       {/* Baseline — holdings pré-existentes do ativo ao criar o bot */}
       {(() => {
