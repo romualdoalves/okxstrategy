@@ -1,0 +1,929 @@
+{
+ "TF008-1D|BTC-USDT": {
+  "candles": 3000,
+  "base_trades": 26,
+  "base_profit": 247.21,
+  "scen": {
+   "A entrada limite, buffer 0,05%": {
+    "orders": 26,
+    "filled": 26,
+    "fill_rate_pct": 100.0,
+    "baseline": {
+     "trades": 26,
+     "profit": 247.21,
+     "pf": 3.23
+    },
+    "maker": {
+     "trades": 26,
+     "profit": 256.44,
+     "pf": 3.41
+    },
+    "delta_profit": 9.23,
+    "fee_and_slippage_saved_on_filled": 9.23,
+    "missed_winners_profit": 0,
+    "missed_losers_avoided": 0,
+    "opportunity_net": 0,
+    "maker_exit": false,
+    "exit_limit_fills": 0,
+    "exit_fallbacks": 0,
+    "verdict": "maker compensa"
+   },
+   "A entrada limite, buffer 0,00% (conta o toque)": {
+    "orders": 26,
+    "filled": 26,
+    "fill_rate_pct": 100.0,
+    "baseline": {
+     "trades": 26,
+     "profit": 247.21,
+     "pf": 3.23
+    },
+    "maker": {
+     "trades": 26,
+     "profit": 256.44,
+     "pf": 3.41
+    },
+    "delta_profit": 9.23,
+    "fee_and_slippage_saved_on_filled": 9.23,
+    "missed_winners_profit": 0,
+    "missed_losers_avoided": 0,
+    "opportunity_net": 0,
+    "maker_exit": false,
+    "exit_limit_fills": 0,
+    "exit_fallbacks": 0,
+    "verdict": "maker compensa"
+   },
+   "A entrada limite 0,5% abaixo, buffer 0,05%": {
+    "orders": 26,
+    "filled": 23,
+    "fill_rate_pct": 88.5,
+    "baseline": {
+     "trades": 26,
+     "profit": 247.21,
+     "pf": 3.23
+    },
+    "maker": {
+     "trades": 23,
+     "profit": 241.11,
+     "pf": 3.56
+    },
+    "delta_profit": -6.1,
+    "fee_and_slippage_saved_on_filled": 20.88,
+    "missed_winners_profit": 34.57,
+    "missed_losers_avoided": 7.59,
+    "opportunity_net": 26.98,
+    "maker_exit": false,
+    "exit_limit_fills": 0,
+    "exit_fallbacks": 0,
+    "verdict": "maker descartado"
+   },
+   "B entrada + saída por sinal a limite, buffer 0,05%": {
+    "orders": 26,
+    "filled": 26,
+    "fill_rate_pct": 100.0,
+    "baseline": {
+     "trades": 26,
+     "profit": 247.21,
+     "pf": 3.23
+    },
+    "maker": {
+     "trades": 26,
+     "profit": 258.09,
+     "pf": 3.41
+    },
+    "delta_profit": 10.88,
+    "fee_and_slippage_saved_on_filled": 10.88,
+    "missed_winners_profit": 0,
+    "missed_losers_avoided": 0,
+    "opportunity_net": 0,
+    "maker_exit": true,
+    "exit_limit_fills": 11,
+    "exit_fallbacks": 1,
+    "verdict": "maker compensa"
+   }
+  }
+ },
+ "RG005-1D|BTC-USDT": {
+  "candles": 3000,
+  "base_trades": 32,
+  "base_profit": 466.48,
+  "scen": {
+   "A entrada limite, buffer 0,05%": {
+    "orders": 32,
+    "filled": 31,
+    "fill_rate_pct": 96.9,
+    "baseline": {
+     "trades": 32,
+     "profit": 466.48,
+     "pf": 3.81
+    },
+    "maker": {
+     "trades": 31,
+     "profit": 488.86,
+     "pf": 4.27
+    },
+    "delta_profit": 22.38,
+    "fee_and_slippage_saved_on_filled": 11.09,
+    "missed_winners_profit": 0,
+    "missed_losers_avoided": 11.28,
+    "opportunity_net": -11.28,
+    "maker_exit": false,
+    "exit_limit_fills": 0,
+    "exit_fallbacks": 0,
+    "verdict": "maker compensa"
+   },
+   "A entrada limite, buffer 0,00% (conta o toque)": {
+    "orders": 32,
+    "filled": 32,
+    "fill_rate_pct": 100.0,
+    "baseline": {
+     "trades": 32,
+     "profit": 466.48,
+     "pf": 3.81
+    },
+    "maker": {
+     "trades": 32,
+     "profit": 477.92,
+     "pf": 3.98
+    },
+    "delta_profit": 11.44,
+    "fee_and_slippage_saved_on_filled": 11.44,
+    "missed_winners_profit": 0,
+    "missed_losers_avoided": 0,
+    "opportunity_net": 0,
+    "maker_exit": false,
+    "exit_limit_fills": 0,
+    "exit_fallbacks": 0,
+    "verdict": "maker compensa"
+   },
+   "A entrada limite 0,5% abaixo, buffer 0,05%": {
+    "orders": 32,
+    "filled": 24,
+    "fill_rate_pct": 75.0,
+    "baseline": {
+     "trades": 32,
+     "profit": 466.48,
+     "pf": 3.81
+    },
+    "maker": {
+     "trades": 24,
+     "profit": 400.36,
+     "pf": 4.22
+    },
+    "delta_profit": -66.12,
+    "fee_and_slippage_saved_on_filled": 22.61,
+    "missed_winners_profit": 120.05,
+    "missed_losers_avoided": 31.32,
+    "opportunity_net": 88.73,
+    "maker_exit": false,
+    "exit_limit_fills": 0,
+    "exit_fallbacks": 0,
+    "verdict": "maker descartado"
+   },
+   "B entrada + saída por sinal a limite, buffer 0,05%": {
+    "orders": 32,
+    "filled": 31,
+    "fill_rate_pct": 96.9,
+    "baseline": {
+     "trades": 32,
+     "profit": 466.48,
+     "pf": 3.81
+    },
+    "maker": {
+     "trades": 31,
+     "profit": 477.27,
+     "pf": 3.94
+    },
+    "delta_profit": 10.79,
+    "fee_and_slippage_saved_on_filled": -0.5,
+    "missed_winners_profit": 0,
+    "missed_losers_avoided": 11.28,
+    "opportunity_net": -11.28,
+    "maker_exit": true,
+    "exit_limit_fills": 10,
+    "exit_fallbacks": 3,
+    "verdict": "maker compensa"
+   }
+  }
+ },
+ "MR007-1D|BTC-USDT": {
+  "candles": 3000,
+  "base_trades": 17,
+  "base_profit": 677.29,
+  "scen": {
+   "A entrada limite, buffer 0,05%": {
+    "orders": 17,
+    "filled": 16,
+    "fill_rate_pct": 94.1,
+    "baseline": {
+     "trades": 17,
+     "profit": 677.29,
+     "pf": 4.87
+    },
+    "maker": {
+     "trades": 16,
+     "profit": 663.78,
+     "pf": 4.85
+    },
+    "delta_profit": -13.51,
+    "fee_and_slippage_saved_on_filled": 5.94,
+    "missed_winners_profit": 19.45,
+    "missed_losers_avoided": 0,
+    "opportunity_net": 19.45,
+    "maker_exit": false,
+    "exit_limit_fills": 0,
+    "exit_fallbacks": 0,
+    "verdict": "maker descartado"
+   },
+   "A entrada limite, buffer 0,00% (conta o toque)": {
+    "orders": 17,
+    "filled": 16,
+    "fill_rate_pct": 94.1,
+    "baseline": {
+     "trades": 17,
+     "profit": 677.29,
+     "pf": 4.87
+    },
+    "maker": {
+     "trades": 16,
+     "profit": 663.78,
+     "pf": 4.85
+    },
+    "delta_profit": -13.51,
+    "fee_and_slippage_saved_on_filled": 5.94,
+    "missed_winners_profit": 19.45,
+    "missed_losers_avoided": 0,
+    "opportunity_net": 19.45,
+    "maker_exit": false,
+    "exit_limit_fills": 0,
+    "exit_fallbacks": 0,
+    "verdict": "maker descartado"
+   },
+   "A entrada limite 0,5% abaixo, buffer 0,05%": {
+    "orders": 17,
+    "filled": 15,
+    "fill_rate_pct": 88.2,
+    "baseline": {
+     "trades": 17,
+     "profit": 677.29,
+     "pf": 4.87
+    },
+    "maker": {
+     "trades": 15,
+     "profit": 623.45,
+     "pf": 4.69
+    },
+    "delta_profit": -53.84,
+    "fee_and_slippage_saved_on_filled": 16.18,
+    "missed_winners_profit": 70.02,
+    "missed_losers_avoided": 0,
+    "opportunity_net": 70.02,
+    "maker_exit": false,
+    "exit_limit_fills": 0,
+    "exit_fallbacks": 0,
+    "verdict": "maker descartado"
+   },
+   "B entrada + saída por sinal a limite, buffer 0,05%": {
+    "orders": 17,
+    "filled": 16,
+    "fill_rate_pct": 94.1,
+    "baseline": {
+     "trades": 17,
+     "profit": 677.29,
+     "pf": 4.87
+    },
+    "maker": {
+     "trades": 16,
+     "profit": 665.9,
+     "pf": 4.86
+    },
+    "delta_profit": -11.39,
+    "fee_and_slippage_saved_on_filled": 8.06,
+    "missed_winners_profit": 19.45,
+    "missed_losers_avoided": 0,
+    "opportunity_net": 19.45,
+    "maker_exit": true,
+    "exit_limit_fills": 1,
+    "exit_fallbacks": 0,
+    "verdict": "maker descartado"
+   }
+  }
+ },
+ "TF008-1D|ETH-USDT": {
+  "candles": 3000,
+  "base_trades": 31,
+  "base_profit": 352.66,
+  "scen": {
+   "A entrada limite, buffer 0,05%": {
+    "orders": 31,
+    "filled": 31,
+    "fill_rate_pct": 100.0,
+    "baseline": {
+     "trades": 31,
+     "profit": 352.66,
+     "pf": 2.2
+    },
+    "maker": {
+     "trades": 31,
+     "profit": 363.69,
+     "pf": 2.26
+    },
+    "delta_profit": 11.03,
+    "fee_and_slippage_saved_on_filled": 11.03,
+    "missed_winners_profit": 0,
+    "missed_losers_avoided": 0,
+    "opportunity_net": 0,
+    "maker_exit": false,
+    "exit_limit_fills": 0,
+    "exit_fallbacks": 0,
+    "verdict": "maker compensa"
+   },
+   "A entrada limite, buffer 0,00% (conta o toque)": {
+    "orders": 31,
+    "filled": 31,
+    "fill_rate_pct": 100.0,
+    "baseline": {
+     "trades": 31,
+     "profit": 352.66,
+     "pf": 2.2
+    },
+    "maker": {
+     "trades": 31,
+     "profit": 363.69,
+     "pf": 2.26
+    },
+    "delta_profit": 11.03,
+    "fee_and_slippage_saved_on_filled": 11.03,
+    "missed_winners_profit": 0,
+    "missed_losers_avoided": 0,
+    "opportunity_net": 0,
+    "maker_exit": false,
+    "exit_limit_fills": 0,
+    "exit_fallbacks": 0,
+    "verdict": "maker compensa"
+   },
+   "A entrada limite 0,5% abaixo, buffer 0,05%": {
+    "orders": 31,
+    "filled": 30,
+    "fill_rate_pct": 96.8,
+    "baseline": {
+     "trades": 31,
+     "profit": 352.66,
+     "pf": 2.2
+    },
+    "maker": {
+     "trades": 30,
+     "profit": 381.42,
+     "pf": 2.37
+    },
+    "delta_profit": 28.76,
+    "fee_and_slippage_saved_on_filled": 27.6,
+    "missed_winners_profit": 0,
+    "missed_losers_avoided": 1.16,
+    "opportunity_net": -1.16,
+    "maker_exit": false,
+    "exit_limit_fills": 0,
+    "exit_fallbacks": 0,
+    "verdict": "maker compensa"
+   },
+   "B entrada + saída por sinal a limite, buffer 0,05%": {
+    "orders": 31,
+    "filled": 31,
+    "fill_rate_pct": 100.0,
+    "baseline": {
+     "trades": 31,
+     "profit": 352.66,
+     "pf": 2.2
+    },
+    "maker": {
+     "trades": 31,
+     "profit": 363.18,
+     "pf": 2.26
+    },
+    "delta_profit": 10.52,
+    "fee_and_slippage_saved_on_filled": 10.52,
+    "missed_winners_profit": 0,
+    "missed_losers_avoided": 0,
+    "opportunity_net": 0,
+    "maker_exit": true,
+    "exit_limit_fills": 11,
+    "exit_fallbacks": 1,
+    "verdict": "maker compensa"
+   }
+  }
+ },
+ "RG005-1D|ETH-USDT": {
+  "candles": 3000,
+  "base_trades": 28,
+  "base_profit": 397.77,
+  "scen": {
+   "A entrada limite, buffer 0,05%": {
+    "orders": 28,
+    "filled": 27,
+    "fill_rate_pct": 96.4,
+    "baseline": {
+     "trades": 28,
+     "profit": 397.77,
+     "pf": 3.86
+    },
+    "maker": {
+     "trades": 27,
+     "profit": 418.06,
+     "pf": 4.37
+    },
+    "delta_profit": 20.29,
+    "fee_and_slippage_saved_on_filled": 9.66,
+    "missed_winners_profit": 0,
+    "missed_losers_avoided": 10.63,
+    "opportunity_net": -10.63,
+    "maker_exit": false,
+    "exit_limit_fills": 0,
+    "exit_fallbacks": 0,
+    "verdict": "maker compensa"
+   },
+   "A entrada limite, buffer 0,00% (conta o toque)": {
+    "orders": 28,
+    "filled": 28,
+    "fill_rate_pct": 100.0,
+    "baseline": {
+     "trades": 28,
+     "profit": 397.77,
+     "pf": 3.86
+    },
+    "maker": {
+     "trades": 28,
+     "profit": 407.77,
+     "pf": 4.03
+    },
+    "delta_profit": 10.0,
+    "fee_and_slippage_saved_on_filled": 10.0,
+    "missed_winners_profit": 0,
+    "missed_losers_avoided": 0,
+    "opportunity_net": 0,
+    "maker_exit": false,
+    "exit_limit_fills": 0,
+    "exit_fallbacks": 0,
+    "verdict": "maker compensa"
+   },
+   "A entrada limite 0,5% abaixo, buffer 0,05%": {
+    "orders": 28,
+    "filled": 26,
+    "fill_rate_pct": 92.9,
+    "baseline": {
+     "trades": 28,
+     "profit": 397.77,
+     "pf": 3.86
+    },
+    "maker": {
+     "trades": 26,
+     "profit": 440.48,
+     "pf": 4.94
+    },
+    "delta_profit": 42.71,
+    "fee_and_slippage_saved_on_filled": 24.53,
+    "missed_winners_profit": 0,
+    "missed_losers_avoided": 18.19,
+    "opportunity_net": -18.19,
+    "maker_exit": false,
+    "exit_limit_fills": 0,
+    "exit_fallbacks": 0,
+    "verdict": "maker compensa"
+   },
+   "B entrada + saída por sinal a limite, buffer 0,05%": {
+    "orders": 28,
+    "filled": 27,
+    "fill_rate_pct": 96.4,
+    "baseline": {
+     "trades": 28,
+     "profit": 397.77,
+     "pf": 3.86
+    },
+    "maker": {
+     "trades": 27,
+     "profit": 400.44,
+     "pf": 4.28
+    },
+    "delta_profit": 2.67,
+    "fee_and_slippage_saved_on_filled": -7.96,
+    "missed_winners_profit": 0,
+    "missed_losers_avoided": 10.63,
+    "opportunity_net": -10.63,
+    "maker_exit": true,
+    "exit_limit_fills": 10,
+    "exit_fallbacks": 1,
+    "verdict": "maker compensa"
+   }
+  }
+ },
+ "MR007-1D|ETH-USDT": {
+  "candles": 3000,
+  "base_trades": 12,
+  "base_profit": 1246.0,
+  "scen": {
+   "A entrada limite, buffer 0,05%": {
+    "orders": 12,
+    "filled": 12,
+    "fill_rate_pct": 100.0,
+    "baseline": {
+     "trades": 12,
+     "profit": 1246.0,
+     "pf": 7.11
+    },
+    "maker": {
+     "trades": 12,
+     "profit": 1250.83,
+     "pf": 7.2
+    },
+    "delta_profit": 4.83,
+    "fee_and_slippage_saved_on_filled": 4.83,
+    "missed_winners_profit": 0,
+    "missed_losers_avoided": 0,
+    "opportunity_net": 0,
+    "maker_exit": false,
+    "exit_limit_fills": 0,
+    "exit_fallbacks": 0,
+    "verdict": "maker compensa"
+   },
+   "A entrada limite, buffer 0,00% (conta o toque)": {
+    "orders": 12,
+    "filled": 12,
+    "fill_rate_pct": 100.0,
+    "baseline": {
+     "trades": 12,
+     "profit": 1246.0,
+     "pf": 7.11
+    },
+    "maker": {
+     "trades": 12,
+     "profit": 1250.83,
+     "pf": 7.2
+    },
+    "delta_profit": 4.83,
+    "fee_and_slippage_saved_on_filled": 4.83,
+    "missed_winners_profit": 0,
+    "missed_losers_avoided": 0,
+    "opportunity_net": 0,
+    "maker_exit": false,
+    "exit_limit_fills": 0,
+    "exit_fallbacks": 0,
+    "verdict": "maker compensa"
+   },
+   "A entrada limite 0,5% abaixo, buffer 0,05%": {
+    "orders": 12,
+    "filled": 12,
+    "fill_rate_pct": 100.0,
+    "baseline": {
+     "trades": 12,
+     "profit": 1246.0,
+     "pf": 7.11
+    },
+    "maker": {
+     "trades": 12,
+     "profit": 1263.15,
+     "pf": 7.34
+    },
+    "delta_profit": 17.15,
+    "fee_and_slippage_saved_on_filled": 17.15,
+    "missed_winners_profit": 0,
+    "missed_losers_avoided": 0,
+    "opportunity_net": 0,
+    "maker_exit": false,
+    "exit_limit_fills": 0,
+    "exit_fallbacks": 0,
+    "verdict": "maker compensa"
+   },
+   "B entrada + saída por sinal a limite, buffer 0,05%": {
+    "orders": 12,
+    "filled": 12,
+    "fill_rate_pct": 100.0,
+    "baseline": {
+     "trades": 12,
+     "profit": 1246.0,
+     "pf": 7.11
+    },
+    "maker": {
+     "trades": 12,
+     "profit": 1250.83,
+     "pf": 7.2
+    },
+    "delta_profit": 4.83,
+    "fee_and_slippage_saved_on_filled": 4.83,
+    "missed_winners_profit": 0,
+    "missed_losers_avoided": 0,
+    "opportunity_net": 0,
+    "maker_exit": true,
+    "exit_limit_fills": 0,
+    "exit_fallbacks": 0,
+    "verdict": "maker compensa"
+   }
+  }
+ },
+ "TF008-1D|SOL-USDT": {
+  "candles": 2223,
+  "base_trades": 21,
+  "base_profit": 528.88,
+  "scen": {
+   "A entrada limite, buffer 0,05%": {
+    "orders": 21,
+    "filled": 21,
+    "fill_rate_pct": 100.0,
+    "baseline": {
+     "trades": 21,
+     "profit": 528.88,
+     "pf": 4.16
+    },
+    "maker": {
+     "trades": 21,
+     "profit": 536.5,
+     "pf": 4.28
+    },
+    "delta_profit": 7.62,
+    "fee_and_slippage_saved_on_filled": 7.62,
+    "missed_winners_profit": 0,
+    "missed_losers_avoided": 0,
+    "opportunity_net": 0,
+    "maker_exit": false,
+    "exit_limit_fills": 0,
+    "exit_fallbacks": 0,
+    "verdict": "maker compensa"
+   },
+   "A entrada limite, buffer 0,00% (conta o toque)": {
+    "orders": 21,
+    "filled": 21,
+    "fill_rate_pct": 100.0,
+    "baseline": {
+     "trades": 21,
+     "profit": 528.88,
+     "pf": 4.16
+    },
+    "maker": {
+     "trades": 21,
+     "profit": 536.5,
+     "pf": 4.28
+    },
+    "delta_profit": 7.62,
+    "fee_and_slippage_saved_on_filled": 7.62,
+    "missed_winners_profit": 0,
+    "missed_losers_avoided": 0,
+    "opportunity_net": 0,
+    "maker_exit": false,
+    "exit_limit_fills": 0,
+    "exit_fallbacks": 0,
+    "verdict": "maker compensa"
+   },
+   "A entrada limite 0,5% abaixo, buffer 0,05%": {
+    "orders": 21,
+    "filled": 19,
+    "fill_rate_pct": 90.5,
+    "baseline": {
+     "trades": 21,
+     "profit": 528.88,
+     "pf": 4.16
+    },
+    "maker": {
+     "trades": 19,
+     "profit": 487.62,
+     "pf": 4.06
+    },
+    "delta_profit": -41.26,
+    "fee_and_slippage_saved_on_filled": 18.84,
+    "missed_winners_profit": 60.09,
+    "missed_losers_avoided": 0,
+    "opportunity_net": 60.09,
+    "maker_exit": false,
+    "exit_limit_fills": 0,
+    "exit_fallbacks": 0,
+    "verdict": "maker descartado"
+   },
+   "B entrada + saída por sinal a limite, buffer 0,05%": {
+    "orders": 21,
+    "filled": 21,
+    "fill_rate_pct": 100.0,
+    "baseline": {
+     "trades": 21,
+     "profit": 528.88,
+     "pf": 4.16
+    },
+    "maker": {
+     "trades": 21,
+     "profit": 532.81,
+     "pf": 4.15
+    },
+    "delta_profit": 3.93,
+    "fee_and_slippage_saved_on_filled": 3.93,
+    "missed_winners_profit": 0,
+    "missed_losers_avoided": 0,
+    "opportunity_net": 0,
+    "maker_exit": true,
+    "exit_limit_fills": 9,
+    "exit_fallbacks": 1,
+    "verdict": "maker compensa"
+   }
+  }
+ },
+ "RG005-1D|SOL-USDT": {
+  "candles": 2223,
+  "base_trades": 20,
+  "base_profit": 382.55,
+  "scen": {
+   "A entrada limite, buffer 0,05%": {
+    "orders": 20,
+    "filled": 20,
+    "fill_rate_pct": 100.0,
+    "baseline": {
+     "trades": 20,
+     "profit": 382.55,
+     "pf": 3.06
+    },
+    "maker": {
+     "trades": 20,
+     "profit": 389.74,
+     "pf": 3.14
+    },
+    "delta_profit": 7.19,
+    "fee_and_slippage_saved_on_filled": 7.19,
+    "missed_winners_profit": 0,
+    "missed_losers_avoided": 0,
+    "opportunity_net": 0,
+    "maker_exit": false,
+    "exit_limit_fills": 0,
+    "exit_fallbacks": 0,
+    "verdict": "maker compensa"
+   },
+   "A entrada limite, buffer 0,00% (conta o toque)": {
+    "orders": 20,
+    "filled": 20,
+    "fill_rate_pct": 100.0,
+    "baseline": {
+     "trades": 20,
+     "profit": 382.55,
+     "pf": 3.06
+    },
+    "maker": {
+     "trades": 20,
+     "profit": 389.74,
+     "pf": 3.14
+    },
+    "delta_profit": 7.19,
+    "fee_and_slippage_saved_on_filled": 7.19,
+    "missed_winners_profit": 0,
+    "missed_losers_avoided": 0,
+    "opportunity_net": 0,
+    "maker_exit": false,
+    "exit_limit_fills": 0,
+    "exit_fallbacks": 0,
+    "verdict": "maker compensa"
+   },
+   "A entrada limite 0,5% abaixo, buffer 0,05%": {
+    "orders": 20,
+    "filled": 18,
+    "fill_rate_pct": 90.0,
+    "baseline": {
+     "trades": 20,
+     "profit": 382.55,
+     "pf": 3.06
+    },
+    "maker": {
+     "trades": 18,
+     "profit": 426.55,
+     "pf": 3.8
+    },
+    "delta_profit": 44.0,
+    "fee_and_slippage_saved_on_filled": 17.65,
+    "missed_winners_profit": 0,
+    "missed_losers_avoided": 26.35,
+    "opportunity_net": -26.35,
+    "maker_exit": false,
+    "exit_limit_fills": 0,
+    "exit_fallbacks": 0,
+    "verdict": "maker compensa"
+   },
+   "B entrada + saída por sinal a limite, buffer 0,05%": {
+    "orders": 20,
+    "filled": 20,
+    "fill_rate_pct": 100.0,
+    "baseline": {
+     "trades": 20,
+     "profit": 382.55,
+     "pf": 3.06
+    },
+    "maker": {
+     "trades": 20,
+     "profit": 391.7,
+     "pf": 3.17
+    },
+    "delta_profit": 9.15,
+    "fee_and_slippage_saved_on_filled": 9.15,
+    "missed_winners_profit": 0,
+    "missed_losers_avoided": 0,
+    "opportunity_net": 0,
+    "maker_exit": true,
+    "exit_limit_fills": 6,
+    "exit_fallbacks": 0,
+    "verdict": "maker compensa"
+   }
+  }
+ },
+ "MR007-1D|SOL-USDT": {
+  "candles": 2223,
+  "base_trades": 13,
+  "base_profit": 1087.35,
+  "scen": {
+   "A entrada limite, buffer 0,05%": {
+    "orders": 13,
+    "filled": 13,
+    "fill_rate_pct": 100.0,
+    "baseline": {
+     "trades": 13,
+     "profit": 1087.35,
+     "pf": 5.96
+    },
+    "maker": {
+     "trades": 13,
+     "profit": 1092.44,
+     "pf": 6.03
+    },
+    "delta_profit": 5.09,
+    "fee_and_slippage_saved_on_filled": 5.09,
+    "missed_winners_profit": 0,
+    "missed_losers_avoided": 0,
+    "opportunity_net": 0,
+    "maker_exit": false,
+    "exit_limit_fills": 0,
+    "exit_fallbacks": 0,
+    "verdict": "maker compensa"
+   },
+   "A entrada limite, buffer 0,00% (conta o toque)": {
+    "orders": 13,
+    "filled": 13,
+    "fill_rate_pct": 100.0,
+    "baseline": {
+     "trades": 13,
+     "profit": 1087.35,
+     "pf": 5.96
+    },
+    "maker": {
+     "trades": 13,
+     "profit": 1092.44,
+     "pf": 6.03
+    },
+    "delta_profit": 5.09,
+    "fee_and_slippage_saved_on_filled": 5.09,
+    "missed_winners_profit": 0,
+    "missed_losers_avoided": 0,
+    "opportunity_net": 0,
+    "maker_exit": false,
+    "exit_limit_fills": 0,
+    "exit_fallbacks": 0,
+    "verdict": "maker compensa"
+   },
+   "A entrada limite 0,5% abaixo, buffer 0,05%": {
+    "orders": 13,
+    "filled": 13,
+    "fill_rate_pct": 100.0,
+    "baseline": {
+     "trades": 13,
+     "profit": 1087.35,
+     "pf": 5.96
+    },
+    "maker": {
+     "trades": 13,
+     "profit": 1104.47,
+     "pf": 6.13
+    },
+    "delta_profit": 17.12,
+    "fee_and_slippage_saved_on_filled": 17.12,
+    "missed_winners_profit": 0,
+    "missed_losers_avoided": 0,
+    "opportunity_net": 0,
+    "maker_exit": false,
+    "exit_limit_fills": 0,
+    "exit_fallbacks": 0,
+    "verdict": "maker compensa"
+   },
+   "B entrada + saída por sinal a limite, buffer 0,05%": {
+    "orders": 13,
+    "filled": 13,
+    "fill_rate_pct": 100.0,
+    "baseline": {
+     "trades": 13,
+     "profit": 1087.35,
+     "pf": 5.96
+    },
+    "maker": {
+     "trades": 13,
+     "profit": 1092.44,
+     "pf": 6.03
+    },
+    "delta_profit": 5.09,
+    "fee_and_slippage_saved_on_filled": 5.09,
+    "missed_winners_profit": 0,
+    "missed_losers_avoided": 0,
+    "opportunity_net": 0,
+    "maker_exit": true,
+    "exit_limit_fills": 0,
+    "exit_fallbacks": 0,
+    "verdict": "maker compensa"
+   }
+  }
+ }
+}

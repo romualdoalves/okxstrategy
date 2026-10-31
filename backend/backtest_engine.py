@@ -200,6 +200,7 @@ class BacktestEngine:
                 "max_gross_pct": (max(position.get("mfe_high", position["entry_price"]), position["entry_price"])
                                   / position["entry_price"] - 1) * 100,   # pico do ganho bruto durante a operação
                 "fees": fees,
+                "stop_price": position["stop_price"],      # stop vigente na saída (estudos de execução, ex.: ordem a limite)
                 "balance": self.balance,
                 "entry_time": position["entry_time"],
                 "exit_time": idx,
