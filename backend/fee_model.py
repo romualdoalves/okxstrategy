@@ -29,6 +29,7 @@ REFRESH_SECONDS = 3600
 _official: float | None = None           # taker oficial da conta (/account/trade-fee)
 _official_maker: float | None = None
 _official_level: str = ""
+_official_raw: dict | None = None
 _observed: float | None = None
 _observed_at: float = 0.0
 _observed_fills: int = 0
@@ -92,8 +93,9 @@ def observe(rate: float | None, n_fills: int) -> None:
     _observed, _observed_at, _observed_fills = rate, time.time(), n_fills
 
 
-def set_official(taker: float | None, maker: float | None = None, level: str = "") -> None:
-    global _official, _official_maker, _official_level
+def set_official(taker: float | None, maker: float | None = None, level: str = "", raw: dict | None = None) -> None:
+    global _official, _official_maker, _official_level, _official_raw
+    _official_raw = raw if raw is not None else _official_raw
     if taker is None or not (0 < taker < 0.02):
         return
     if _official is None or abs(taker - _official) > 1e-9:
@@ -106,7 +108,7 @@ def status() -> dict:
     mismatch = (_official is not None and _observed is not None and abs(_official - _observed) > 0.0002)
     return {"fee_rate": fee_rate(), "source": source(), "official_taker": _official, "official_maker": _official_maker,
             "official_level": _official_level or None, "observed": _observed, "observed_fills": _observed_fills,
-            "observed_at": _observed_at or None, "default": DEFAULT_FEE_RATE,
+            "observed_at": _observed_at or None, "default": DEFAULT_FEE_RATE, "official_raw": _official_raw,
             # a OKX diz uma coisa e os fills mostram outra: o número em uso é o oficial, mas a divergência precisa ser vista
             "mismatch": mismatch}
 
@@ -123,7 +125,7 @@ async def refresh_from_exchange(days: int = 30) -> dict:
             exchange = build_exchange(sess)
             try:
                 official = await exchange.get_trade_fee("BTC-USDT")
-                set_official(official.get("taker"), official.get("maker"), official.get("level", ""))
+                set_official(official.get("taker"), official.get("maker"), official.get("level", ""), official.get("raw"))
             except Exception as exc:
                 log.warning("Taxa oficial: não consegui perguntar à OKX (%s).", exc)
             fills = await exchange.get_activities(

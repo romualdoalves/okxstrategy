@@ -180,6 +180,30 @@ def _check(data: dict, op: str = "") -> dict:
     return data
 
 
+def parse_trade_fee(row: dict) -> dict:
+    """Extrai taker/maker (frações positivas = taxa cobrada) de uma linha de /account/trade-fee. A OKX mudou o formato:
+    as taxas do SPOT podem vir em `feeGroup[]` (uma por grupo de instrumentos) ou nos campos `taker`/`maker` da linha.
+    Com `feeGroup` presente ele vale mais; se tiver mais de um grupo com taxas diferentes, fica o MAIOR taker (a estimativa
+    prudente) e `ambiguous` avisa. `raw` guarda a linha para conferência (tela e /api/system/fee-model)."""
+    def num(v):
+        try:
+            return abs(float(v))                         # a OKX informa a taxa cobrada como número negativo
+        except (TypeError, ValueError):
+            return None
+
+    out: dict = {"level": str(row.get("level") or ""), "raw": row}
+    groups = [g for g in (row.get("feeGroup") or []) if num(g.get("taker")) is not None]
+    if groups:
+        best = max(groups, key=lambda g: num(g.get("taker")))
+        out["taker"], out["maker"] = num(best.get("taker")), num(best.get("maker"))
+        out["ambiguous"] = len({num(g.get("taker")) for g in groups}) > 1
+        out["source_field"] = "feeGroup"
+    else:
+        out["taker"], out["maker"] = num(row.get("taker")), num(row.get("maker"))
+        out["source_field"] = "taker/maker"
+    return {k: v for k, v in out.items() if v is not None}
+
+
 _FILLS_MAX_PAGES = 30     # 3.000 fills por consulta (o `/fills-history` da OKX guarda 3 meses)
 
 
@@ -906,14 +930,7 @@ class OKXExchange(BaseExchange):
         if str(data.get("code", "0")) != "0" or not data.get("data"):
             log.warning("[get_trade_fee] OKX recusou (code=%s msg=%s)", data.get("code"), data.get("msg"))
             return {}
-        row = data["data"][0]
-        out = {"level": str(row.get("level") or "")}
-        for key in ("taker", "maker"):
-            try:
-                out[key] = abs(float(row.get(key)))      # a OKX informa a taxa cobrada como número negativo
-            except (TypeError, ValueError):
-                pass
-        return out
+        return parse_trade_fee(data["data"][0])
 
     async def get_account_summary(self) -> dict:
         path = "/api/v5/account/balance"

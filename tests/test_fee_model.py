@@ -107,3 +107,16 @@ def test_feeRate_recorded_by_okx_in_each_fill_is_used_when_present():
     fills = [dict(f, fee_rate_api="-0.002") for f in REAL]          # a OKX gravou 0,2% em todos os fills
     rate, n = fee_model.observed_rate(reconcile_fills(fills))
     assert n == 4 and rate == pytest.approx(0.002)
+
+
+def test_trade_fee_parser_handles_both_okx_formats():
+    from backend.exchanges.okx import parse_trade_fee
+    old = parse_trade_fee({"level": "Lv1", "taker": "-0.0010", "maker": "-0.0008"})          # campos na própria linha
+    assert old["taker"] == pytest.approx(0.001) and old["maker"] == pytest.approx(0.0008) and old["source_field"] == "taker/maker"
+    new = parse_trade_fee({"level": "Lv1", "taker": "-0.0005", "maker": "-0.0002",           # SPOT em feeGroup
+                           "feeGroup": [{"groupId": "1", "taker": "-0.0010", "maker": "-0.0008"}]})
+    assert new["taker"] == pytest.approx(0.001) and new["source_field"] == "feeGroup" and not new["ambiguous"]
+    multi = parse_trade_fee({"feeGroup": [{"groupId": "1", "taker": "-0.001", "maker": "-0.0008"},
+                                          {"groupId": "2", "taker": "-0.004", "maker": "-0.004"}]})
+    assert multi["taker"] == pytest.approx(0.004) and multi["ambiguous"] is True              # na dúvida, a taxa maior
+    assert "taker" not in parse_trade_fee({"level": "Lv1"})                                     # sem taxa: nada inventado
