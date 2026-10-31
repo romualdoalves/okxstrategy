@@ -151,7 +151,10 @@ fi
 if has_line "okx_strategy" docker ps; then
     ONLY_IN_CONTAINER=""
     for f in $(docker exec okx_strategy sh -c 'ls /app/backend/strategies/factory' 2>/dev/null | grep -E '^([a-z]{2}[0-9]{3}|t000)\.py$' || true); do
-        [ -f "${DEPLOY_DIR}/backend/strategies/factory/${f}" ] || ONLY_IN_CONTAINER="${ONLY_IN_CONTAINER} ${f}"
+        [ -f "${DEPLOY_DIR}/backend/strategies/factory/${f}" ] && continue
+        # Arquivo que já esteve no git e foi removido de propósito (estratégia excluída): não é "só do container".
+        [ -n "$(git -C "${DEPLOY_DIR}" log --oneline -1 -- "backend/strategies/factory/${f}" 2>/dev/null)" ] && continue
+        ONLY_IN_CONTAINER="${ONLY_IN_CONTAINER} ${f}"
     done
     if [ -n "${ONLY_IN_CONTAINER}" ]; then
         echo ""

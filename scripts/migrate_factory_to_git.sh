@@ -30,6 +30,8 @@ if docker ps --format '{{.Names}}' | grep -qx "${CONTAINER}"; then
         [ -e "$f" ] || continue
         b="$(basename "$f")"
         [[ "$b" =~ $PATTERN ]] || continue
+        # Já esteve no git e foi excluída de propósito: não traz de volta.
+        if [ -n "$(git -C "${DEPLOY_DIR}" log --oneline -1 -- "backend/strategies/factory/${b}" 2>/dev/null)" ]; then continue; fi
         if [ ! -f "${DEST}/${b}" ]; then
             cp "$f" "${DEST}/${b}"
             NEW+=("${b}")
@@ -46,6 +48,7 @@ IDS="$(docker exec "${DB_CONTAINER}" psql -U "${DB_USER}" -d "${DB_NAME}" -At \
 for id in ${IDS}; do
     b="${id}.py"
     [[ "$b" =~ $PATTERN ]] || continue
+    if [ -n "$(git -C "${DEPLOY_DIR}" log --oneline -1 -- "backend/strategies/factory/${b}" 2>/dev/null)" ]; then continue; fi
     if [ ! -f "${DEST}/${b}" ]; then
         docker exec "${DB_CONTAINER}" psql -U "${DB_USER}" -d "${DB_NAME}" -At \
             -c "select code_py from strategies where lower(strategy_id)='${id}'" > "${DEST}/${b}"
