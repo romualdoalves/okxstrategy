@@ -890,8 +890,30 @@ class OKXExchange(BaseExchange):
                 "fee":              f.get("fee", ""),
                 "fee_currency":     f.get("feeCcy", ""),
                 "exec_type":        {"T": "Taker", "M": "Maker"}.get(f.get("execType", ""), ""),
+                "fee_rate_api":     f.get("feeRate", ""),     # taxa por lado que a OKX aplicou neste fill (spot)
             })
         return result
+
+    async def get_trade_fee(self, inst_id: str = "BTC-USDT") -> dict:
+        """Taxas OFICIAIS da conta (GET /api/v5/account/trade-fee, SPOT): é a própria OKX dizendo o que cobra, no mesmo
+        ambiente (demo ou real) em que o app opera. Devolve {"taker": fração, "maker": fração, "level": str} (frações
+        positivas = taxa cobrada) ou {} se a OKX não responder."""
+        path = f"/api/v5/account/trade-fee?instType=SPOT&instId={inst_id}"
+        headers = _auth_headers("GET", path)
+        async with aiohttp.ClientSession() as s:
+            async with s.get(f"{OKX_BASE}{path}", headers=headers) as resp:
+                data = await resp.json()
+        if str(data.get("code", "0")) != "0" or not data.get("data"):
+            log.warning("[get_trade_fee] OKX recusou (code=%s msg=%s)", data.get("code"), data.get("msg"))
+            return {}
+        row = data["data"][0]
+        out = {"level": str(row.get("level") or "")}
+        for key in ("taker", "maker"):
+            try:
+                out[key] = abs(float(row.get(key)))      # a OKX informa a taxa cobrada como número negativo
+            except (TypeError, ValueError):
+                pass
+        return out
 
     async def get_account_summary(self) -> dict:
         path = "/api/v5/account/balance"

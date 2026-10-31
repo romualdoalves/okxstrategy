@@ -200,6 +200,7 @@ async def get_activities(date: Optional[str] = None, db: Session = Depends(get_d
             "effective_fee_pct":   okx["effective_fee_pct"],
             "model_fee_pct":       round(fee_rate() * 100, 4),
             "fee_source":          fee_model.source(),
+            "fee_status":          fee_model.status(),
             "fees_total_day":      okx["fees_total"],
             "unmatched_sells":     okx["unmatched_sells"],
             "unknown_fee_fills":   okx["unknown_fee_fills"],

@@ -85,3 +85,25 @@ def test_exit_message_shows_net_first_then_gross_and_fees():
                          exit_price=100.5, pnl=-0.3, gross_pnl=0.5, fees=0.8, daily_pnl=-1, stop_loss_usd=-50, wins=1, losses=2)
     assert "P&L líquido" in txt and "-0.30" in txt and "Bruto +$0.50" in txt and "taxas -$0.80" in txt
     assert "🔴" in txt                                    # +0,50 de preço com 0,80 de taxas é prejuízo
+
+
+def test_official_account_rate_beats_what_fills_show_and_a_divergence_is_flagged(monkeypatch):
+    monkeypatch.delenv("OKX_FEE_RATE", raising=False)
+    monkeypatch.setattr(fee_model, "_official", None)
+    fee_model.observe(0.004, 10)                                   # os fills da conta (demo) mostram 0,40%
+    assert fee_model.source() == "fills" and fee_model.fee_rate() == 0.004
+    fee_model.set_official(0.001, 0.0008, "Lv1")                   # a OKX responde: taker 0,10% / maker 0,08%
+    try:
+        st = fee_model.status()
+        assert st["source"] == "official" and st["fee_rate"] == 0.001 and st["official_maker"] == 0.0008
+        assert st["mismatch"] is True                               # oficial 0,10% x fills 0,40%: a tela precisa avisar
+        fee_model.set_official(0.004)
+        assert fee_model.status()["mismatch"] is False
+    finally:
+        monkeypatch.setattr(fee_model, "_official", None)
+
+
+def test_feeRate_recorded_by_okx_in_each_fill_is_used_when_present():
+    fills = [dict(f, fee_rate_api="-0.002") for f in REAL]          # a OKX gravou 0,2% em todos os fills
+    rate, n = fee_model.observed_rate(reconcile_fills(fills))
+    assert n == 4 and rate == pytest.approx(0.002)

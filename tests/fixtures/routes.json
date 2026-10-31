@@ -44,6 +44,7 @@
  "GET /api/strategy-factory/strategies",
  "GET /api/strategy-factory/strategies/{strategy_id}/code",
  "GET /api/system/ai-usage",
+ "GET /api/system/fee-model",
  "GET /api/system/telegram-status",
  "GET /api/trades",
  "GET /api/trades/summary",

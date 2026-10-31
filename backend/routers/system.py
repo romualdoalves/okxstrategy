@@ -186,6 +186,13 @@ async def monitor_bots():
     
     return {"bots": result, "count": len(result), "timestamp": datetime.now(timezone.utc).isoformat()}
 
+@router.get("/api/system/fee-model")
+async def system_fee_model(refresh: bool = False):
+    """Taxa por lado em uso e de onde vem (env, oficial da OKX, fills ou padrão). `refresh=true` mede de novo agora."""
+    from .. import fee_model
+    return await fee_model.refresh_from_exchange() if refresh else fee_model.status()
+
+
 @router.get("/api/system/ai-usage")
 def system_ai_usage():
     deepseek_enabled = bool(os.getenv("DEEPSEEK_API_KEY", "").strip())

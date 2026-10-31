@@ -485,9 +485,17 @@ function TabAtividades() {
               </div>
               {recon.effective_fee_pct != null && (
                 <p className={`text-xs ${feeGap ? 'text-amber-400' : 'text-muted'}`}>
-                  Taxa efetiva cobrada pela OKX nos fills do dia: <strong>{fmt(recon.effective_fee_pct, 2)}% por lado</strong>
-                  {' '}· taxa que o app assume nos cálculos (cards, trava, backtest): <strong>{fmt(recon.model_fee_pct, 2)}% por lado</strong>.
-                  {feeGap && ' Os números líquidos de cards e backtests ficam otimistas enquanto esses dois valores forem diferentes.'}
+                  Taxa efetiva medida nos fills do dia: <strong>{fmt(recon.effective_fee_pct, 2)}% por lado</strong>
+                  {' '}· taxa que o app usa nos cálculos (cards, trava, meta, backtest): <strong>{fmt(recon.model_fee_pct, 2)}% por lado</strong>
+                  {' '}({{ env: 'definida em OKX_FEE_RATE', official: 'taxa oficial da conta, consultada na OKX', fills: 'medida nos fills da conta', default: 'padrão: ainda não confirmada pela OKX' }[recon.fee_source] || recon.fee_source}).
+                  {feeGap && ' Enquanto os dois valores forem diferentes, os números líquidos ficam errados.'}
+                </p>
+              )}
+              {recon.fee_status?.official_taker != null && (
+                <p className={`text-xs ${recon.fee_status.mismatch ? 'text-amber-400' : 'text-muted'}`}>
+                  Taxa oficial da conta na OKX{recon.fee_status.official_level ? ` (nível ${recon.fee_status.official_level})` : ''}: taker <strong>{fmt(recon.fee_status.official_taker * 100, 2)}%</strong>
+                  {recon.fee_status.official_maker != null && <>, maker <strong>{fmt(recon.fee_status.official_maker * 100, 2)}%</strong></>}.
+                  {recon.fee_status.mismatch && ' Diverge do que os fills cobraram: confira o ambiente (demo x real) e o nível da conta.'}
                 </p>
               )}
               {recon.app_fees_pending > 0 && (
