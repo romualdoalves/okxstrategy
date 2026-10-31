@@ -4,7 +4,7 @@ const p2 = (v) => Number(v).toFixed(2).replace('.', ',')
 const sg = (v) => `${v > 0 ? '+' : ''}${p2(v)}%`
 const tone = (v) => (v > 0 ? 'text-bull' : v < 0 ? 'text-bear' : 'text-white/80')
 
-// Taxa REAL (referência de conta real: a que avalia estratégias e a Meta) e taxa DEMO (a que a conta conectada cobra de fato),
+// Taxa REAL (tabela da OKX para o nível da conta: a que avalia estratégias e a Meta) e taxa DEMO (a que a conta conectada cobra de fato),
 // com o cálculo das duas. Posição aberta: bruto − taxas = líquido, sobre o mesmo preço ao vivo. Sem posição: custo de ida e volta.
 export function netFor(direction, entry, last, rate) {
   const gross = direction * ((last - entry) / entry) * 100
@@ -17,8 +17,8 @@ export default function FeeCompare({ direction, entry, last, demoRate, realRate 
   const same = Math.abs(demoRate - realRate) < 1e-9
   const positioned = Math.abs(direction) > 0 && entry > 0 && last > 0
   const rows = [
-    { key: 'real', label: 'Taxa Real', rate: realRate, hint: 'Conta real: avalia estudos, Scanner e Meta 1%' },
-    { key: 'demo', label: 'Taxa Demo', rate: demoRate, hint: 'Cobrada pela conta conectada (é a que forma o P&L realizado)' },
+    { key: 'real', label: 'Taxa Real', rate: realRate, hint: 'Tabela da OKX para o seu nível (taker): avalia estudos, Scanner e Meta 1%' },
+    { key: 'demo', label: 'Taxa Demo', rate: demoRate, hint: 'Cobrada pela conta conectada, medida nos fills (forma o P&L realizado)' },
   ]
   return (
     <div className="mb-3 rounded-lg border border-white/8 bg-white/4 px-2.5 py-2 text-[11px]" data-testid="fee-compare">

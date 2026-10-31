@@ -486,9 +486,9 @@ function TabAtividades() {
               {recon.effective_fee_pct != null && (
                 <p className={`text-xs ${feeGap ? 'text-amber-400' : 'text-muted'}`}>
                   Taxa <strong>cobrada</strong> nos fills do dia: <strong>{fmt(recon.effective_fee_pct, 2)}% por lado</strong> (é ela que forma o P&L líquido desta tela, do P&L diário e dos cards)
-                  {' '}· taxa de <strong>referência</strong> (conta real; estudos, Scanner, backtests e Meta 1%): <strong>{fmt(recon.model_fee_pct, 2)}% por lado</strong>
-                  {' '}({{ env: 'definida em OKX_FEE_RATE', reference: 'tabela publicada da OKX', official: 'taxa oficial da conta, consultada na OKX', fills: 'medida nos fills da conta', default: 'padrão' }[recon.fee_source] || recon.fee_source}).
-                  {feeGap && recon.effective_fee_pct > recon.model_fee_pct && ' A conta cobra mais que a referência (no demo): o que ela realiza fica abaixo do que o backtest projeta. Em conta real, a taxa cobrada seria a de referência.'}
+                  {' '}· taxa de <strong>referência</strong> (estudos, Scanner, backtests e Meta 1%): <strong>{fmt(recon.model_fee_pct, 2)}% por lado</strong>
+                  {' '}({{ env: 'definida em OKX_FEE_RATE', reference: 'página da OKX Brasil, Regular user, taker', official: 'taker oficial da conta, consultado na OKX', fills: 'medida nos fills da conta', default: 'padrão' }[recon.fee_source] || recon.fee_source}).
+                  {feeGap && recon.effective_fee_pct > recon.model_fee_pct && ' A conta cobra mais que a referência: o que ela realiza fica abaixo do que o backtest projeta.'}
                 </p>
               )}
               {recon.fee_status?.official_taker != null && (

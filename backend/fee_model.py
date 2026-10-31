@@ -1,16 +1,17 @@
 """
-fee_model.py — As DUAS taxas por lado que o app mostra, sempre lado a lado:
+fee_model.py — A taxa por lado que o app usa, e a que a conta de fato paga, sempre visíveis.
 
-  * REFERÊNCIA (`fee_rate()`): a taxa de uma conta REAL (taker de ordem a mercado). É a que avalia estratégia: estudos, Scanner BT,
-    backtests e Meta 1%. Padrão 0,10% (tabela publicada da OKX: BTC-USDT, DOT-USDT etc., regular user, taker). `OKX_FEE_RATE`
-    a sobrepõe. Com `OKX_DEMO=false` (conta real) ela passa a ser a taxa cobrada de fato.
-  * COBRADA (`charged_rate()`): o que a conta conectada está pagando AGORA, medida nos fills reais (ou a oficial da OKX, ou, sem
-    nada medido, a de referência). Na conta demo os fills mostram 0,40% por lado (Order Center, 29–30/10/2026: ex.: 0,3756205
-    USDT sobre 93,9051 USDT), 4x a referência: o demo cobra a mais. Vale para o dinheiro da conta: P&L diário, circuito de
-    perda, cards, Registros, avisos.
+Fonte da verdade: a página pública da OKX Brasil (okx.com/en-br/fees), linha "Regular user": maker 0,1000% / taker 0,4000%.
+A própria OKX confirma para esta conta (`/account/trade-fee`, SPOT, Lv1): taker 0,40% / maker 0,10%, e 132 fills medidos deram
+0,40% (31/10/2026). O bot opera a mercado, então a taxa por lado é a TAKER.
 
-A diferença (`demo_premium`) é exibida, nunca escondida. A decisão de avaliar estratégias pela taxa menor é de quem opera: é a
-que a conta real pagaria. Origem de cada número: `status()` e /api/system/fee-model.
+  * REFERÊNCIA (`fee_rate()`): a que avalia estratégias (estudos, Scanner BT, backtests, Meta 1%) e entra nos cálculos líquidos.
+    `OKX_FEE_RATE` > taker oficial da conta (consulta à OKX) > REFERENCE_FEE_RATE (0,40%, a da página para Regular user).
+  * COBRADA (`charged_rate()`): o que a conta paga AGORA, medida nos fills reais (> oficial > referência). É a do dinheiro da
+    conta: P&L diário, circuito de perda, cards, Registros. Hoje coincide com a referência; se um dia divergirem (conta em outro
+    nível, taxa promocional), as telas mostram as duas e a diferença.
+
+O padrão antigo de 0,10% era a tabela global (0,08% / 0,10%), que NÃO é a do nível desta conta: o líquido saía otimista.
 """
 from __future__ import annotations
 
@@ -20,7 +21,7 @@ import time
 
 log = logging.getLogger("fee_model")
 
-REFERENCE_FEE_RATE = 0.001        # 0,10% por lado: taxa taker publicada pela OKX para pares spot de regular user
+REFERENCE_FEE_RATE = 0.004        # 0,40% por lado: taker de Regular user na página pública da OKX Brasil
 DEFAULT_FEE_RATE = REFERENCE_FEE_RATE
 MIN_FILLS_TO_TRUST = 4            # menos fills que isso não bastam para sobrepor o padrão
 REFRESH_SECONDS = 3600
@@ -49,12 +50,10 @@ def is_demo() -> bool:
 
 
 def charged_rate() -> float:
-    """O que a conta conectada paga por lado AGORA: medida nos fills > oficial da OKX > referência."""
+    """O que a conta conectada paga por lado AGORA: medida nos fills > a referência."""
     if _observed is not None:
         return _observed
-    if _official is not None:
-        return _official
-    return REFERENCE_FEE_RATE
+    return fee_rate()                       # nada medido: vale a referência (inclui OKX_FEE_RATE e o taker oficial)
 
 
 def fee_rate() -> float:
@@ -62,18 +61,14 @@ def fee_rate() -> float:
     env = _env_rate()
     if env is not None:
         return env
-    return REFERENCE_FEE_RATE if is_demo() else charged_rate()
+    return _official if _official is not None else REFERENCE_FEE_RATE
 
 
 def source() -> str:
-    """De onde vem a taxa de REFERÊNCIA: 'env' | 'reference' (demo: tabela publicada) | 'official' | 'fills' | 'default' (conta real)."""
+    """De onde vem a taxa de REFERÊNCIA: 'env' | 'official' (taker da conta, consultado na OKX) | 'reference' (página da OKX)."""
     if _env_rate() is not None:
         return "env"
-    if is_demo():
-        return "reference"
-    if _observed is not None:
-        return "fills"
-    return "official" if _official is not None else "default"
+    return "official" if _official is not None else "reference"
 
 
 def observed_rate(fills: list[dict]) -> tuple[float | None, int]:

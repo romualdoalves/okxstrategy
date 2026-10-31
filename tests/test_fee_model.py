@@ -1,5 +1,5 @@
-"""Duas taxas por lado, sempre lado a lado: REFERÊNCIA (conta real: avalia estudos, Scanner e meta) e COBRADA (o que a conta
-conectada paga agora: dinheiro da conta). Na conta demo os fills cobram 0,40%, 4x a referência de 0,10%."""
+"""Taxa por lado: REFERÊNCIA (avalia estudos, Scanner e meta) e COBRADA (o que a conta paga agora: dinheiro da conta). Fonte: página
+da OKX Brasil, Regular user: taker 0,40% / maker 0,10%; a própria OKX confirma para a conta e os fills medidos dão 0,40%."""
 import pytest
 
 from backend import fee_model, goal
@@ -19,38 +19,37 @@ REAL = [_fill(1, "buy", 76845.9, 0.00122284, -0.0000049, "BTC"), _fill(2, "sell"
 @pytest.fixture(autouse=True)
 def _clean(monkeypatch):
     monkeypatch.delenv("OKX_FEE_RATE", raising=False)
-    monkeypatch.setenv("OKX_DEMO", "true")
     monkeypatch.setattr(fee_model, "_observed", None)
     monkeypatch.setattr(fee_model, "_official", None)
 
 
-def test_reference_is_the_published_live_rate_and_drives_goal_and_lock():
-    assert fee_model.fee_rate() == 0.001 and fee_model.source() == "reference"
-    assert lock_fee_rate() == 0.001
-    assert goal.net_equivalent_pct(1.0) == pytest.approx(1.0 - 0.001 * 201)        # +1% bruto ≈ +0,80% líquido (taxa real de referência)
-    assert breakeven_stop(100.0) > 100.0 * 1.002
+def test_reference_is_the_taker_rate_of_regular_user_and_drives_goal_and_lock():
+    assert fee_model.fee_rate() == 0.004 and fee_model.source() == "reference"
+    assert lock_fee_rate() == 0.004
+    assert goal.net_equivalent_pct(1.0) == pytest.approx(1.0 - 0.004 * 201)        # +1% bruto ≈ +0,20% líquido
+    assert breakeven_stop(100.0) > 100.0 * 1.008                                   # o breakeven cobre as duas taxas de 0,4%
 
 
-def test_charged_rate_is_what_the_demo_fills_show_and_both_are_exposed():
-    assert fee_model.charged_rate() == 0.001                                      # nada medido: não inventa 0,40%
+def test_charged_rate_is_what_the_fills_show_and_both_rates_are_exposed():
+    assert fee_model.charged_rate() == 0.004                                       # nada medido: cai na referência
     rate, n = fee_model.observed_rate(reconcile_fills(REAL))
     assert n == 4 and rate == pytest.approx(0.004, abs=0.0001)
     fee_model.observe(rate, n)
     st = fee_model.status()
-    assert st["fee_rate"] == 0.001 and st["charged_rate"] == pytest.approx(0.004, abs=0.0001)    # referência x cobrada
-    assert st["demo"] is True and st["demo_premium"] == pytest.approx(0.003, abs=0.0001)         # o demo cobra 0,30 p.p. a mais
+    assert st["fee_rate"] == 0.004 and st["charged_rate"] == pytest.approx(0.004, abs=0.0001)
+    assert st["demo_premium"] == pytest.approx(0.0, abs=0.0001)                     # hoje coincidem; se divergirem, aparece
+    fee_model.observe(0.0055, 10)                                                  # conta passa a pagar mais que a referência
+    assert fee_model.status()["demo_premium"] == pytest.approx(0.0015, abs=0.0001)
 
 
-def test_on_a_live_account_the_reference_is_the_charged_rate(monkeypatch):
-    monkeypatch.setenv("OKX_DEMO", "false")
-    fee_model.set_official(0.001, 0.0008, "Lv1")
-    assert fee_model.fee_rate() == 0.001 and fee_model.source() == "official"
-    fee_model.observe(0.0012, 10)
-    assert fee_model.fee_rate() == pytest.approx(0.0012) and fee_model.source() == "fills"      # o app acompanha a conta real
+def test_official_taker_of_the_account_becomes_the_reference():
+    fee_model.set_official(0.0035, 0.001, "Lv2")
+    assert fee_model.fee_rate() == 0.0035 and fee_model.source() == "official"     # o nível da conta mudou: o app acompanha
 
 
 def test_env_overrides_the_reference(monkeypatch):
     monkeypatch.setenv("OKX_FEE_RATE", "0.0015")
+    fee_model.set_official(0.004, 0.001)
     fee_model.observe(0.004, 10)
     assert fee_model.fee_rate() == 0.0015 and fee_model.source() == "env" and fee_model.charged_rate() == pytest.approx(0.004)
 
@@ -59,7 +58,7 @@ def test_few_fills_or_absurd_rates_do_not_move_the_charged_rate():
     assert fee_model.observed_rate(reconcile_fills(REAL[:2]))[0] is None
     fee_model.observe(0.003, 2)
     fee_model.observe(0.5, 50)
-    assert fee_model.charged_rate() == 0.001
+    assert fee_model.charged_rate() == 0.004
 
 
 def test_maker_fills_do_not_pull_the_taker_rate_down():
@@ -74,7 +73,7 @@ def test_official_rate_is_shown_and_a_divergence_from_the_fills_is_flagged():
     st = fee_model.status()
     assert st["official_taker"] == 0.001 and st["official_maker"] == 0.0008 and st["mismatch"] is True
     assert fee_model.charged_rate() == pytest.approx(0.004)                      # o dinheiro da conta segue o que ela pagou
-    fee_model.set_official(0.004)
+    fee_model.set_official(0.004, 0.001)
     assert fee_model.status()["mismatch"] is False
 
 
@@ -91,9 +90,9 @@ def test_backtest_uses_the_reference_rate_and_the_worker_receives_it(monkeypatch
     cheap = BacktestEngine("TF003-1D").run_strict_sync(cs, fee_rate=0.001)
     dear = BacktestEngine("TF003-1D").run_strict_sync(cs, fee_rate=0.004)
     assert dear["total_profit"] < cheap["total_profit"]
-    assert BacktestEngine("TF003-1D").run_strict_sync(cs)["total_profit"] == pytest.approx(cheap["total_profit"])   # padrão = referência
-    monkeypatch.setenv("OKX_FEE_RATE", "0.004")
-    assert BacktestEngine("TF003-1D").run_strict_sync(cs)["total_profit"] == pytest.approx(dear["total_profit"])
+    assert BacktestEngine("TF003-1D").run_strict_sync(cs)["total_profit"] == pytest.approx(dear["total_profit"])    # padrão = 0,40%
+    monkeypatch.setenv("OKX_FEE_RATE", "0.001")
+    assert BacktestEngine("TF003-1D").run_strict_sync(cs)["total_profit"] == pytest.approx(cheap["total_profit"])
 
 
 def test_daily_pnl_and_win_count_use_the_rate_the_account_pays():
