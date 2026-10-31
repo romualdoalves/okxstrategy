@@ -22,7 +22,7 @@ from .database import BotModel, SessionLocal
 from .exchanges.okx_universe import fetch_top_spot_assets
 from .profit_lock import EXIT_SLIPPAGE_RATE, fee_rate
 from .strategies.registry import REGISTRY
-from .validation.reports import validated_timeframe
+from .validation.reports import study_summary, validated_timeframe
 
 log = logging.getLogger("goal_service")
 
@@ -56,6 +56,8 @@ def candidate_strategies() -> list[tuple[str, str]]:
             continue
         info = cls.info()
         if "test" in (info.tags or []):          # estratégias de diagnóstico da plataforma (ex.: T000) nunca são candidatas
+            continue
+        if study_summary(sid)["study_verdict"] == "retired":   # aposentada pelo estudo: a criação do bot a recusaria
             continue
         tf = validated_timeframe(sid, info.recommended_timeframe)     # o timeframe do estudo = o do bot
         if tf.lower() in G.INTRADAY_TIMEFRAMES:

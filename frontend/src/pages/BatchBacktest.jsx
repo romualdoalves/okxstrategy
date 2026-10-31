@@ -286,7 +286,7 @@ function ResultCard({ r, symbol, selected, disabled, disabledReason, onToggle })
   const predictive = r.predictive || null
   const predScore = rec.predictive_score ?? predictive?.predictive_score
   const historicalScore = rec.historical_score ?? rec.score
-  const canSelect = !isNA && !disabled
+  const canSelect = !isNA && !disabled && !rec.study_retired     // aposentada pelo estudo: a criação do bot a recusaria
   const coverage = r.coverage || { level: isNA ? 'unsupported' : 'partial', reasons: [] }
   const coverageCfg = COVERAGE_CFG[coverage.level] || COVERAGE_CFG.partial
   const CoverageIcon = coverageCfg.icon
@@ -646,7 +646,7 @@ export default function BatchBacktest() {
     for (const row of rows) {
       const rowSymbol = row.symbol || fallbackSymbol
       const rec = row.recommendation || {}
-      if (!rowSymbol || rec.verdict === 'N/A') continue
+      if (!rowSymbol || rec.verdict === 'N/A' || rec.study_retired) continue
       if (usedSymbols.has(rowSymbol) || symbols.has(rowSymbol)) continue
       symbols.add(rowSymbol)
       next[resultKey(row, rowSymbol)] = { key: resultKey(row, rowSymbol), ...row, symbol: rowSymbol }

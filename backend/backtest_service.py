@@ -52,6 +52,21 @@ def verdict_from_score(score: float) -> tuple[str, str]:
         return "CUIDADO", "warning"
     return "NÃO INICIAR", "danger"
 
+def apply_study_verdict(strategy_id: str, rec: dict) -> dict:
+    """O veredito do ESTUDO (walk-forward de anos) manda sobre o backtest recente: estratégia aposentada nunca é
+    INICIAR no Scanner, senão ele recomenda o que a criação do bot depois recusa. O score é mantido (para consulta)."""
+    from .validation.reports import study_summary
+    study = study_summary(strategy_id)
+    if study["study_verdict"] != "retired" or rec.get("verdict") in (None, "N/A"):
+        return rec
+    rec = dict(rec)
+    rec["study_retired"] = True
+    if rec.get("verdict") != "NÃO INICIAR":
+        rec["verdict"], rec["level"] = "NÃO INICIAR", "danger"
+    rec["reasons"] = [f"Aposentada pelo estudo: {study['study_reason']}"] + list(rec.get("reasons") or [])
+    return rec
+
+
 def compose_predictive_recommendation(result: dict, predictive: dict) -> dict:
     rec = dict(result.get("recommendation") or {})
     if rec.get("verdict") == "N/A":
@@ -241,6 +256,7 @@ async def run_one(
         result["predictive"] = _predictive.score(strategy_id, symbol, timeframe, candles, backtest_result=result)
         result["recommendation"] = backtest_recommendation(result)
         result["recommendation"] = compose_predictive_recommendation(result, result["predictive"])
+        result["recommendation"] = apply_study_verdict(strategy_id, result["recommendation"])
         if not detail:
             for k in ("trades", "closed_trades", "assumptions"):
                 result.pop(k, None)

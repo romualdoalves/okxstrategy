@@ -203,3 +203,15 @@ def test_engine_closed_trades_carry_gross_net_and_peak(inline_worker):
     for t in res["closed_trades"]:
         assert t["gross_profit_pct"] - t["profit_pct"] == pytest.approx(t["fees"])         # stake 100: bruto = líquido + taxas
         assert t["max_gross_pct"] + 1e-9 >= t["gross_profit_pct"]                          # o pico nunca fica abaixo do fechamento
+
+
+def test_scanner_never_recommends_a_strategy_the_study_retired(inline_worker):
+    """TF013 (aposentada) saía como a melhor no Scanner e a criação do bot a recusava: o estudo manda no veredito."""
+    from backend.backtest_service import apply_study_verdict
+    rec = {"verdict": "INICIAR", "level": "success", "score": 8.1, "reasons": ["Lucro positivo."]}
+    out = apply_study_verdict("TF013", rec)
+    assert out["verdict"] == "NÃO INICIAR" and out["study_retired"] and out["score"] == 8.1
+    assert out["reasons"][0].startswith("Aposentada pelo estudo:")
+    assert rec["verdict"] == "INICIAR"                                    # não altera o original
+    assert apply_study_verdict("TF008", rec)["verdict"] == "INICIAR"      # candidata: intacta
+    assert apply_study_verdict("TF013", {"verdict": "N/A"})["verdict"] == "N/A"

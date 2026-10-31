@@ -514,3 +514,9 @@ def test_closest_list_prefers_rows_with_enough_history_over_a_flashy_short_sampl
     solid = dict(base, strategy_id="SOLID", chance_pct=9.0, chance_lb_pct=3.0, independent_windows=30.0)
     _, closest = svc.rank([flashy, solid])
     assert [r["strategy_id"] for r in closest] == ["SOLID", "FLASHY"]
+
+
+def test_goal_candidates_skip_strategies_retired_by_the_study():
+    from backend.validation.reports import study_summary
+    ids = [sid for sid, _ in svc.candidate_strategies()]
+    assert ids and all(study_summary(sid)["study_verdict"] != "retired" for sid in ids)
