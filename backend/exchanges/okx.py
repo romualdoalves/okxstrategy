@@ -180,6 +180,9 @@ def _check(data: dict, op: str = "") -> dict:
     return data
 
 
+_FILLS_MAX_PAGES = 30     # 3.000 fills por consulta (o `/fills-history` da OKX guarda 3 meses)
+
+
 def _iso_to_ms(iso_str: str) -> str:
     try:
         dt = datetime.fromisoformat(iso_str.replace("Z", "+00:00"))
@@ -831,30 +834,50 @@ class OKXExchange(BaseExchange):
         after: str | None = None,
         until: str | None = None,
         activity_type: str = "FILL",
+        strict: bool = False,
     ) -> list[dict]:
-        """Retorna fills históricos da OKX (GET /api/v5/trade/fills). App é SPOT-only."""
-        path = "/api/v5/trade/fills?instType=SPOT"
-        if after:
-            ms = _iso_to_ms(after)
-            if ms:
-                path += f"&begin={ms}"
-        if until:
-            ms = _iso_to_ms(until)
-            if ms:
-                path += f"&end={ms}"
-        headers = _auth_headers("GET", path)
-        async with aiohttp.ClientSession() as s:
-            async with s.get(f"{OKX_BASE}{path}", headers=headers) as resp:
-                data = await resp.json()
-        if str(data.get("code", "0")) != "0":
-            log.warning(
-                "[get_activities] OKX recusou /trade/fills (code=%s msg=%s path=%s) — "
-                "retornando lista vazia, NÃO necessariamente 'zero fills'.",
-                data.get("code"), data.get("msg"), path,
-            )
-            return []
+        """Retorna fills da OKX (App é SPOT-only), TODOS os da janela: a OKX entrega 100 por página, então pagina por
+        `billId` (mais antigos primeiro na cursor `after`). `/trade/fills` só guarda ~3 dias; janelas que começam antes disso
+        usam `/trade/fills-history` (3 meses). `strict=True` levanta erro em vez de devolver lista vazia (a conciliação
+        não pode confundir "a OKX recusou" com "zero fills")."""
+        begin_ms = _iso_to_ms(after) if after else ""
+        end_ms = _iso_to_ms(until) if until else ""
+        recent_limit = int((time.time() - 2.5 * 86400) * 1000)
+        endpoint = "fills-history" if (begin_ms and int(begin_ms) < recent_limit) else "fills"
+        base_path = f"/api/v5/trade/{endpoint}?instType=SPOT&limit=100"
+        if begin_ms:
+            base_path += f"&begin={begin_ms}"
+        if end_ms:
+            base_path += f"&end={end_ms}"
+        rows: list[dict] = []
+        cursor = ""
+        for _page in range(_FILLS_MAX_PAGES):
+            path = base_path + (f"&after={cursor}" if cursor else "")
+            headers = _auth_headers("GET", path)
+            async with aiohttp.ClientSession() as s:
+                async with s.get(f"{OKX_BASE}{path}", headers=headers) as resp:
+                    data = await resp.json()
+            if str(data.get("code", "0")) != "0":
+                log.warning(
+                    "[get_activities] OKX recusou /trade/%s (code=%s msg=%s path=%s) — "
+                    "retornando %s, NÃO necessariamente 'zero fills'.",
+                    endpoint, data.get("code"), data.get("msg"), path, "o que veio até aqui" if rows else "lista vazia",
+                )
+                if strict:
+                    raise RuntimeError(f"OKX recusou /trade/{endpoint}: {data.get('msg') or data.get('code')}")
+                break
+            page = data.get("data", [])
+            rows.extend(page)
+            if len(page) < 100:
+                break
+            cursor = page[-1].get("billId") or ""
+            if not cursor:
+                break
+        else:
+            if strict:
+                raise RuntimeError(f"Mais de {_FILLS_MAX_PAGES * 100} fills na janela: reduza o período.")
         result = []
-        for f in data.get("data", []):
+        for f in rows:
             result.append({
                 "symbol":           f.get("instId", ""),
                 "side":             f.get("side", ""),
@@ -862,9 +885,11 @@ class OKXExchange(BaseExchange):
                 "qty":              f.get("fillSz", ""),
                 "transaction_time": _ms_to_iso(f.get("ts", "")),
                 "id":               f.get("tradeId", ""),
+                "bill_id":          f.get("billId", ""),
                 "order_id":         f.get("ordId", ""),
                 "fee":              f.get("fee", ""),
                 "fee_currency":     f.get("feeCcy", ""),
+                "exec_type":        {"T": "Taker", "M": "Maker"}.get(f.get("execType", ""), ""),
             })
         return result
 

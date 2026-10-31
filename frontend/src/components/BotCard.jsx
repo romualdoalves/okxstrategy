@@ -8,6 +8,8 @@ import StrategyChecklist, { getCriteriaCount } from './StrategyChecklist'
 import AssetPriceCard from './AssetPriceCard'
 import StudyBadge from './StudyBadge'
 import GoalLine from './GoalLine'
+
+const BOT_SOURCE_LABEL = { scanner: 'Scanner BT', goal: 'Meta 1%', bots: 'Bots', strategies: 'Estratégias' }
 import { useMarketStatus } from '../hooks/useMarketStatus'
 import { botMood } from '../botMood'
 
@@ -179,6 +181,9 @@ export default function BotCard({ bot, liveStatus }) {
           </div>
           <p className="text-xs text-muted truncate">
             {bot.symbol} · {bot.timeframe}
+            <span className="ml-1.5 rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-muted/80" title="Página do menu em que o bot foi criado">
+              Origem: {BOT_SOURCE_LABEL[bot.source] || 'não registrada'}
+            </span>
           </p>
           {startedAt && (
             <p className="text-[10px] text-muted flex items-center gap-1 mt-0.5 opacity-70">

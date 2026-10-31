@@ -211,6 +211,7 @@ export default function MetaHoje() {
         name: `META ${c.target_pct}% BRUTO · ${row.strategy_id} (${row.symbol})`,
         goal_pct: c.target_pct,
         goal_window_hours: c.window_hours,
+        source: 'goal',
       }))
       setCreated(prev => ({ ...prev, [key]: bot }))
       qc.invalidateQueries({ queryKey: ['bots'] })

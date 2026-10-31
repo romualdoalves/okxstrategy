@@ -49,7 +49,7 @@ export const recaptureBaseline   = (id) => req(`/bots/${id}/recapture-baseline`,
 // Trades
 export const getTrades        = (botId)  => req(`/trades${botId ? `?bot_id=${botId}` : ''}`)
 export const getTradesSummary = (botId)  => req(`/trades/summary${botId ? `?bot_id=${botId}` : ''}`)
-export const syncTradeFees    = (days = 30) => req(`/trades/sync-fees?days_back=${days}`, { method: 'POST' })
+export const syncTradeFees    = (days = 30, force = false) => req(`/trades/sync-fees?days_back=${days}&force=${force}`, { method: 'POST' })
 
 // Sistema
 export const getAiUsageStatus    = () => req('/system/ai-usage')

@@ -69,7 +69,7 @@ function TabHistorico() {
   const handleSyncFees = async () => {
     setSyncing(true)
     try {
-      await syncTradeFees(90)
+      await syncTradeFees(90, true)
       await qc.invalidateQueries({ queryKey: ['summary'] })
       await qc.invalidateQueries({ queryKey: ['trades'] })
     } catch (e) {
@@ -107,7 +107,7 @@ function TabHistorico() {
           className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg bg-accent/10 hover:bg-accent/20 text-accent border border-accent/20 transition-all disabled:opacity-50"
         >
           <RefreshCcw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
-          {syncing ? 'Sincronizando taxas...' : 'Sincronizar Corretagem'}
+          {syncing ? 'Recalculando taxas...' : 'Recalcular taxas pela OKX'}
         </button>
       </div>
 
@@ -154,6 +154,8 @@ function TabHistorico() {
           <span className="text-bear/70 font-mono">${(summary.avg_fee ?? 0).toFixed(4)}</span>
           <span className="text-muted">·</span>
           <span className="text-muted">{summary.fees_synced} de {summary.total_trades} trades com taxa registrada</span>
+          <span className="text-muted">·</span>
+          <span className="text-muted/80">taxas em US$ conforme os fills da OKX (compra cobrada em moeda base, convertida pelo preço do fill)</span>
         </div>
       )}
 
@@ -173,22 +175,30 @@ function FillsTable({ fills, locale }) {
     <div className="text-center text-muted py-10 text-sm">Nenhum fill registrado nesta data.</div>
   )
 
+  const fmtQty = (v) => Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 8, maximumFractionDigits: 8 })
+
   return (
     <div className="overflow-x-auto">
+      <p className="px-3 pt-3 text-[11px] text-muted">
+        Mesmas linhas do Order center da OKX (Trading history), uma por fill, do mais recente para o mais antigo. Taxa: compra é cobrada em moeda base
+        (ex.: BTC), venda em USDT; a coluna US$ converte tudo para dólares. P&L aparece na venda, por FIFO.
+      </p>
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-border text-muted text-[11px] uppercase tracking-wide">
             <th className="text-left py-2 px-3 font-medium w-4" />
             <th className="text-left py-2 px-3 font-medium">Hora</th>
-            <th className="text-left py-2 px-3 font-medium">Lado</th>
+            <th className="text-left py-2 px-3 font-medium">Ação</th>
+            <th className="text-left py-2 px-3 font-medium">Taker/Maker</th>
             <th className="text-left py-2 px-3 font-medium">Símbolo</th>
-            <th className="text-right py-2 px-3 font-medium">Qtd</th>
+            <th className="text-right py-2 px-3 font-medium">Quantidade</th>
+            <th className="text-right py-2 px-3 font-medium">Valor (USDT)</th>
             <th className="text-right py-2 px-3 font-medium">Preço</th>
-            <th className="text-right py-2 px-3 font-medium">P&L Bruto</th>
-            <th className="text-right py-2 px-3 font-medium">Fee</th>
-            <th className="text-right py-2 px-3 font-medium">P&L Líquido</th>
-            <th className="text-left py-2 px-3 font-medium">Bot Correlato</th>
-            <th className="text-left py-2 px-3 font-medium">Trade App</th>
+            <th className="text-right py-2 px-3 font-medium">Taxa</th>
+            <th className="text-right py-2 px-3 font-medium">Taxa (US$ · %)</th>
+            <th className="text-right py-2 px-3 font-medium">P&L bruto</th>
+            <th className="text-right py-2 px-3 font-medium">P&L líquido</th>
+            <th className="text-left py-2 px-3 font-medium">Bot</th>
           </tr>
         </thead>
         <tbody>
@@ -197,7 +207,8 @@ function FillsTable({ fills, locale }) {
               ? new Date(f.transaction_time).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit' })
               : '—'
             const isOpen  = expanded === i
-            const hasMeta = f.matched_db_trade || (f.matched_bots && f.matched_bots.length > 0)
+            const sell = (f.side || '').toLowerCase() === 'sell'
+            const hasMeta = f.matched_db_trade || (f.matched_bots && f.matched_bots.length > 0) || f.unmatched_qty > 0
 
             return (
               <React.Fragment key={f.id || i}>
@@ -210,54 +221,59 @@ function FillsTable({ fills, locale }) {
                   </td>
                   <td className="py-2.5 px-3 text-muted text-xs font-mono whitespace-nowrap">{ts}</td>
                   <td className="py-2.5 px-3"><SideBadge side={f.side} /></td>
+                  <td className="py-2.5 px-3 text-xs text-muted">{f.exec_type || '—'}</td>
                   <td className="py-2.5 px-3 font-mono text-xs font-semibold">{f.symbol ?? '—'}</td>
-                  <td className="py-2.5 px-3 text-right text-xs tabular-nums">{fmt(f.qty, 6)}</td>
-                  <td className="py-2.5 px-3 text-right font-mono text-xs tabular-nums">${fmt(f.price, 4)}</td>
-                  <td className="py-2.5 px-3 text-right">
-                    {f.side === 'sell' ? <PnlChip value={f.fill_pnl} /> : <span className="text-muted text-xs">—</span>}
+                  <td className="py-2.5 px-3 text-right text-xs tabular-nums">{fmtQty(f.qty)}</td>
+                  <td className="py-2.5 px-3 text-right text-xs tabular-nums">{fmt(f.notional, 4)}</td>
+                  <td className="py-2.5 px-3 text-right font-mono text-xs tabular-nums">{fmt(f.price, 2)}</td>
+                  <td className="py-2.5 px-3 text-right text-xs tabular-nums text-bear/80 whitespace-nowrap">
+                    {f.fee !== '' && f.fee != null ? `${Number(f.fee).toLocaleString('pt-BR', { maximumFractionDigits: 8 })} ${f.fee_ccy || ''}` : '—'}
+                  </td>
+                  <td className="py-2.5 px-3 text-right text-xs tabular-nums whitespace-nowrap">
+                    {!f.fee_known
+                      ? <span className="text-amber-400" title="Moeda de taxa sem conversão confiável">?</span>
+                      : f.fee_usd > 0
+                        ? <span className="text-bear">-${fmt(f.fee_usd, 4)} <span className="text-muted">· {fmt(f.fee_pct, 2)}%</span></span>
+                        : <span className="text-muted">—</span>}
                   </td>
                   <td className="py-2.5 px-3 text-right">
-                    {f.fee_usd > 0
-                      ? <span className="text-bear text-xs tabular-nums">-${fmt(f.fee_usd)}</span>
-                      : <span className="text-muted text-xs">—</span>}
+                    {sell && f.gross_pnl != null ? <PnlChip value={f.gross_pnl} /> : <span className="text-muted text-xs">—</span>}
                   </td>
                   <td className="py-2.5 px-3 text-right">
-                    {f.side === 'sell' ? <PnlChip value={f.net_pnl} /> : <span className="text-muted text-xs">—</span>}
+                    {sell && f.net_pnl != null
+                      ? <PnlChip value={f.net_pnl} />
+                      : sell && f.unmatched_qty > 0
+                        ? <span className="text-amber-400/80 text-[10px]" title="Venda de saldo que já existia antes do app: sem compra correspondente">sem compra</span>
+                        : <span className="text-muted text-xs">—</span>}
                   </td>
                   <td className="py-2.5 px-3">
                     <div className="flex flex-wrap gap-1">
                       {(f.matched_bots || []).map(b => <BotTag key={b.id} bot={b} />)}
                     </div>
                   </td>
-                  <td className="py-2.5 px-3 text-xs">
-                    {f.matched_db_trade
-                      ? <span className="text-muted">#{f.matched_db_trade.id} · <PnlChip value={f.matched_db_trade.pnl} /></span>
-                      : <span className="text-muted/40">—</span>}
-                  </td>
                 </tr>
                 {isOpen && hasMeta && (
                   <tr className="bg-panel/20 border-b border-border/20">
-                    <td colSpan={11} className="px-6 py-3 text-xs text-muted space-y-1">
-                      <div><span className="font-medium text-white">Order ID:</span> {f.order_id ?? '—'}</div>
-                      <div><span className="font-medium text-white">Status:</span> {f.order_status ?? '—'}</div>
-                      {f.fee_usd > 0 && (
-                        <div>
-                          <span className="font-medium text-white">Fee (CFEE):</span>{' '}
-                          <span className="text-bear">-${fmt(f.fee_usd)}</span>
-                          {f.fill_pnl != null && (
-                            <span className="text-muted ml-2">→ P&L líquido: <PnlChip value={f.net_pnl} /></span>
-                          )}
+                    <td colSpan={13} className="px-6 py-3 text-xs text-muted space-y-1">
+                      <div><span className="font-medium text-white">Order ID:</span> {f.order_id ?? '—'} · <span className="font-medium text-white">Trade ID:</span> {f.id ?? '—'}</div>
+                      <div>
+                        <span className="font-medium text-white">Variação de saldo (como o "Balance change" da OKX):</span>{' '}
+                        {fmtQty(f.base_flow)} {String(f.symbol || '').split('-')[0]} · {fmt(f.quote_flow, 4)} {String(f.symbol || '').split('-')[1]}
+                      </div>
+                      {f.pnl_fees_usd != null && (
+                        <div><span className="font-medium text-white">Taxas das duas pontas desta operação:</span> <span className="text-bear">-${fmt(f.pnl_fees_usd, 4)}</span> (bruto − líquido)</div>
+                      )}
+                      {f.unmatched_qty > 0 && (
+                        <div className="text-amber-400/90">
+                          {fmtQty(f.unmatched_qty)} vendidos sem compra correspondente nos fills consultados: saldo que já existia antes do app (ou compra fora do período). Não há P&L inventado.
                         </div>
                       )}
                       {f.matched_db_trade && (
                         <div>
-                          <span className="font-medium text-white">Trade app:</span>{' '}
-                          #{f.matched_db_trade.id} — tipo {f.matched_db_trade.type} —
-                          P&L app: <PnlChip value={f.matched_db_trade.pnl} />
-                          {f.fill_pnl !== null && f.fill_pnl !== undefined && f.matched_db_trade.pnl !== null && (
-                            <span className="ml-2 text-amber-400">
-                              Δ ${fmt(f.fill_pnl - (f.matched_db_trade.pnl ?? 0))}
-                            </span>
+                          <span className="font-medium text-white">Trade no app:</span>{' '}
+                          #{f.matched_db_trade.id} · tipo {f.matched_db_trade.type} · P&L app: <PnlChip value={f.matched_db_trade.pnl} />
+                          {f.gross_pnl != null && f.matched_db_trade.pnl != null && (
+                            <span className="ml-2 text-amber-400">Δ bruto ${fmt(f.gross_pnl - f.matched_db_trade.pnl)}</span>
                           )}
                         </div>
                       )}
@@ -366,6 +382,9 @@ function TabAtividades() {
   const history  = data?.history        ?? []
   const discrepancy    = recon.discrepancy ?? 0
   const hasDiscrepancy = Math.abs(discrepancy) >= 0.01
+  const netDiscrepancy = recon.discrepancy_net ?? 0
+  const hasNetDiscrepancy = Math.abs(netDiscrepancy) >= 0.01
+  const feeGap = recon.effective_fee_pct != null && Math.abs(recon.effective_fee_pct - (recon.model_fee_pct ?? 0)) >= 0.02
 
   return (
     <div className="space-y-5">
@@ -409,17 +428,17 @@ function TabAtividades() {
               icon={(account.day_pl ?? 0) >= 0 ? TrendingUp : TrendingDown}
             />
             <StatCard
-              label="P&L App (banco)"
-              value={`${(recon.app_pnl_today ?? 0) >= 0 ? '+' : ''}$${fmt(recon.app_pnl_today)}`}
-              sub={`${recon.db_trades_count ?? 0} trades no banco`}
-              color={(recon.app_pnl_today ?? 0) >= 0 ? 'bull' : 'bear'}
+              label="P&L App líquido (banco)"
+              value={`${(recon.app_net_pnl ?? 0) >= 0 ? '+' : ''}$${fmt(recon.app_net_pnl)}`}
+              sub={`${recon.db_trades_count ?? 0} trades · bruto ${(recon.app_pnl_today ?? 0) >= 0 ? '+' : ''}$${fmt(recon.app_pnl_today)}`}
+              color={(recon.app_net_pnl ?? 0) >= 0 ? 'bull' : 'bear'}
               icon={DollarSign}
             />
             <StatCard
-              label="P&L OKX (fills)"
-              value={`${(recon.exchange_realized_pl ?? 0) >= 0 ? '+' : ''}$${fmt(recon.exchange_realized_pl)}`}
-              sub={`${recon.fills_count ?? 0} fills hoje`}
-              color={(recon.exchange_realized_pl ?? 0) >= 0 ? 'bull' : 'bear'}
+              label="P&L OKX líquido (fills)"
+              value={`${(recon.net_pnl_after_fees ?? 0) >= 0 ? '+' : ''}$${fmt(recon.net_pnl_after_fees)}`}
+              sub={`${recon.fills_count ?? 0} fills · bruto ${(recon.exchange_realized_pl ?? 0) >= 0 ? '+' : ''}$${fmt(recon.exchange_realized_pl)}`}
+              color={(recon.net_pnl_after_fees ?? 0) >= 0 ? 'bull' : 'bear'}
               icon={DollarSign}
             />
           </div>
@@ -428,33 +447,70 @@ function TabAtividades() {
             <div className="mt-0.5">
               {hasDiscrepancy ? <AlertTriangle size={18} className="text-amber-400" /> : <CheckCircle size={18} className="text-bull" />}
             </div>
-            <div className="flex-1 space-y-1">
+            <div className="flex-1 space-y-2">
               <p className="font-semibold text-sm">
-                {hasDiscrepancy ? 'Discrepância detectada entre App e OKX' : 'Valores reconciliados ✓'}
+                {hasDiscrepancy ? 'Diferença entre o App e a OKX' : 'App e OKX reconciliados ✓'}
               </p>
-              <div className="grid grid-cols-4 gap-4 text-xs text-muted mt-2">
-                <div><span className="block text-white/60">P&L Bruto (fills)</span><PnlChip value={recon.exchange_realized_pl} /></div>
-                <div>
-                  <span className="block text-white/60">Fees (CFEE)</span>
-                  <span className="font-semibold text-bear">{recon.total_fees > 0 ? `-$${fmt(recon.total_fees)}` : '—'}</span>
-                </div>
-                <div><span className="block text-white/60">P&L Líquido</span><PnlChip value={recon.net_pnl_after_fees} /></div>
-                <div>
-                  <span className="block text-white/60">P&L App (banco)</span>
-                  <span className={`font-semibold ${hasDiscrepancy ? 'text-amber-400' : 'text-bull'}`}>
-                    {(recon.app_pnl_today ?? 0) >= 0 ? '+' : ''}${fmt(recon.app_pnl_today)}
-                    {hasDiscrepancy && <span className="text-amber-400 ml-1">(Δ {discrepancy >= 0 ? '+' : ''}${fmt(discrepancy)})</span>}
-                  </span>
-                </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-muted text-[11px] uppercase tracking-wide">
+                      <th className="text-left py-1 pr-4 font-medium" />
+                      <th className="text-right py-1 px-3 font-medium">OKX (fills)</th>
+                      <th className="text-right py-1 px-3 font-medium">App (banco)</th>
+                      <th className="text-right py-1 pl-3 font-medium">Diferença</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="border-t border-border/30">
+                      <td className="py-1.5 pr-4 text-white/70">P&L bruto (só preço)</td>
+                      <td className="text-right px-3"><PnlChip value={recon.exchange_realized_pl} /></td>
+                      <td className="text-right px-3"><PnlChip value={recon.app_pnl_today} /></td>
+                      <td className={`text-right pl-3 font-semibold ${hasDiscrepancy ? 'text-amber-400' : 'text-bull'}`}>{discrepancy >= 0 ? '+' : ''}${fmt(discrepancy)}</td>
+                    </tr>
+                    <tr className="border-t border-border/30">
+                      <td className="py-1.5 pr-4 text-white/70">Taxas das operações fechadas (US$)</td>
+                      <td className="text-right px-3 text-bear">{recon.total_fees > 0 ? `-$${fmt(recon.total_fees, 4)}` : '—'}</td>
+                      <td className="text-right px-3 text-bear">{recon.app_fees > 0 ? `-$${fmt(recon.app_fees, 4)}` : '—'}</td>
+                      <td className="text-right pl-3 text-muted">{recon.total_fees > 0 || recon.app_fees > 0 ? `$${fmt((recon.total_fees ?? 0) - (recon.app_fees ?? 0), 4)}` : '—'}</td>
+                    </tr>
+                    <tr className="border-t border-border/30">
+                      <td className="py-1.5 pr-4 text-white/70">P&L líquido (caixa)</td>
+                      <td className="text-right px-3"><PnlChip value={recon.net_pnl_after_fees} /></td>
+                      <td className="text-right px-3"><PnlChip value={recon.app_net_pnl} /></td>
+                      <td className={`text-right pl-3 font-semibold ${hasNetDiscrepancy ? 'text-amber-400' : 'text-bull'}`}>{netDiscrepancy >= 0 ? '+' : ''}${fmt(netDiscrepancy)}</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
+              {recon.effective_fee_pct != null && (
+                <p className={`text-xs ${feeGap ? 'text-amber-400' : 'text-muted'}`}>
+                  Taxa efetiva cobrada pela OKX nos fills do dia: <strong>{fmt(recon.effective_fee_pct, 2)}% por lado</strong>
+                  {' '}· taxa que o app assume nos cálculos (cards, trava, backtest): <strong>{fmt(recon.model_fee_pct, 2)}% por lado</strong>.
+                  {feeGap && ' Os números líquidos de cards e backtests ficam otimistas enquanto esses dois valores forem diferentes.'}
+                </p>
+              )}
+              {recon.app_fees_pending > 0 && (
+                <p className="text-xs text-amber-400/90">
+                  {recon.app_fees_pending} saída(s) do app ainda sem taxa sincronizada: o líquido do app está incompleto. Use "Recalcular taxas pela OKX" na aba Histórico.
+                </p>
+              )}
+              {recon.unmatched_sells > 0 && (
+                <p className="text-xs text-muted">
+                  {recon.unmatched_sells} venda(s) sem compra correspondente nos fills consultados (saldo anterior ao app): ficam de fora do P&L, sem valor inventado.
+                </p>
+              )}
+              {recon.unknown_fee_fills > 0 && (
+                <p className="text-xs text-amber-400/90">{recon.unknown_fee_fills} fill(s) com taxa em moeda sem conversão confiável (marcados com “?”).</p>
+              )}
               {recon.cross_day_fifo && (
-                <p className="text-xs text-accent/80 mt-2">
+                <p className="text-xs text-accent/80">
                   FIFO cross-day ativo: fills carregados desde {recon.fifo_since} para calcular P&L de posições abertas em dias anteriores.
                 </p>
               )}
-              {hasDiscrepancy && (
-                <p className="text-xs text-amber-400/80 mt-2">
-                  Uma discrepância pode indicar fills não capturados pelo bot, trades em aberto ainda não encerrados, ou slippage entre preço estimado e filled_avg_price.
+              {(hasDiscrepancy || hasNetDiscrepancy) && (
+                <p className="text-xs text-amber-400/80">
+                  Diferença pode vir de fills que o bot não registrou, operações ainda abertas, quantidade vendida menor que a comprada (taxa de compra cobrada em moeda base) ou taxas ainda não sincronizadas.
                 </p>
               )}
             </div>

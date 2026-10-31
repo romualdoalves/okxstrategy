@@ -226,7 +226,7 @@ function StrategyCard({ strategy, sortBy, score, regime }) {
             </button>
           )}
           <button
-            onClick={() => nav(`/bots/new?strategy=${strategy.id}`)}
+            onClick={() => nav(`/bots/new?strategy=${strategy.id}&from=strategies`)}
             className="btn-primary btn text-xs"
           >
             {t('c.use')}

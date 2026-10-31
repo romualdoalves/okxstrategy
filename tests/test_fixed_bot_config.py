@@ -117,3 +117,16 @@ def test_goal_candidates_are_only_strategies_validated_in_an_intraday_timeframe(
     assert "TF009" not in cands and "TF017" not in cands          # validadas em 1D: não servem para uma meta de 24 h
     assert cands and all(tf.lower() in ("1m", "5m", "15m", "1h") for tf in cands.values())
     assert all(tf == validated_timeframe(sid, tf) for sid, tf in cands.items())
+
+
+# ── origem do bot: a página do menu em que foi criado ────────────────────────────────────────────────────────────
+def test_bot_records_the_page_it_was_created_from(db):
+    for i, (src, expected) in enumerate([("scanner", "scanner"), ("strategies", "strategies"), ("bots", "bots"),
+                                         (None, "bots"), ("hacker", "bots")]):
+        run(create_bot(BotCreate(name=f"b{i}", strategy_id="TF008", symbol=f"S{i}-USDT", source=src), db))
+        assert db.query(BotModel).filter(BotModel.name == f"b{i}").one().source == expected
+    # com meta, a origem é sempre a Meta 1%, seja o que o cliente enviar
+    run(create_bot(BotCreate(name="g", strategy_id="TF008", symbol="G-USDT", goal_pct=1.0, source="scanner"), db))
+    assert db.query(BotModel).filter(BotModel.name == "g").one().source == "goal"
+    listed = {b["name"]: b["source"] for b in bots_router.list_bots(db)}
+    assert listed["b0"] == "scanner" and listed["g"] == "goal"

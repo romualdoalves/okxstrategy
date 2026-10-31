@@ -40,6 +40,9 @@ class BotCreate(BaseModel):
     force_retired:   bool   = False   # confirma criar bot com estratégia aposentada pelo estudo
     goal_pct:          Optional[float] = None   # modo "Meta 1% Hoje!": meta líquida em % do stake
     goal_window_hours: Optional[float] = None   # janela da meta (padrão 24 h)
+    source:            Optional[str]   = None   # página de origem: scanner | goal | bots | strategies
+
+BOT_SOURCES = ("scanner", "goal", "bots", "strategies")
 
 class BotUpdate(BaseModel):
     name:            Optional[str]   = None
@@ -261,7 +264,7 @@ def list_bots(db: Session = Depends(get_db)):
             "strategy_id": b.strategy_id, "symbol": b.symbol,
             "timeframe": b.timeframe, "demo": b.demo,
             "stake_usd": FIXED_STAKE_USD, "leverage": b.leverage,
-            "active": b.active, "created_at": str(b.created_at),
+            "active": b.active, "created_at": str(b.created_at), "source": b.source,
             "baseline_balance": b.baseline_balance or 0.0,
             "goal": goal_view_from_row(pct=b.goal_pct, window_hours=b.goal_window_hours,
                                        started_at=b.goal_started_at, outcome=b.goal_outcome,
@@ -303,6 +306,8 @@ async def create_bot(payload: BotCreate, db: Session = Depends(get_db)):
         if not (0 < payload.goal_window_hours <= 168):
             raise HTTPException(400, "A janela da meta deve ficar entre 0 e 168 horas.")
     _assert_symbol_available(db, payload.symbol)
+    # Origem do bot (mostrada no card). Bot com meta nasce da Meta 1%; sem informação, vale "Bots" (criação manual).
+    payload.source = "goal" if payload.goal_pct is not None else (payload.source if payload.source in BOT_SOURCES else "bots")
 
     bot = BotModel(**payload.model_dump(exclude={"force_retired"}))
     db.add(bot)

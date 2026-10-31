@@ -119,6 +119,7 @@ export default function NewBot() {
   const [params] = useSearchParams()
   const defaultStrategy = params.get('strategy') ?? ''
   const defaultSymbol   = params.get('symbol')   ?? 'BTC-USDT'
+  const source          = ['scanner', 'strategies'].includes(params.get('from')) ? params.get('from') : 'bots'   // página que levou até aqui
 
   const { data: strategies = [] } = useQuery({
     queryKey: ['strategies'],
@@ -242,7 +243,7 @@ export default function NewBot() {
     setLoading(true)
     try {
       // Só identifica o bot: timeframe, parâmetros e stop são fixos e definidos pelo servidor.
-      const bot = await createBot({ name: form.name, strategy_id: form.strategy_id, symbol: form.symbol, demo: form.demo, force_retired: forceRetired })
+      const bot = await createBot({ name: form.name, strategy_id: form.strategy_id, symbol: form.symbol, demo: form.demo, force_retired: forceRetired, source })
       qc.invalidateQueries({ queryKey: ['bots'] })
       nav(`/bots/${bot.id}`)
     } catch (err) {

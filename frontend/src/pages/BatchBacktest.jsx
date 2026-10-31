@@ -292,7 +292,7 @@ function ResultCard({ r, symbol, selected, disabled, disabledReason, onToggle })
   const CoverageIcon = coverageCfg.icon
 
   function handleCreateBot() {
-    nav(`/bots/new?strategy=${r.strategy_id}&symbol=${encodeURIComponent(symbol)}`)
+    nav(`/bots/new?strategy=${r.strategy_id}&symbol=${encodeURIComponent(symbol)}&from=scanner`)
   }
 
   return (
@@ -664,7 +664,7 @@ export default function BatchBacktest() {
     const failed = []
     for (const row of rows) {
       try {
-        const bot = await createBot(buildBotPayload(row, row.symbol))
+        const bot = await createBot(buildBotPayload(row, row.symbol, { source: 'scanner' }))
         created.push({ row, bot })
       } catch (err) {
         failed.push({ row, error: err.message })

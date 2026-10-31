@@ -64,8 +64,8 @@ async def get_activities(date: Optional[str] = None, db: Session = Depends(get_d
         if earliest_date:
             # Pega desde o início do dia mais antigo até o fim do dia local atual
             _, _cross_end = _local_date_to_utc_range(target_date)
-            return exchange.get_activities(after=earliest_date + "T00:00:00Z", until=_cross_end)
-        return exchange.get_activities(after=_utc_start, until=_utc_end)
+            return exchange.get_activities(after=earliest_date + "T00:00:00Z", until=_cross_end, strict=True)
+        return exchange.get_activities(after=_utc_start, until=_utc_end, strict=True)
 
     try:
         all_fills, account, port_history, open_orders = await asyncio.gather(
@@ -107,51 +107,28 @@ async def get_activities(date: Optional[str] = None, db: Session = Depends(get_d
         for t in db_trades
     ]
 
-    # 5. FIFO P&L sobre TODOS os fills (inclui cross-day se earliest_date foi usado).
-    #    Exibição: apenas fills de target_date; P&L totalizado só para fills de hoje.
-    from collections import defaultdict, deque
-    buy_queues: dict[str, deque] = defaultdict(deque)
-    enriched_fills = []
-    total_realized_from_fills = 0.0
+    # 5. Conciliação em dólares (backend/fills.py): taxa na moeda certa e P&L FIFO por caixa, como a tela da OKX.
+    #    O FIFO roda sobre TODOS os fills (inclui cross-day se earliest_date foi usado); a tela mostra só os de target_date.
+    from ..fills import reconcile_fills, summarize
+    from ..profit_lock import fee_rate
 
-    for f in all_fills:
-        sym_raw   = f.get("symbol", "")
-        sym_norm  = _norm(sym_raw)
-        side      = f.get("side", "")
+    def _local_date(f: dict) -> str:
         try:
-            price = float(f.get("price", 0))
-            qty   = float(f.get("qty", 0))
-        except (TypeError, ValueError):
-            price = qty = 0.0
-
-        matched_bots = bot_by_symbol.get(sym_norm, [])
-
-        fill_pnl = None
-        if side == "buy":
-            buy_queues[sym_norm].append({"price": price, "qty": qty})
-        elif side == "sell" and buy_queues[sym_norm]:
-            entry = buy_queues[sym_norm].popleft()
-            matched_qty = min(entry["qty"], qty)
-            fill_pnl = round((price - entry["price"]) * matched_qty, 4)
-
-        # Determina data LOCAL do fill para filtrar exibição e totalização do dia
-        try:
-            fill_ts = _dt.datetime.fromisoformat(
-                f.get("transaction_time", "").replace("Z", "+00:00")
-            ).replace(tzinfo=None)
-            fill_local_date = (fill_ts + _dt.timedelta(hours=_TZ_OFFSET)).strftime("%Y-%m-%d")
+            ts = _dt.datetime.fromisoformat(f.get("transaction_time", "").replace("Z", "+00:00")).replace(tzinfo=None)
+            return (ts + _dt.timedelta(hours=_TZ_OFFSET)).strftime("%Y-%m-%d")
         except Exception:
-            fill_ts = None
-            fill_local_date = f.get("transaction_time", "")[:10]
+            return (f.get("transaction_time") or "")[:10]
 
-        is_today = fill_local_date == target_date
-        if is_today and fill_pnl is not None:
-            total_realized_from_fills += fill_pnl
-
-        # Só inclui fills de target_date na resposta (cross-day fills servem apenas para FIFO)
-        if not is_today:
+    enriched_fills = []
+    for f in reconcile_fills(all_fills):
+        if _local_date(f) != target_date:
             continue
-
+        fill_ts = None
+        try:
+            fill_ts = _dt.datetime.fromisoformat(f.get("transaction_time", "").replace("Z", "+00:00")).replace(tzinfo=None)
+        except Exception:
+            pass
+        sym_norm = _norm(f.get("symbol", ""))
         matched_db_trade = None
         if fill_ts:
             for t in db_trades:
@@ -160,25 +137,16 @@ async def get_activities(date: Optional[str] = None, db: Session = Depends(get_d
                     if ref_ts and abs((ref_ts - fill_ts).total_seconds()) <= 300:
                         matched_db_trade = {"id": t.id, "type": t.type, "pnl": t.pnl}
                         break
-
-        # Taxa real da OKX, já incluída no próprio fill (campo `fee`, tipicamente negativo).
-        try:
-            fee_usd = abs(float(f.get("fee") or 0))
-        except (TypeError, ValueError):
-            fee_usd = 0.0
-        net_pnl = round(fill_pnl - fee_usd, 4) if fill_pnl is not None else None
-
         enriched_fills.append({
             **f,
             "symbol_norm": sym_norm,
-            "price":       price,
-            "qty":         qty,
-            "fill_pnl":    fill_pnl,
-            "fee_usd":     fee_usd,
-            "net_pnl":     net_pnl,
-            "matched_bots": matched_bots,
+            "fill_pnl": f["gross_pnl"],          # nome antigo mantido para a tela
+            "matched_bots": bot_by_symbol.get(sym_norm, []),
             "matched_db_trade": matched_db_trade,
         })
+    # a tela da OKX lista do mais recente para o mais antigo
+    enriched_fills.sort(key=lambda r: r.get("transaction_time") or "", reverse=True)
+    okx = summarize(enriched_fills)
 
     # 6. Resumo da conta
     equity      = float(account.get("equity", 0))
@@ -187,11 +155,12 @@ async def get_activities(date: Optional[str] = None, db: Session = Depends(get_d
     unreal_pl   = float(account.get("unrealized_pl") or 0)
     day_pl      = equity - last_equity
 
-    # P&L app (apenas exits do dia)
-    app_pnl_today = sum(t.pnl for t in db_trades if t.type == "exit" and t.pnl is not None)
-
-    total_fees = round(sum(f.get("fee_usd", 0.0) for f in enriched_fills), 4)
-    net_pnl_after_fees = round(total_realized_from_fills - total_fees, 4)
+    # P&L do app no dia (saídas): bruto = o que o app grava (preço), taxa = a sincronizada da OKX (em US$)
+    app_exits = [t for t in db_trades if t.type == "exit" and t.pnl is not None]
+    app_gross = sum(t.pnl for t in app_exits)
+    app_fees = sum(t.fee for t in app_exits if t.fee is not None)
+    app_fees_pending = sum(1 for t in app_exits if t.fee is None)
+    app_net = app_gross - app_fees
 
     # Portfólio history — último ponto do dia
     ph_timestamps = port_history.get("timestamp", [])
@@ -213,11 +182,24 @@ async def get_activities(date: Optional[str] = None, db: Session = Depends(get_d
             "unrealized_pl": round(unreal_pl, 2),
         },
         "reconciliation": {
-            "exchange_realized_pl": round(total_realized_from_fills, 2),
-            "total_fees":          round(total_fees, 4),
-            "net_pnl_after_fees":  round(net_pnl_after_fees, 2),
-            "app_pnl_today":       round(app_pnl_today, 2),
-            "discrepancy":         round(total_realized_from_fills - app_pnl_today, 2),
+            # OKX (fills): bruto = só preço; líquido = caixa (venda recebida − compra paga, taxas incluídas)
+            "exchange_realized_pl": round(okx["gross"], 2),
+            "total_fees":          round(okx["closed_fees"], 4),
+            "net_pnl_after_fees":  round(okx["net"], 2),
+            # App (banco)
+            "app_pnl_today":       round(app_gross, 2),
+            "app_fees":            round(app_fees, 4),
+            "app_net_pnl":         round(app_net, 2),
+            "app_fees_pending":    app_fees_pending,
+            # diferenças: bruto contra bruto, líquido contra líquido
+            "discrepancy":         round(okx["gross"] - app_gross, 2),
+            "discrepancy_net":     round(okx["net"] - app_net, 2),
+            # taxa efetiva cobrada pela OKX nos fills do dia contra a que o app assume nos cálculos
+            "effective_fee_pct":   okx["effective_fee_pct"],
+            "model_fee_pct":       round(fee_rate() * 100, 4),
+            "fees_total_day":      okx["fees_total"],
+            "unmatched_sells":     okx["unmatched_sells"],
+            "unknown_fee_fills":   okx["unknown_fee_fills"],
             "fills_count":         len(enriched_fills),
             "db_trades_count":     len(db_trades),
             "cross_day_fifo":      earliest_date is not None,
@@ -275,7 +257,7 @@ def list_trades(bot_id: Optional[int] = None,
         }
     return [_serialize(t) for t in trades]
 
-async def _sync_trade_fees_impl(db: Session, days_back: int = 30) -> dict:
+async def _sync_trade_fees_impl(db: Session, days_back: int = 30, force: bool = False) -> dict:
     """
     Sincroniza taxas de corretagem REAIS da OKX para trades registrados.
     Para cada trade pendente, busca os fills de entrada e saída na OKX
@@ -286,11 +268,10 @@ async def _sync_trade_fees_impl(db: Session, days_back: int = 30) -> dict:
     import aiohttp as _aio
 
     cutoff = datetime.utcnow() - timedelta(days=days_back)
-    pending = db.query(TradeModel).filter(
-        TradeModel.type == "exit",
-        TradeModel.fee.is_(None),
-        TradeModel.timestamp >= cutoff,
-    ).all()
+    q_pending = db.query(TradeModel).filter(TradeModel.type == "exit", TradeModel.timestamp >= cutoff)
+    if not force:                       # force=True recalcula também as já sincronizadas (gravadas antes da conversão para US$)
+        q_pending = q_pending.filter(TradeModel.fee.is_(None))
+    pending = q_pending.all()
 
     if not pending:
         return {"updated": 0, "skipped": False, "reason": "Nenhum trade pendente de sincronização."}
@@ -337,22 +318,28 @@ async def _sync_trade_fees_impl(db: Session, days_back: int = 30) -> dict:
             entry_fill = _closest_fill([f for f in matching if f.get("side") == entry_side], entry_ts)
             exit_fill  = _closest_fill([f for f in matching if f.get("side") == exit_side], exit_ts)
 
+            # Taxa em US$ (compra: cobrada em moeda base; venda: em cotação), somando TODOS os fills da mesma ordem
+            # (uma ordem a mercado pode vir em vários fills).
+            from ..fills import fee_in_usd
             total_fee = 0.0
             found_any = False
             for fill in (entry_fill, exit_fill):
-                if fill and fill.get("fee") not in (None, ""):
-                    try:
-                        total_fee += abs(float(fill["fee"]))
+                if not fill:
+                    continue
+                oid = fill.get("order_id")
+                group = [f for f in matching if oid and f.get("order_id") == oid] or [fill]
+                for g in group:
+                    usd, known = fee_in_usd(g)
+                    if known and g.get("fee") not in (None, ""):
+                        total_fee += usd
                         found_any = True
-                    except (TypeError, ValueError):
-                        pass
 
             if not found_any:
                 skipped_no_fill += 1
                 continue
 
             trade.fee = round(total_fee, 6)
-            if entry_trade and entry_trade.fee is None:
+            if entry_trade and (entry_trade.fee is None or force):
                 entry_trade.fee = trade.fee
             updated += 1
 
@@ -365,12 +352,12 @@ async def _sync_trade_fees_impl(db: Session, days_back: int = 30) -> dict:
     }
 
 @router.post("/api/trades/sync-fees")
-async def sync_trade_fees(days_back: int = 30, db: Session = Depends(get_db)):
+async def sync_trade_fees(days_back: int = 30, force: bool = False, db: Session = Depends(get_db)):
     """
     Dispara manualmente a sincronização de taxas de corretagem.
     Preenche o campo `fee` nos trades sem valor registrado.
     """
-    result = await _sync_trade_fees_impl(db, days_back=days_back)
+    result = await _sync_trade_fees_impl(db, days_back=days_back, force=force)
     return result
 
 @router.get("/api/trades/summary")
