@@ -43,6 +43,6 @@ def test_tf018_now_produces_a_result_instead_of_none():
         o, c = price, price * (1 + rnd.gauss(0, 0.01))
         cs.append(NS(epoch=T0 + i * H, open=o, high=max(o, c) * 1.003, low=min(o, c) * 0.997, close=c, volume=rnd.uniform(50, 500)))
         price = c
-    res = REGISTRY["TF018"]().compute_with_context(cs)
+    res = REGISTRY["TF018-1D"]().compute_with_context(cs)
     assert res is not None, "TF018 devolvia None por causa do ta.vwap"
     assert abs(res.indicators["vwap"] - cs[-1].close) / cs[-1].close < 0.2

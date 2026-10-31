@@ -12,7 +12,7 @@ from fastapi import Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ..database import StrategyModel as FactoryStrategyModel, SessionLocal, get_db
-from ..strategies.registry import list_strategies
+from ..strategies.registry import factory_stem, list_strategies
 
 router = APIRouter()
 log = logging.getLogger("main")
@@ -249,7 +249,7 @@ def factory_delete_permanent(strategy_id: str, db: Session = Depends(get_db)):
     removed = remove(sid)
     
     # Apaga o arquivo
-    filepath = _FACTORY_DIR / f"{sid.lower()}.py"
+    filepath = _FACTORY_DIR / f"{factory_stem(sid)}.py"
     file_deleted = False
     if filepath.exists():
         filepath.unlink()

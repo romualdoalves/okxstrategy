@@ -16,16 +16,16 @@ import AssetPriceCard    from '../components/AssetPriceCard'
 import AiUsageNotice     from '../components/AiUsageNotice'
 
 const CHART_SUBTITLE = {
-  TF002: 'RSI + MA200',
-  TF013: 'Bollinger Bands',
-  TF003: 'MACD + Trend MA',
-  TF005: 'Joe Di Napoli',
-  TF007: 'Multi-TF EMA 4H/1H + MACD',
-  MR001: 'Mean Reversion EMA',
-  TF008: 'EMA 21 Semanal',
-  TF010: 'Stochastic Reversal',
-  PA004: 'Three Line Bar + EMA200',
-  PA005: 'Liquidity Sweep',
+  'TF002-1D': 'RSI + MA200',
+  'TF013-1D': 'Bollinger Bands',
+  'TF003-1D': 'MACD + Trend MA',
+  'TF005-1D': 'Joe Di Napoli',
+  'TF007-1D': 'Multi-TF EMA 4H/1H + MACD',
+  'MR001-15m': 'Mean Reversion EMA',
+  'TF008-1D': 'EMA 21 Semanal',
+  'TF010-1D': 'Stochastic Reversal',
+  'PA004-15m': 'Three Line Bar + EMA200',
+  'PA005-1H': 'Liquidity Sweep',
 }
 
 function useElapsed(startedAt) {

@@ -14,7 +14,7 @@ FACTORY = ROOT / "backend" / "strategies" / "factory"
 
 
 def test_every_registered_strategy_has_its_file_in_the_repo():
-    missing = [sid for sid in REGISTRY if not (FACTORY / f"{sid.lower()}.py").exists()]
+    missing = [sid for sid in REGISTRY if not (FACTORY / f"{sid.split('-')[0].lower()}.py").exists()]
     assert not missing, f"estratégias registradas sem arquivo versionado: {missing}"
 
 

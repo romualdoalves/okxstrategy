@@ -11,18 +11,18 @@ const root = process.cwd()
 const outFile = path.join(root, '.tmp_bot_forms.bundle.mjs')
 
 const STRATEGIES = [{
-  id: 'TF009', name: 'TF009 - Teste', recommended_timeframe: '1D', study_verdict: 'candidate', study_label: 'Candidata',
+  id: 'TF009-1D', name: 'TF009 - Teste', recommended_timeframe: '1D', study_verdict: 'candidate', study_label: 'Candidata',
   params: { ema_period: { type: 'int', default: 21, min: 5, max: 50, description: 'Período da EMA' },
             sl_mult: { type: 'float', default: 3, description: 'Stop em ATR' } },
 }]
-const BOT = { id: 1, name: 'TF009 bot', strategy_id: 'TF009', symbol: 'SOL-USDT', timeframe: '15m', demo: true, active: false,
+const BOT = { id: 1, name: 'TF009 bot', strategy_id: 'TF009-1D', symbol: 'SOL-USDT', timeframe: '15m', demo: true, active: false,
   stop_loss_usd: -50, strategy_params: { ema_period: 3 } }
 
 const stubs = {
   'react-router-dom': `
     export const useNavigate = () => () => {}
     export const useParams = () => ({ id: '1' })
-    export const useSearchParams = () => [new URLSearchParams('strategy=TF009&symbol=SOL-USDT')]`,
+    export const useSearchParams = () => [new URLSearchParams('strategy=TF009-1D&symbol=SOL-USDT')]`,
   '@tanstack/react-query': `
     const DATA = globalThis.__DATA
     export const useQuery = ({ queryKey }) => ({ data: DATA[queryKey[0]], isLoading: false })

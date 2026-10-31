@@ -30,8 +30,8 @@ class LindaRaschkeStrategy(BaseStrategy):
     @classmethod
     def info(cls) -> StrategyInfo:
         return StrategyInfo(
-            id="TF006",
-            name="TF006 - Linda Raschke (Swing Trade)",
+            id="TF006-1D",
+            name="TF006-1D - Linda Raschke (Swing Trade)",
             description=(
                 "Swing Trade baseado na metodologia de Linda Raschke. "
                 "Três camadas: (1) ADX(14) semanal ≥ 25 em alta — ativo tendencial; "

@@ -19,29 +19,29 @@ class StrategyOptimizer:
         
         # Define o espaço de busca para cada estratégia
         self.search_space = {
-            "TF002": {
+            "TF002-1D": {
                 "rsi_oversold": [25, 30, 35],
                 "rsi_overbought": [65, 70, 75],
                 "ma_period": [100, 200],
                 "atr_mult_sl": [1.2, 1.5, 2.0],
             },
-            "TF003": {
+            "TF003-1D": {
                 "macd_fast": [8, 12],
                 "macd_slow": [21, 26, 34],
                 "macd_signal": [7, 9],
                 "trend_ma": [100, 200],
             },
-            "TF005": {
+            "TF005-1D": {
                 "ema_trend_len": [34, 50, 89, 144],
             },
-            "TF006": {
+            "TF006-1D": {
                 "adx_threshold": [20, 25, 30],
                 "breakout_weeks": [1, 4, 8, 13],
                 "ema_fast": [5, 8, 13],
                 "ema_slow": [21, 34],
                 "tp_multiplier": [1.5, 2.0, 3.0],
             },
-            "TF007": {
+            "TF007-1D": {
                 "bias_ema": [20, 30, 40],
                 "rsi_threshold": [48.0, 50.0, 52.0],
                 "rsi_buffer": [1.0, 2.0, 3.0],
@@ -49,74 +49,74 @@ class StrategyOptimizer:
                 "sl_mult": [2.0, 2.5, 3.0],
                 "tp1_rr": [1.5, 2.0, 3.0],
             },
-            "TF008": {
+            "TF008-1D": {
                 "ema_period": [13, 21, 34],
                 "sl_mult": [2.0, 2.5, 3.0],
                 "tp_rr": [3.0, 4.0, 5.0],
                 "max_dist_pct": [0.0, 10.0, 20.0],
                 "exit_buffer_pct": [0.0, 2.0],
             },
-            "TF009": {
+            "TF009-1D": {
                 "fast_ma_period": [10, 20, 34],
                 "slow_ma_period": [50, 89, 144],
                 "ma_type": ["sma", "ema"],
                 "atr_mult_sl": [1.5, 2.0, 2.5],
             },
-            "TF010": {
+            "TF010-1D": {
                 "ema_fast": [13, 21],
                 "ema_med": [34, 55],
                 "ema_slow": [144, 200],
                 "tp_rr": [1.5, 2.0, 3.0],
             },
-            "TF013": {
+            "TF013-1D": {
                 "bb_period": [20, 30, 50],
                 "bb_std": [1.8, 2.0, 2.5],
                 "vol_mult": [1.2, 1.5, 2.0],
                 "atr_mult_sl": [1.2, 1.5, 2.0],
             },
-            "TF014": {
+            "TF014-1D": {
                 "ema_macro_period": [10, 20],
                 "ema_micro_period": [34, 50, 89],
                 "sl_mult": [1.5, 2.0, 2.5],
                 "tp1_rr": [1.5, 2.0, 3.0],
             },
-            "TF017": {
+            "TF017-1D": {
                 "supertrend_factor": [2.0, 3.0, 4.0],
                 "commit_buffer": [0.25, 0.5, 0.75],
                 "sl_mult": [1.5, 2.0, 3.0],
                 "tp1_rr": [1.5, 2.0, 3.0],
             },
-            "TF018": {
+            "TF018-1D": {
                 "rsi_oversold": [5, 10, 20],
                 "keltner_mult": [2.0, 2.5, 3.0],
                 "regime_threshold": [20.0, 25.0, 30.0],
                 "tp1_rr": [1.5, 2.0, 3.0],
             },
-            "TF015": {
+            "TF015-1D": {
                 "ema_period": [5, 9, 13],
                 "confirm_candles": [1, 2, 3],
                 "sl_mult": [1.5, 2.0, 3.0],
                 "tp1_rr": [1.0, 2.0, 3.0],
             },
-            "MR001": {
+            "MR001-15m": {
                 "ema_period": [55, 80, 120],
                 "signal_period": [3, 5, 8],
                 "buy_zone_pct": [4.0, 7.0, 10.0],
                 "sl_mult": [2.0, 2.5, 3.0],
             },
-            "PA004": {
+            "PA004-15m": {
                 "ema_trend": [100, 200],
                 "rr_trend": [1.0, 1.5],
                 "rr_reversal": [2.0, 3.0],
                 "rsi_threshold": [25, 30, 35],
             },
-            "PA005": {
+            "PA005-1H": {
                 "support_window": [3, 4, 5],
                 "sweep_lookback": [15, 20, 30],
                 "wick_ratio": [0.4, 0.5, 0.6],
                 "rr_ratio": [2.0, 3.0, 4.0],
             },
-            "RG005": {
+            "RG005-1D": {
                 "lookback": [14, 20, 30],
                 "bull_threshold": [3.0, 5.0, 8.0],
                 "bear_threshold": [-3.0, -5.0, -8.0],

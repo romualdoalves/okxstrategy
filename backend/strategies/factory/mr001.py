@@ -39,8 +39,8 @@ class MeanReversionStrategy(BaseStrategy):
     @classmethod
     def info(cls) -> StrategyInfo:
         return StrategyInfo(
-            id="MR001",
-            name="MR001 - Mean Reversion (ByeBot)",
+            id="MR001-15m",
+            name="MR001-15m - Mean Reversion (ByeBot)",
             description = (
                 "Estratégia de reversão à média baseada no afastamento percentual "
                 "do preço em relação a uma EMA longa (padrão 80 períodos). "

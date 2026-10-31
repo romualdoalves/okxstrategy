@@ -32,6 +32,10 @@ def normalize_bots(db) -> None:
     """
     from sqlalchemy import text
     db.execute(text("UPDATE bots SET strategy_id = 'TF014' WHERE strategy_id = 'F001'"))
+    # ID com timeframe (TF008 -> TF008-1D): bots criados antes da mudança passam para o ID novo.
+    from .strategies.registry import legacy_ids
+    for old, new in legacy_ids().items():
+        db.execute(text("UPDATE bots SET strategy_id = :new WHERE strategy_id = :old"), {"new": new, "old": old})
     db.execute(text("UPDATE bots SET symbol = REPLACE(symbol, '-SWAP', '') WHERE symbol LIKE '%-SWAP'"))
     db.execute(text("UPDATE bots SET symbol = REPLACE(symbol, '-FUTURES', '') WHERE symbol LIKE '%-FUTURES'"))
     db.execute(text("UPDATE bots SET leverage = 1 WHERE leverage IS NULL OR leverage <> 1"))

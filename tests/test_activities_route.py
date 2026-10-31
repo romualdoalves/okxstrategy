@@ -48,7 +48,7 @@ def db(monkeypatch):
         model.__table__.create(engine)
     session = sessionmaker(bind=engine)()
     monkeypatch.setattr(trades_router, "build_exchange", lambda *a, **k: FakeOKX())
-    session.add(BotModel(id=1, name="BTC bot", strategy_id="TF008", symbol="BTC-USDT"))
+    session.add(BotModel(id=1, name="BTC bot", strategy_id="TF008-1D", symbol="BTC-USDT"))
     # o app gravou a saída do dia 30 com P&L de preço e a taxa sincronizada em dólares (as duas pontas)
     session.add(TradeModel(id=1, bot_id=1, symbol="BTC-USDT", type="exit", direction="LONG", pnl=0.31, fee=0.7522,
                            timestamp=dt.datetime(2026, 10, 30, 17, 53, 44), closed_at=dt.datetime(2026, 10, 30, 17, 53, 44)))

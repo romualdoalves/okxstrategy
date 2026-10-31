@@ -1,4 +1,4 @@
-"""Estratégia RG005 - Markov Regime Transition
+"""Estratégia RG005-1D - Markov Regime Transition
 Gerado pela Fábrica de Estratégias
 Data de criação: 2024-01-01
 """
@@ -15,8 +15,8 @@ class MarkovRegimeTransitionStrategy(BaseStrategy):
     @classmethod
     def info(cls) -> StrategyInfo:
         return StrategyInfo(
-            id="RG005",
-            name="RG005 - Markov Regime Transition",
+            id="RG005-1D",
+            name="RG005-1D - Markov Regime Transition",
             description="Estratégia baseada em Cadeias de Markov para classificar o regime de mercado (Bull, Sideways, Bear) usando retornos de 20 dias. Calcula matriz de transição de estados para gerar sinal de direção (P(Bull) - P(Bear)) com dimensionamento proporcional à confiança. Inclui confirmação via Hidden Markov Model para alinhamento de estados.",
             tags=["statistical", "regime", "swing"],
             recommended_timeframe="1d",

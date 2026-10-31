@@ -20,8 +20,8 @@ class MaCrossoverStrategy(BaseStrategy):
     @classmethod
     def info(cls) -> StrategyInfo:
         return StrategyInfo(
-            id="TF009",
-            name="TF009 - MA Crossover",
+            id="TF009-1D",
+            name="TF009-1D - MA Crossover",
             description = (
                 "Entra LONG quando a média móvel curta cruza acima da longa. "
                 "Entra SHORT quando a média móvel curta cruza abaixo da longa. "

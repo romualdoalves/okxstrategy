@@ -32,11 +32,11 @@ def test_every_report_is_consistent():
 
 def test_parsers():
     wf = R.parse_walkforward((R._SRC / "walkforward_1d.txt").read_text(encoding="utf-8"))
-    assert set(wf) == {"RG005", "TF006", "TF008", "TF009", "TF014", "TF015", "TF017", "TF018"}
-    assert wf["TF008"]["SOL-USDT"]["oos_pf"] == 3.055 and wf["TF008"]["SOL-USDT"]["folds_positive"] == 3
+    assert set(wf) == {"RG005-1D", "TF006-1D", "TF008-1D", "TF009-1D", "TF014-1D", "TF015-1D", "TF017-1D", "TF018-1D"}
+    assert wf["TF008-1D"]["SOL-USDT"]["oos_pf"] == 3.055 and wf["TF008-1D"]["SOL-USDT"]["folds_positive"] == 3
     per, bh = R.parse_yearly((R._SRC / "yearly_1d.txt").read_text(encoding="utf-8"))
-    assert bh["BTC-USDT"][2022] == -65 and per["TF008"]["BTC-USDT"][2022] == [0, 0]
-    assert per["TF018"]["SOL-USDT"][2022] == [-166, 7]
+    assert bh["BTC-USDT"][2022] == -65 and per["TF008-1D"]["BTC-USDT"][2022] == [0, 0]
+    assert per["TF018-1D"]["SOL-USDT"][2022] == [-166, 7]
 
 
 def test_parse_baseline():
@@ -52,10 +52,10 @@ def test_unknown_strategy_has_no_study():
 
 
 def test_stale_flag_follows_code_hash(tmp_path, monkeypatch):
-    fresh = R.load_study("TF009")
+    fresh = R.load_study("TF009-1D")
     assert fresh["stale"] is False  # estudado com o código atual
     monkeypatch.setattr(R, "strategy_hash", lambda sid: "outro-hash")
-    assert R.load_study("TF009")["stale"] is True
+    assert R.load_study("TF009-1D")["stale"] is True
 
 
 def test_study_endpoint():
@@ -76,7 +76,7 @@ def test_strategy_list_carries_verdict():
     app = FastAPI()
     app.include_router(strategies.router)
     by_id = {s["id"]: s for s in TestClient(app).get("/api/strategies").json()}
-    assert by_id["TF003"]["study_verdict"] == "retired" and by_id["TF009"]["study_verdict"] == "candidate"
+    assert by_id["TF003-1D"]["study_verdict"] == "retired" and by_id["TF009-1D"]["study_verdict"] == "candidate"
     # toda estratégia do registro tem veredito: nova estratégia sem estudo derruba este teste de propósito
     sem = [i for i, v in by_id.items() if v["study_verdict"] == "none"]
     assert not sem, f"sem estudo: {sem}"
@@ -91,7 +91,7 @@ def test_creating_bot_with_retired_strategy_is_blocked_unless_forced():
     app.include_router(bots.router)
     app.dependency_overrides[get_db] = lambda: None
     c = TestClient(app)
-    body = {"name": "x", "strategy_id": "TF003", "symbol": "BTC-USDT", "timeframe": "1D"}
+    body = {"name": "x", "strategy_id": "TF003-1D", "symbol": "BTC-USDT", "timeframe": "1D"}
     r = c.post("/api/bots", json=body)
     assert r.status_code == 409 and "aposentada" in r.json()["detail"]
     # com force_retired o bloqueio do estudo não dispara (a falha, se houver, vem de etapas seguintes)

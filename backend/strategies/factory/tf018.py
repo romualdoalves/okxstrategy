@@ -1,4 +1,4 @@
-"""TF018 - Sistema Multicamadas Híbrido e Ortogonal - MR e Momentum
+"""TF018-1D - Sistema Multicamadas Híbrido e Ortogonal - MR e Momentum
 
 Estratégia multicamadas que combina reversão à média (RSI+Keltner) em consolidação e momentum baseado em força relativa, com detecção de regime via ADX, filtro de volume e dimensionamento por ATR.
 """
@@ -16,8 +16,8 @@ class SistemaHibridoMrEMomentumStrategy(BaseStrategy):
     @classmethod
     def info(cls) -> StrategyInfo:
         return StrategyInfo(
-            id="TF018",
-            name="TF018 - Sistema Multicamadas Híbrido e Ortogonal - MR e Momentum",
+            id="TF018-1D",
+            name="TF018-1D - Sistema Multicamadas Híbrido e Ortogonal - MR e Momentum",
             description="Estratégia multicamadas que combina reversão à média (RSI+Keltner) em consolidação e momentum baseado em força relativa, com detecção de regime via ADX, filtro de volume e dimensionamento por ATR.",
             tags=["trend", "momentum", "mean-reversion", "multi-tf"],
             recommended_timeframe="1d",

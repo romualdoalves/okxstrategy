@@ -370,12 +370,13 @@ Migrations adicionais são executadas via lista `migrations` em `database.py` us
 
 | Prefixo | Categoria | Exemplos |
 |---------|-----------|---------|
-| **TF** | Trend Following | TF002 RSI+MA, TF003 MACD, TF005 Di Napoli, TF008, TF009 |
-| **MR** | Mean Reversion | MR001 ByeBot, MR007 |
-| **PA** | Price Action | PA004 Three Line Bar, PA005 Liquidity Sweep |
-| **RG** | Regime | RG005 |
+| **TF** | Trend Following | TF002-1D RSI+MA, TF003-1D MACD, TF005-1D Di Napoli, TF008-1D, TF009-1D |
+| **MR** | Mean Reversion | MR001-15m ByeBot, MR007-1D |
+| **PA** | Price Action | PA004-15m Three Line Bar, PA005-1H Liquidity Sweep |
+| **RG** | Regime | RG005-1D |
 | **T** | Test | T000 |
 
+- **O ID carrega o timeframe** para o qual a estratégia foi desenhada e validada: `TF008-1D`, `PA005-1H`, `MR001-15m` (o sufixo é o `validated_timeframe`; um teste garante). O arquivo continua `tf008.py`. IDs antigos sem sufixo (`TF008`) ainda resolvem (`resolve_strategy_id`) e os bots antigos são migrados no startup.
 - Prefixos F, FX, B, A, S, I, M **não existem mais**. SC, IF e NW também não: em 2026-10-30 foram excluídas 38 estratégias (perdiam em todos os ativos, não operavam ou dependiam de dados ao vivo que o backtest não testa). O git guarda o histórico.
 - Arquivos: `backend/strategies/factory/[a-z]{2}[0-9]{3}.py`
 - O código de TODAS as estratégias vive em `backend/strategies/factory/*.py`, versionado no git (fonte única). Não há volume Docker nem cópia do código no banco (`strategies.code_py` é legado e não é mais gravado).

@@ -28,8 +28,8 @@ class StochasticReversalStrategy(BaseStrategy):
     @classmethod
     def info(cls) -> StrategyInfo:
         return StrategyInfo(
-            id="TF010",
-            name="TF010 - Stochastic Reversal",
+            id="TF010-1D",
+            name="TF010-1D - Stochastic Reversal",
             description = (
                 "Identifica o início de uma nova tendência usando o cruzamento "
                 "das EMAs 21, 34 e 144. Entra exclusivamente no primeiro pullback "

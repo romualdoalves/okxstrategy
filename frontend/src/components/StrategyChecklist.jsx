@@ -94,25 +94,25 @@ function makeCriteriaMap(t, bot) {
   return {
     // ── B: Básicas ────────────────────────────────────────────────────────────
 
-    TF002: wrap((ind) => [
+    'TF002-1D': wrap((ind) => [
       { id: 'rsi', label: `C1 ${t('sc.rsi_label')}`, sub: t('sc.rsi_sub'), value: fmt(ind?.rsi, 1), status: (() => { const r = ind?.rsi; if (!r) return 'none'; if (r <= 32 || r >= 68) return 'green'; if (r <= 40 || r >= 60) return 'yellow'; return 'red' })(), detail: ind?.rsi > 70 ? t('sc.rsi_overbought_imm') : ind?.rsi < 30 ? t('sc.rsi_oversold_imm') : t('sc.rsi_neutral') },
       { id: 'ma', label: `C2 ${t('sc.ma_label')}`, sub: t('sc.ma_sub'), value: (() => { if (!ind?.ma || !ind?.close) return '—'; return `${(ind.close - ind.ma) >= 0 ? '+' : ''}${fmt(ind.close - ind.ma, 0)} pts` })(), status: (() => { const m = ind?.ma; const c = ind?.close; if (!m || !c) return 'none'; return (ind.rsi <= 32 && c > m) || (ind.rsi >= 68 && c < m) ? 'green' : 'red' })(), detail: ind?.close > ind?.ma ? t('sc.ma_above') : t('sc.ma_below') }
     ]),
 
-    TF013: wrap((ind) => [
+    'TF013-1D': wrap((ind) => [
       { id: 'bb_pos', label: `C1 ${t('sc.bb_pos_label')}`, sub: t('sc.bb_pos_sub'), value: (() => { const { bb_upper: u, bb_mid: m, close: c } = ind ?? {}; if (!u || !m || !c) return '—'; return `${((c - m) / ((u - m) || 1) * 100).toFixed(0)}%` })(), status: (() => { const { bb_upper: u, bb_lower: l, close: c } = ind ?? {}; if (!u || !l || !c) return 'none'; if (c > u || c < l) return 'green'; return 'grey' })(), detail: ind?.close > ind?.bb_upper ? t('sc.bb_above_upper') : ind?.close < ind?.bb_lower ? t('sc.bb_below_lower') : t('sc.bb_inside') },
       { id: 'bb_width', label: `C2 ${t('sc.bb_width_label')}`, sub: t('sc.bb_width_sub'), value: (() => { const { bb_upper: u, bb_lower: l, bb_mid: m } = ind ?? {}; if (!u || !l || !m) return '—'; return `${fmt((u - l) / m * 100, 1)}%` })(), status: (() => { const { bb_upper: u, bb_lower: l, bb_mid: m } = ind ?? {}; if (!u || !l || !m) return 'none'; const w = (u - l) / m * 100; return w >= 4 ? 'green' : w >= 2 ? 'yellow' : 'red' })(), detail: t('sc.bb_width_sub') },
       { id: 'volume', label: `C3 ${t('sc.vol_label')}`, sub: t('sc.vol_sub'), value: (() => { const v = ind?.volume; const a = ind?.vol_avg; if (!v || !a) return '—'; return `${fmt(v / a, 2)}x` })(), status: (() => { const r = ind?.volume / ind?.vol_avg; if (!r) return 'none'; return r >= 1.5 ? 'green' : r >= 1.0 ? 'yellow' : 'red' })(), detail: t('sc.vol_sub') }
     ]),
 
-    TF003: wrap((ind) => [
+    'TF003-1D': wrap((ind) => [
       { id: 'macd_cross', label: `C1 ${t('sc.macd_label')}`, sub: t('sc.macd_sub'), value: fmtS(ind?.macd - ind?.signal, 4), status: ind?.macd != null && ind?.signal != null && Math.abs(ind.macd - ind.signal) < 0.0001 ? 'yellow' : 'green', detail: ind?.macd > ind?.signal ? t('sc.macd_above') : t('sc.macd_below') },
       { id: 'hist', label: `C2 ${t('sc.hist_label')}`, sub: t('sc.hist_sub'), value: fmtS(ind?.hist, 4), status: ind?.hist != null && Math.abs(ind.hist) < 0.00005 ? 'yellow' : 'green', detail: ind?.hist > 0 ? t('sc.hist_pos') : t('sc.hist_neg') },
       { id: 'trend_ma', label: `C3 ${t('sc.trend_ma_label')}`, sub: t('sc.trend_ma_sub'), value: fmtS(ind?.close - ind?.trend_ma, 0), status: ind?.close > ind?.trend_ma ? 'green' : 'red', detail: t('sc.trend_ma_sub') }
     ]),
 
 
-    TF005: wrap((ind) => [
+    'TF005-1D': wrap((ind) => [
       { id: 'trend', label: `C1 ${t('sc.dinapoli_trend_label')}`, sub: t('sc.dinapoli_trend_sub'), value: ind?.trend_ok === 1 ? 'Bullish' : ind?.trend_ok === -1 ? 'Bearish' : '-', status: ind?.trend_ok !== 0 ? 'green' : 'grey', detail: t('sc.dinapoli_trend_sub') },
       { id: 'setup', label: `C2 ${t('sc.dinapoli_setup_label')}`, sub: t('sc.dinapoli_setup_sub'), value: ind?.setup_formed === 1 ? 'Fundo Asc.' : ind?.setup_formed === -1 ? 'Topo Desc.' : '-', status: ind?.setup_formed !== 0 ? 'green' : 'grey', detail: t('sc.dinapoli_setup_sub') },
       { id: 'trigger', label: `C3 ${t('sc.dinapoli_trigger_label')}`, sub: t('sc.dinapoli_trigger_sub'), value: ind?.trigger_crossed !== 0 ? 'Rompido' : '-', status: ind?.trigger_crossed !== 0 ? 'green' : 'grey', detail: t('sc.dinapoli_trigger_sub') }
@@ -121,7 +121,7 @@ function makeCriteriaMap(t, bot) {
     // ── A: Autorais ───────────────────────────────────────────────────────────
 
 
-    TF007: wrap((ind) => {
+    'TF007-1D': wrap((ind) => {
       const bias  = ind?.bias_4h  ?? 0
       const trend = ind?.trend_1h ?? 0
       const dirConflict = bias !== 0 && trend !== 0 && bias !== trend
@@ -133,7 +133,7 @@ function makeCriteriaMap(t, bot) {
       ]
     }),
 
-    MR001: wrap((ind) => {
+    'MR001-15m': wrap((ind) => {
       const buyZone  = !!ind?.in_buy_zone
       const sellZone = !!ind?.in_sell_zone
       const crossUp  = !!ind?.cross_up
@@ -146,13 +146,13 @@ function makeCriteriaMap(t, bot) {
       ]
     }),
 
-    TF008: wrap((ind) => [
+    'TF008-1D': wrap((ind) => [
       { id: 'cycle', label: 'C1 Ciclo Macro', sub: 'Weekly EMA 21', value: ind?.c1_full_above ? 'Rompido' : 'Bear', status: ind?.c1_full_above ? 'green' : 'red', detail: 'Vela semanal completa acima da EMA 21' },
       { id: 'support', label: 'C2 Suporte', sub: 'Confirmação', value: ind?.c2_support_ok ? 'Mantido' : 'Abaixo', status: ind?.c2_support_ok ? 'green' : 'red', detail: 'Preço sustentado acima da média semanal' },
       { id: 'test', label: 'C3 Proximidade', sub: 'Reteste', value: `${fmt(ind?.dist_close_pct, 2)}%`, status: ind?.c3_near_ok ? 'green' : 'yellow', detail: 'Distância do fechamento à EMA semanal dentro do limite configurado (0 = sem limite)' }
     ]),
 
-    TF006: wrap((ind) => {
+    'TF006-1D': wrap((ind) => {
       const adxVal  = ind?.adx_w ?? null
       const adxOk   = adxVal != null && adxVal >= 25 && ind?.adx_rising === 1
       const adxSt   = adxVal == null ? 'none' : adxVal >= 25 && ind?.adx_rising === 1 ? 'green' : adxVal >= 20 ? 'yellow' : 'red'
@@ -194,11 +194,11 @@ function makeCriteriaMap(t, bot) {
 
 
 
-    TF010: wrap((ind) => [
+    'TF010-1D': wrap((ind) => [
       { id: 'stoch', label: 'C1 Stoch K/D', sub: 'Exaustão', value: `${fmt(ind?.stoch_k, 0)}/${fmt(ind?.stoch_d, 0)}`, status: ind?.stoch_k > 80 || ind?.stoch_k < 20 ? 'green' : 'yellow', detail: 'Níveis de sobrecompra/sobrevenda' }
     ]),
 
-    PA004: wrap((ind) => [
+    'PA004-15m': wrap((ind) => [
       { id: 'pattern_3lb', label: 'C1 3LB Pattern', sub: 'C1 < C2 < C3', value: ind?.c3_high ? 'DETECTADO' : 'AGUARDANDO', status: ind?.c3_high ? 'green' : 'yellow', detail: ind?.c3_high ? `C3 ${fmt(ind?.c3_high)} > C2 ${fmt(ind?.c2_high)} > C1 ${fmt(ind?.c1_low)}` : 'Aguardando C3 > C2 > C1' },
       { id: 'context', label: 'C2 Contexto', sub: 'Acima/abaixo EMA200', value: ind?.in_uptrend ? `Favoravel (RR ${fmt(ind?.rr)}:1)` : `Reversao (RR ${fmt(ind?.rr)}:1)`, status: ind?.c3_high ? 'green' : 'grey', detail: `EMA200 = ${fmt(ind?.ema_trend)}, Close = ${fmt(ind?.close)}` },
       { id: 'rsi', label: 'C3 RSI', sub: '<30 sobrevenda', value: `${fmt(ind?.rsi, 0)}`, status: ind?.rsi < 30 ? 'green' : 'red', detail: `RSI ${fmt(ind?.rsi, 0)} ${ind?.rsi < 30 ? '<' : '>='} 30` },
@@ -210,7 +210,7 @@ function makeCriteriaMap(t, bot) {
 
 
 
-    PA005: wrap((ind) => [
+    'PA005-1H': wrap((ind) => [
       { id: 'support', label: 'C1 Suporte', sub: 'Zona de Demanda', value: ind?.support_ok ? 'DETECTADA' : 'BUSCANDO', status: ind?.support_ok ? 'green' : 'yellow', detail: 'Identificação de fundo anterior' },
       { id: 'sweep', label: 'C2 Varredura', sub: 'Liquidity Sweep', value: ind?.sweep_ok ? 'OK' : 'AGUARDANDO', status: ind?.sweep_ok ? 'green' : 'yellow', detail: 'Violação e retorno ao range' },
       { id: 'choch', label: 'C3 CHoCH', sub: 'Confirmação', value: ind?.choch_ok ? 'QUEBRA' : 'ESTÁVEL', status: ind?.choch_ok ? 'green' : 'yellow', detail: 'Quebra de estrutura de baixa' }
@@ -227,7 +227,7 @@ function makeCriteriaMap(t, bot) {
 
 
 
-    TF009: wrap((ind) => {
+    'TF009-1D': wrap((ind) => {
       const fast = ind?.fast_ma
       const slow = ind?.slow_ma
       const hasMa = fast != null && slow != null && isFinite(fast) && isFinite(slow)
@@ -252,7 +252,7 @@ function makeCriteriaMap(t, bot) {
       ]
     }),
 
-    TF014: wrap((ind) => {
+    'TF014-1D': wrap((ind) => {
       const bias = ind?.bias
       const hasBias = bias != null && bias !== 0
       const biasLabel = bias === 1 ? 'Green Light ↑' : bias === -1 ? 'Red Light ↓' : 'Neutro'
@@ -342,18 +342,18 @@ function makeExitCriteriaMap(t, bot) {
   }
 
   return {
-    TF002: wrapExit(reversalCriterion),
-    TF013: wrapExit(reversalCriterion),
-    TF003: wrapExit(reversalCriterion),
-    TF005: wrapExit(reversalCriterion),
-    TF007: wrapExit(reversalCriterion),
-    MR001: wrapExit(reversalCriterion),
-    TF008: wrapExit(reversalCriterion),
-    TF010: wrapExit(reversalCriterion),
-    PA004: wrapExit(reversalCriterion),
-    PA005: wrapExit(reversalCriterion),
-    TF009: wrapExit(reversalCriterion),
-    TF014: wrapExit(reversalCriterion),
+    'TF002-1D': wrapExit(reversalCriterion),
+    'TF013-1D': wrapExit(reversalCriterion),
+    'TF003-1D': wrapExit(reversalCriterion),
+    'TF005-1D': wrapExit(reversalCriterion),
+    'TF007-1D': wrapExit(reversalCriterion),
+    'MR001-15m': wrapExit(reversalCriterion),
+    'TF008-1D': wrapExit(reversalCriterion),
+    'TF010-1D': wrapExit(reversalCriterion),
+    'PA004-15m': wrapExit(reversalCriterion),
+    'PA005-1H': wrapExit(reversalCriterion),
+    'TF009-1D': wrapExit(reversalCriterion),
+    'TF014-1D': wrapExit(reversalCriterion),
     default: wrapExit(() => [])
   }
 }

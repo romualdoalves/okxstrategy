@@ -139,6 +139,13 @@ export default function NewBot() {
     timeframe:       '',          // só para o ranking: vem do servidor (o timeframe VALIDADO da estratégia), não é editável
     demo:            true,
   })
+  // Link antigo com o ID sem timeframe (?strategy=TF008): escolhe o ID atual (TF008-1D) quando a lista chega.
+  useEffect(() => {
+    if (!form.strategy_id || strategies.some(s => s.id === form.strategy_id)) return
+    const base = form.strategy_id.toUpperCase().split('-')[0]
+    const hit = strategies.find(s => s.id.toUpperCase().split('-')[0] === base)
+    if (hit) setForm(f => ({ ...f, strategy_id: hit.id }))
+  }, [strategies])
   const [forceRetired, setForceRetired] = useState(false)
   const [error, setError]     = useState('')
   const [loading, setLoading] = useState(false)

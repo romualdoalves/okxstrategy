@@ -50,9 +50,19 @@ def hash_text(text: str) -> str:
     return hashlib.sha256(text.replace("\r\n", "\n").encode("utf-8")).hexdigest()
 
 
+def _legacy(sid: str) -> str:
+    """ID sem o timeframe (TF008-1D -> TF008): nome do arquivo da estratégia e chave dos textos-fonte dos estudos."""
+    return sid.split("-")[0].upper()
+
+
 def strategy_hash(sid: str) -> str | None:
-    path = _FACTORY / f"{sid.lower()}.py"
-    return hash_text(path.read_text(encoding="utf-8")) if path.exists() else None
+    from ..strategies.registry import resolve_strategy_id
+    rid = resolve_strategy_id(sid)
+    path = _FACTORY / f"{_legacy(rid).lower()}.py"
+    if not path.exists():
+        return None
+    # O ID novo (com timeframe) é a única diferença do código estudado: normaliza para não marcar tudo como "desatualizado".
+    return hash_text(path.read_text(encoding="utf-8").replace(rid, _legacy(rid)))
 
 
 def parse_walkforward(text: str) -> dict:
@@ -113,10 +123,10 @@ def parse_baseline(text: str) -> dict:
 def _studied_hash(sid: str, rev: str | None) -> str | None:
     if not rev:
         return strategy_hash(sid)
-    out = subprocess.run(["git", "show", f"{rev}:OKXStrategy/backend/strategies/factory/{sid.lower()}.py"],
+    out = subprocess.run(["git", "show", f"{rev}:OKXStrategy/backend/strategies/factory/{_legacy(sid).lower()}.py"],
                          capture_output=True, text=True, cwd=Path(__file__).resolve().parent, encoding="utf-8")
     if out.returncode != 0:  # repositório com a raiz em OKXStrategy
-        out = subprocess.run(["git", "show", f"{rev}:backend/strategies/factory/{sid.lower()}.py"],
+        out = subprocess.run(["git", "show", f"{rev}:backend/strategies/factory/{_legacy(sid).lower()}.py"],
                              capture_output=True, text=True, cwd=Path(__file__).resolve().parent, encoding="utf-8")
     if out.returncode != 0:
         raise RuntimeError(f"git show falhou para {sid}@{rev}: {out.stderr.strip()}")
@@ -131,14 +141,15 @@ def build_reports() -> list[str]:
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     written = []
     for sid, v in verdicts.items():
-        base = baseline.get(sid, {})
+        key = _legacy(sid)                       # os textos-fonte dos estudos usam o ID antigo
+        base = baseline.get(key, {})
         tf = next(iter(base.values()))["tf"] if base else "1D"
         report = {
             "strategy_id": sid, "timeframe": v.get("timeframe", tf), "generated_at": now,
             "verdict": v["verdict"], "verdict_label": VERDICT_LABELS[v["verdict"]], "reason": v["reason"],
             "applied_params": v.get("applied_params", {}), "note": v.get("note"),
             "file_sha256": _studied_hash(sid, v.get("studied_rev")),
-            "walkforward": wf.get(sid, {}), "yearly": yearly.get(sid, {}), "buy_hold": bh,
+            "walkforward": wf.get(key, {}), "yearly": yearly.get(key, {}), "buy_hold": bh,
             "baseline": base,
             "caveats": v.get("caveats") or (CAVEATS if tf == "1D" else CAVEATS_INTRADAY),
         }
@@ -149,9 +160,11 @@ def build_reports() -> list[str]:
 
 def load_study(sid: str) -> dict:
     """Relatório do estudo da estratégia, com `stale=True` se o código mudou desde o estudo."""
-    path = _DIR / f"{sid.upper()}.json"
+    from ..strategies.registry import resolve_strategy_id
+    sid = resolve_strategy_id(sid)
+    path = _DIR / f"{sid}.json"
     if not path.exists():
-        return {"strategy_id": sid.upper(), "verdict": "none", "verdict_label": "Sem estudo",
+        return {"strategy_id": sid, "verdict": "none", "verdict_label": "Sem estudo",
                 "reason": "Esta estratégia ainda não passou pela revisão (baseline e walk-forward).", "stale": False}
     report = json.loads(path.read_text(encoding="utf-8"))
     current = strategy_hash(sid)

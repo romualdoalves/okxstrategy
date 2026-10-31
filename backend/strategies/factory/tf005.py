@@ -9,8 +9,8 @@ class JoeDiNapoliStrategy(BaseStrategy):
     @classmethod
     def info(cls) -> StrategyInfo:
         return StrategyInfo(
-            id="TF005",
-            name="TF005 - Joe Di Napoli",
+            id="TF005-1D",
+            name="TF005-1D - Joe Di Napoli",
             description="Setup clássico que utiliza EMA 3 para capturar fundos ascendentes a favor da tendência primária.",
             params={
                 "ema_trend_len": ParamDef("int", 50, "Períodos da EMA de Tendência (Contexto)", 20, 200, 1)

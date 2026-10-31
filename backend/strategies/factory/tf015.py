@@ -1,4 +1,4 @@
-"""Estratégia TF015 - EMA Deslocada + MACD
+"""Estratégia TF015-1D - EMA Deslocada + MACD
 Gerado pela Fábrica de Estratégias
 Data de criação: 2025-01-01
 Revisado: 2026-06-17
@@ -15,8 +15,8 @@ class EmaDeslocadaMacdStrategy(BaseStrategy):
     @classmethod
     def info(cls) -> StrategyInfo:
         return StrategyInfo(
-            id="TF015",
-            name="TF015 - EMA Deslocada + MACD",
+            id="TF015-1D",
+            name="TF015-1D - EMA Deslocada + MACD",
             description="Estratégia de day trade baseada no cruzamento de médias móveis exponenciais deslocadas, com confirmação de dois candles consecutivos e retorno à média não deslocada. Utiliza MACD como filtro de tendência.",
             tags=["trend", "momentum", "intraday"],
             recommended_timeframe="5m",

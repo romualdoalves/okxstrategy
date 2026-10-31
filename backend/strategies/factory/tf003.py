@@ -21,8 +21,8 @@ class MacdStrategy(BaseStrategy):
     @classmethod
     def info(cls) -> StrategyInfo:
         return StrategyInfo(
-            id="TF003",
-            name="TF003 - MACD Crossover",
+            id="TF003-1D",
+            name="TF003-1D - MACD Crossover",
             description = (
                 "Usa o cruzamento da linha MACD com a linha Signal "
                 "para identificar mudanças de momentum. "

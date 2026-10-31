@@ -34,8 +34,8 @@ class ThreeLineBarStrategy(BaseStrategy):
     @classmethod
     def info(cls) -> StrategyInfo:
         return StrategyInfo(
-            id="PA004",
-            name="PA004 - Three Line Bar",
+            id="PA004-15m",
+            name="PA004-15m - Three Line Bar",
             description = (
                 "Estratégia de reversão baseada exclusivamente em price action "
                 "de 3 candles (Fabrício Lorenz). Detecta o fundo de um movimento "

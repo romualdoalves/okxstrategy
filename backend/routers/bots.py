@@ -275,7 +275,9 @@ def list_bots(db: Session = Depends(get_db)):
 
 @router.post("/api/bots", status_code=201)
 async def create_bot(payload: BotCreate, db: Session = Depends(get_db)):
-    # Valida estratégia
+    # Valida estratégia (aceita o ID antigo, sem timeframe, e grava sempre o canônico, ex.: TF008-1D)
+    from ..strategies.registry import resolve_strategy_id
+    payload.strategy_id = resolve_strategy_id(payload.strategy_id)
     try:
         strategy = get_strategy(payload.strategy_id)
     except ValueError as e:

@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from backend.exchanges.base import CandleBar
-from backend.strategies.registry import REGISTRY
+from backend.strategies.registry import REGISTRY, resolve_strategy_id
 
 GOLDEN = json.loads((Path(__file__).resolve().parent.parent / "fixtures" / "golden_supertrend.json").read_text())
 
@@ -28,10 +28,10 @@ def _clean(x):
     return round(x, 8) if isinstance(x, float) else x
 
 
-@pytest.mark.parametrize("key", sorted(k for k in GOLDEN if k.split("|")[0] in REGISTRY))     # TF004 foi excluída
+@pytest.mark.parametrize("key", sorted(k for k in GOLDEN if resolve_strategy_id(k.split("|")[0]) in REGISTRY))     # TF004 foi excluída
 def test_matches_pre_optimization_output(key):
     sid, seed, end = key.split("|")
-    r = REGISTRY[sid]().compute_with_context(_walk(500, 3_600_000, int(seed))[:int(end)], {})
+    r = REGISTRY[resolve_strategy_id(sid)]().compute_with_context(_walk(500, 3_600_000, int(seed))[:int(end)], {})
     got = None if r is None else _clean({"signal": r.signal.value, "ind": r.indicators, "meta": r.metadata,
                                          "hold": r.hold_reason, "met": r.criteria_met, "tot": r.criteria_total})
     assert got == GOLDEN[key]

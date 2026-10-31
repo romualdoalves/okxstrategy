@@ -95,7 +95,10 @@ async def _run_category_backtest_core(
     """
     from ..strategies.registry import REGISTRY
 
-    exclude_strategies = exclude_strategies or []
+    from ..strategies.registry import resolve_strategy_id
+    exclude_strategies = [resolve_strategy_id(s) for s in (exclude_strategies or [])]
+    if include_strategies is not None:
+        include_strategies = [resolve_strategy_id(s) for s in include_strategies]
     prefix = category.upper()
     strategy_ids = [sid for sid in REGISTRY if sid.upper().startswith(prefix) and sid not in exclude_strategies]
     if include_strategies is not None:

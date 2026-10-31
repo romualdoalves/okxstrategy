@@ -32,7 +32,7 @@ from ..backtest_stats import bootstrap_profit_factor, profit_factor, summarize
 from ..candle_store import drop_open_candle, timeframe_ms
 from ..exchanges.base import CandleBar
 from ..optimizer import StrategyOptimizer
-from ..strategies.registry import REGISTRY
+from ..strategies.registry import REGISTRY, resolve_strategy_id
 
 WARMUP = 100
 YEAR_MS = 365.25 * 86_400_000
@@ -183,7 +183,7 @@ def cmd_baseline(a) -> None:
     ids, symbols, tfs = _eligible_ids(a.ids), a.symbols.split(","), a.tfs.split(",") if a.tfs else []
     jobs = []
     for sid in ids:
-        cls = REGISTRY[sid]
+        cls = REGISTRY[resolve_strategy_id(sid)]
         extra = list(cls.extra_timeframes() or [])
         for tf in (tfs or [cls.info().recommended_timeframe or "15m"]):
             for sym in symbols:
@@ -214,8 +214,8 @@ def cmd_walkforward(a) -> None:
         if not space:
             print(f"[skip] {sid}: sem espaço de busca em optimizer.py")
             continue
-        extra = list(REGISTRY[sid].extra_timeframes() or [])
-        for tf in (a.tfs.split(",") if a.tfs else [REGISTRY[sid].info().recommended_timeframe or "15m"]):
+        extra = list(REGISTRY[resolve_strategy_id(sid)].extra_timeframes() or [])
+        for tf in (a.tfs.split(",") if a.tfs else [REGISTRY[resolve_strategy_id(sid)].info().recommended_timeframe or "15m"]):
             for sym in symbols:
                 if not _series(sym, tf, a.source, a.csv_dir) or any(not _series(sym, x, a.source, a.csv_dir) for x in extra):
                     print(f"[sem dados] {sid} {sym} {tf}")
@@ -314,7 +314,7 @@ def cmd_yearly(a) -> None:
     ids, symbols, tfs = _eligible_ids(a.ids), a.symbols.split(","), a.tfs.split(",") if a.tfs else []
     jobs = []
     for sid in ids:
-        cls = REGISTRY[sid]
+        cls = REGISTRY[resolve_strategy_id(sid)]
         extra = list(cls.extra_timeframes() or [])
         for tf in (tfs or [cls.info().recommended_timeframe or "15m"]):
             for sym in symbols:

@@ -29,7 +29,7 @@ def _daily(n, price, seed=1):
 def _break_flag(closes, **params):
     weekly = _weekly(closes)
     daily = _daily(len(closes) * 7, closes[-1])
-    s = REGISTRY["TF006"]()
+    s = REGISTRY["TF006-1D"]()
     s.set_params(params)
     res = s.compute_with_context(daily, {"extra_candles": {"1W": weekly}})
     return res.indicators["donchian_break"]

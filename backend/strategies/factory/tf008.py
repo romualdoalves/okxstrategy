@@ -21,8 +21,8 @@ class CycleShiftStrategy(BaseStrategy):
     @classmethod
     def info(cls) -> StrategyInfo:
         return StrategyInfo(
-            id="TF008",
-            name="TF008 - Cycle Shift (CJacob)",
+            id="TF008-1D",
+            name="TF008-1D - Cycle Shift (CJacob)",
             description = (
                 "Estratégia macro baseada na tese de CJacob: "
                 "(1) Primeiro fechamento semanal completo acima da EMA semanal; "

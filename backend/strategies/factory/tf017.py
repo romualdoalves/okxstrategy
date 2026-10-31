@@ -1,4 +1,4 @@
-"""Estratégia TF017 - Adaptive Supertrend (Versão Final Corrigida)
+"""Estratégia TF017-1D - Adaptive Supertrend (Versão Final Corrigida)
 Gerado pela Fábrica de Estratégias
 Data de criação: 2024-01-01
 Última modificação: 2026-06-26
@@ -16,8 +16,8 @@ class AdaptiveSupertrendStrategy(BaseStrategy):
     @classmethod
     def info(cls) -> StrategyInfo:
         return StrategyInfo(
-            id="TF017",
-            name="TF017 - Adaptive Supertrend",
+            id="TF017-1D",
+            name="TF017-1D - Adaptive Supertrend",
             description="Estratégia baseada no Modern Adaptive Supertrend, que adiciona filtro de commit (fechamento além de 0.5 ATR), distância adaptativa (expande em tendência/range, contrai em transições) e velocidade adaptativa opcional. Gera sinais de compra/venda quando o Supertrend flipa com confirmação de fechamento, reduzindo falsos flips em mercados laterais.",
             tags=["trend", "momentum", "breakout"],
             recommended_timeframe="1h",

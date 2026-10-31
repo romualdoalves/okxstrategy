@@ -47,8 +47,8 @@ class MultiTFStrategy(BaseStrategy):
     @classmethod
     def info(cls) -> StrategyInfo:
         return StrategyInfo(
-            id="TF007",
-            name="TF007 - Multi-Timeframe Trend",
+            id="TF007-1D",
+            name="TF007-1D - Multi-Timeframe Trend",
             description = (
                 "Estratégia de três camadas temporais: "
                 "(1) Bias de 4H via slope da EMA longa — define a direção macro; "

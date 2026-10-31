@@ -1,115 +1,53 @@
 {
- "strategy_id": "TF007",
+ "strategy_id": "MR007-1D",
  "timeframe": "1D",
  "generated_at": "2026-10-30",
  "verdict": "watch",
  "verdict_label": "Em observação",
- "reason": "Sem trades até 2023 em 1D; só opera de 2024 em diante. Não é testável nesta janela.",
- "applied_params": {},
- "note": null,
- "file_sha256": "c8fc19a98fbed8646279dffba80420b50959244b0f1c6471af092427ac52ec03",
+ "reason": "Só vale para o BTC (a lei de potência é calibrada para ele). Em 8 anos: 17 trades, PF 5,03, lucro de US$ 682, mas cerca de 70% do lucro vem de 2020 e fora da amostra são só 4 trades (PF 0,51). Compra os fundos de 2018 e 2020 e perde em 2022 (-33). Fica 70% do tempo comprada, então se parece com segurar o BTC: amostra pequena demais para concluir.",
+ "applied_params": {
+  "power_law_a": -17.01
+ },
+ "note": "O intercepto -17,584 era o piso do canal e a estratégia só vendia (0 trades); corrigido para o valor central -17,01 pelo valor publicado, sem ajuste aos dados.",
+ "file_sha256": "713acaf3d3f79379434d3b26b7f3fb816cd079586c1d7995f27aec1c85fb4baf",
  "walkforward": {},
  "yearly": {
   "BTC-USDT": {
    "2018": [
-    0,
-    0
+    126,
+    2
    ],
    "2019": [
-    0,
-    0
+    -23,
+    1
    ],
    "2020": [
-    0,
-    0
+    475,
+    2
    ],
    "2021": [
     0,
     0
    ],
    "2022": [
-    0,
-    0
+    -33,
+    3
    ],
    "2023": [
-    0,
-    0
+    73,
+    3
    ],
    "2024": [
-    8,
-    7
+    86,
+    2
    ],
    "2025": [
-    1,
-    12
+    -7,
+    3
    ],
    "2026": [
-    7,
-    10
-   ]
-  },
-  "ETH-USDT": {
-   "2018": [
-    0,
-    0
-   ],
-   "2019": [
-    0,
-    0
-   ],
-   "2020": [
-    0,
-    0
-   ],
-   "2021": [
-    0,
-    0
-   ],
-   "2022": [
-    0,
-    0
-   ],
-   "2023": [
-    0,
-    0
-   ],
-   "2024": [
-    -4,
-    6
-   ],
-   "2025": [
-    11,
-    16
-   ],
-   "2026": [
-    14,
-    6
-   ]
-  },
-  "SOL-USDT": {
-   "2021": [
-    0,
-    0
-   ],
-   "2022": [
-    0,
-    0
-   ],
-   "2023": [
-    0,
-    0
-   ],
-   "2024": [
-    -6,
-    6
-   ],
-   "2025": [
-    -35,
-    14
-   ],
-   "2026": [
-    15,
-    8
+    -15,
+    1
    ]
   }
  },

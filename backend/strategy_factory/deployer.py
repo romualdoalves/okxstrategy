@@ -13,6 +13,8 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from ..strategies.registry import factory_stem
+
 log = logging.getLogger("strategy_factory.deployer")
 
 _FACTORY_DIR = Path(__file__).resolve().parent.parent / "strategies" / "factory"
@@ -33,7 +35,7 @@ def assign_next_id(db_ids: list[str], prefix: str = "TF") -> str:
     # IDs do banco que ainda têm arquivo no disco
     existing_file_ids = set()
     for sid in db_ids:
-        if (_FACTORY_DIR / f"{sid.lower()}.py").exists():
+        if (_FACTORY_DIR / f"{factory_stem(sid)}.py").exists():
             existing_file_ids.add(sid)
 
     # IDs que existem no disco mas não estão no banco (órfãos)
@@ -62,7 +64,7 @@ def deploy(strategy_id: str, code: str, plan: dict) -> str:
     3. Registra no REGISTRY em memória
     Retorna o nome da classe registrada.
     """
-    filename = f"{strategy_id.lower()}.py"
+    filename = f"{factory_stem(strategy_id)}.py"
     filepath = _FACTORY_DIR / filename
 
     # Adiciona header de geração e corrige o ID no código
@@ -78,13 +80,13 @@ def deploy(strategy_id: str, code: str, plan: dict) -> str:
     log.info("Arquivo escrito: %s", filepath)
 
     # Hot-load via importlib
-    module_name = f"backend.strategies.factory.{strategy_id.lower()}"
+    module_name = f"backend.strategies.factory.{factory_stem(strategy_id)}"
     if module_name in sys.modules:
         del sys.modules[module_name]
 
     try:
         mod = importlib.import_module(
-            f".strategies.factory.{strategy_id.lower()}",
+            f".strategies.factory.{factory_stem(strategy_id)}",
             package="backend",
         )
     except ImportError as e:
@@ -125,7 +127,7 @@ def remove(strategy_id: str) -> bool:
     if strategy_id in REGISTRY:
         del REGISTRY[strategy_id]
         # Remove do sys.modules para forçar reimport se necessário
-        module_name = f"backend.strategies.factory.{strategy_id.lower()}"
+        module_name = f"backend.strategies.factory.{factory_stem(strategy_id)}"
         sys.modules.pop(module_name, None)
         log.info("Estratégia %s removida do REGISTRY.", strategy_id)
         return True
@@ -134,7 +136,7 @@ def remove(strategy_id: str) -> bool:
 
 def get_factory_file(strategy_id: str) -> str | None:
     """Retorna o conteúdo do arquivo de uma estratégia de fábrica."""
-    filepath = _FACTORY_DIR / f"{strategy_id.lower()}.py"
+    filepath = _FACTORY_DIR / f"{factory_stem(strategy_id)}.py"
     if filepath.exists():
         return filepath.read_text(encoding="utf-8")
     return None

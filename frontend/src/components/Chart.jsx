@@ -276,7 +276,7 @@ function getStrategyOverlays(strategyId, indicators = {}) {
       : []
   }
 
-  if (strategyId === 'TF013') { // Bollinger
+  if (strategyId === 'TF013-1D') { // Bollinger
     return [
       ...line('bb_upper', 'C1 BB superior', '#26a69a'),
       ...line('bb_mid',   'C2 BB media',    '#9ca3af', 3),
@@ -284,22 +284,22 @@ function getStrategyOverlays(strategyId, indicators = {}) {
     ]
   }
 
-  if (strategyId === 'TF002') { // RSI + MA
+  if (strategyId === 'TF002-1D') { // RSI + MA
     return line('ma', 'C2 MA200', '#f59e0b', 2, 2)
   }
 
-  if (strategyId === 'TF003') { // MACD
+  if (strategyId === 'TF003-1D') { // MACD
     return line('trend_ma', 'C3 Trend MA', '#f59e0b', 2, 2)
   }
 
-  if (strategyId === 'TF007') { // Multi-TF
+  if (strategyId === 'TF007-1D') { // Multi-TF
     return [
       ...line('ema_slow_1h', 'C1 EMA55 1H', '#ff9800', 2, 2),
       ...line('ema_fast_1h', 'C2 EMA21 1H', '#00bcd4', 2, 1),
     ]
   }
 
-  if (strategyId === 'TF010') { // Stochastic Reversal
+  if (strategyId === 'TF010-1D') { // Stochastic Reversal
     return [
       ...line('ema144', 'C1 EMA144', '#ff9800', 2, 2),
       ...line('ema34',  'C2 EMA34',  '#9ca3af', 2, 1),
@@ -307,29 +307,29 @@ function getStrategyOverlays(strategyId, indicators = {}) {
     ]
   }
 
-  if (strategyId === 'MR001') { // Mean Reversion
+  if (strategyId === 'MR001-15m') { // Mean Reversion
     return line('ema', 'C1 EMA Base', '#f59e0b', 2, 2)
   }
 
-  if (strategyId === 'TF008') { // Cycle Shift
+  if (strategyId === 'TF008-1D') { // Cycle Shift
     return line('ema_21_w', 'C1 EMA 21 Semanal', '#f59e0b', 1, 2)
   }
 
-  if (strategyId === 'TF005') { // Joe Di Napoli
+  if (strategyId === 'TF005-1D') { // Joe Di Napoli
     return [
       line('ema3', 'EMA 3', '#ffeb3b', 2, 0),
       line('ema_trend', 'EMA Trend', '#ff9800', 2, 0)
     ]
   }
   
-  if (strategyId === 'PA005') { // Liquidity Sweep
+  if (strategyId === 'PA005-1H') { // Liquidity Sweep
     return [
       ...line('support_level', 'C1 Suporte', '#26a69a', 1, 2),
       ...line('channel_high',  'C3 Gatilho CHoCH', '#ff9800', 2, 1),
     ]
   }
 
-  if (strategyId === 'PA004') { // Three Line Bar
+  if (strategyId === 'PA004-15m') { // Three Line Bar
     return [
       ...line('ema_trend', 'C2 EMA200',  '#f59e0b', 2, 2),
       ...line('c3_high',   'C1 High C3', '#26a69a', 2, 1),

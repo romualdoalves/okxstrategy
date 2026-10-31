@@ -1,5 +1,5 @@
 {
-  "TF008": {
+  "TF008-1D": {
     "verdict": "candidate",
     "reason": "Único com ganho consistente fora da amostra nos 3 ativos e que ficou fora da queda de 2022 (0 a 1 trade). Lucra em 2019, 2020, 2021 e 2024.",
     "applied_params": {
@@ -8,42 +8,42 @@
     },
     "note": "Padrões alterados de 21/2,5 para 13/3,0 depois do walk-forward. O baseline e a tabela por ano foram medidos com 13/3,0; a tabela de walk-forward compara os padrões antigos (21/2,5) com o candidato 13/3,0."
   },
-  "TF009": {
+  "TF009-1D": {
     "verdict": "candidate",
     "reason": "Baseline 1D mais robusto (PF fora da amostra 1,53 / 3,94 / 2,45). A otimização piorou fora da amostra, então o padrão foi mantido. Perde em 2022 (-31 a -41).",
     "applied_params": {}
   },
-  "TF014": {
+  "TF014-1D": {
     "verdict": "watch",
     "applied_params": {},
     "reason": "Sem consistência: PF 1,31 / 1,60 / 1,12 com p5 abaixo de 1 nos 3 ativos, e fora da amostra o BTC fica em 0,67 (13 trades). Perde em 2022 (-29 a -44) e a otimização só melhora o BTC, então o padrão foi mantido. Em observação até haver mais dados."
   },
-  "TF017": {
+  "TF017-1D": {
     "verdict": "watch",
     "applied_params": {},
     "reason": "Só o BTC se sustenta (PF 2,54, p5 1,11, fora da amostra 1,97). Na ETH e na SOL o PF fora da amostra é 0,62 e 0,31 (7 e 5 trades) e o p5 fica abaixo de 1. Os candidatos de otimização são inconsistentes (sem planalto), então o padrão foi mantido. Perde pouco em 2022 (-6 a -21). Em observação."
   },
-  "TF015": {
+  "TF015-1D": {
     "verdict": "watch",
     "reason": "Lucro da SOL em 2021 (+789 com 3 trades) distorce o total, e a otimização piora a SOL fora da amostra. Em observação.",
     "applied_params": {}
   },
-  "TF006": {
+  "TF006-1D": {
     "verdict": "watch",
     "reason": "Poucos trades (0 a 7 por ano) e a SOL sem nenhum trade fora da amostra. Amostra insuficiente para concluir.",
     "applied_params": {}
   },
-  "TF007": {
+  "TF007-1D": {
     "verdict": "watch",
     "reason": "Sem trades até 2023 em 1D; só opera de 2024 em diante. Não é testável nesta janela.",
     "applied_params": {}
   },
-  "TF003": {
+  "TF003-1D": {
     "verdict": "retired",
     "reason": "Perde na maioria dos anos, com 40 a 120 trades por ano: excesso de operações sem vantagem.",
     "applied_params": {}
   },
-  "RG005": {
+  "RG005-1D": {
     "verdict": "candidate",
     "reason": "Walk-forward positivo nos 3 ativos (PF fora da amostra 1,81 / 2,42 / 1,36 com 23 a 32 trades). Com o stop de 3 ATR, o baseline tem PF 3,6 / 4,2 / 3,2 e fora da amostra 1,61 / 1,44 (BTC e ETH; a SOL tem só 4 trades). Ganha em 2020, 2021 e 2023, mas perde em 2022 (-29 a -50): não protege no mercado de baixa.",
     "applied_params": {
@@ -51,7 +51,7 @@
     },
     "note": "O stop passou de 2,0 para 3,0 ATR depois do walk-forward (único parâmetro em que os 3 ativos convergiram). Baseline e tabela por ano foram medidos com 3,0, com o limite de stop de 4 ATR que o bot usa."
   },
-  "MR007": {
+  "MR007-1D": {
     "verdict": "watch",
     "reason": "Só vale para o BTC (a lei de potência é calibrada para ele). Em 8 anos: 17 trades, PF 5,03, lucro de US$ 682, mas cerca de 70% do lucro vem de 2020 e fora da amostra são só 4 trades (PF 0,51). Compra os fundos de 2018 e 2020 e perde em 2022 (-33). Fica 70% do tempo comprada, então se parece com segurar o BTC: amostra pequena demais para concluir.",
     "applied_params": {
@@ -59,32 +59,32 @@
     },
     "note": "O intercepto -17,584 era o piso do canal e a estratégia só vendia (0 trades); corrigido para o valor central -17,01 pelo valor publicado, sem ajuste aos dados."
   },
-  "TF018": {
+  "TF018-1D": {
     "verdict": "retired",
     "reason": "Perde na ETH com qualquer parâmetro (PF 0,53 a 0,74) e teve -166 na SOL em 2022: compra a queda em mercado de baixa.",
     "applied_params": {}
   },
-  "TF005": {
+  "TF005-1D": {
     "verdict": "retired",
     "reason": "Reprovada no baseline 1D (BTC e ETH). Sem walk-forward.",
     "applied_params": {}
   },
-  "MR001": {
+  "MR001-15m": {
     "verdict": "retired",
     "reason": "Quase não opera (4 a 30 trades em 4 anos) e perde no BTC e na ETH; o PF 1,10 da SOL não se repete fora da amostra (5 trades, nenhum ganho).",
     "applied_params": {}
   },
-  "PA004": {
+  "PA004-15m": {
     "verdict": "retired",
     "reason": "Perde nos 3 ativos (PF 0,23 a 0,55) com poucos trades; o PF 3,59 fora da amostra na SOL são só 6 trades.",
     "applied_params": {}
   },
-  "PA005": {
+  "PA005-1H": {
     "verdict": "watch",
     "applied_params": {},
     "reason": "Opera pouco (cerca de 6 trades por ano). PF 1,20 no BTC e 1,27 na SOL, mas com p5 abaixo de 0,35 e a ETH perde (PF 0,27): amostra pequena e sem consistência. Sem walk-forward."
   },
-  "TF002": {
+  "TF002-1D": {
     "verdict": "watch",
     "applied_params": {},
     "caveats": [
@@ -94,7 +94,7 @@
     ],
     "reason": "Quase não opera (0,6 a 2 trades por ano). O BTC perde (PF 0,54, fora da amostra 0,27); o PF 10 da ETH e da SOL vem de 5 trades, sem valor estatístico. Em observação por amostra insuficiente."
   },
-  "TF010": {
+  "TF010-1D": {
     "verdict": "watch",
     "applied_params": {},
     "caveats": [
@@ -104,7 +104,7 @@
     ],
     "reason": "PF 1,79 / 1,42 / 2,30 em 1D, mas com só 7 a 13 trades em 8 anos e 1 a 2 fora da amostra. Os timeframes menores, com mais amostra, não confirmam: em 4H o PF é 1,03 / 0,85 / 1,13 (25 a 34 trades, fora da amostra abaixo de 1) e em 1H é 0,90 / 0,54 / 0,96. O resultado do 1D provavelmente é sorte de amostra. Em observação."
   },
-  "TF013": {
+  "TF013-1D": {
     "verdict": "retired",
     "applied_params": {},
     "caveats": [

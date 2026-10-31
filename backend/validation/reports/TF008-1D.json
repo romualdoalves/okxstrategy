@@ -1,69 +1,75 @@
 {
- "strategy_id": "TF017",
+ "strategy_id": "TF008-1D",
  "timeframe": "1D",
  "generated_at": "2026-10-30",
- "verdict": "watch",
- "verdict_label": "Em observação",
- "reason": "Só o BTC se sustenta (PF 2,54, p5 1,11, fora da amostra 1,97). Na ETH e na SOL o PF fora da amostra é 0,62 e 0,31 (7 e 5 trades) e o p5 fica abaixo de 1. Os candidatos de otimização são inconsistentes (sem planalto), então o padrão foi mantido. Perde pouco em 2022 (-6 a -21). Em observação.",
- "applied_params": {},
- "note": null,
- "file_sha256": "031dd10445b1f81d8675a5f1c2c5a248b4bb5489e0a6d6e00d5c3cba1753b188",
+ "verdict": "candidate",
+ "verdict_label": "Candidata",
+ "reason": "Único com ganho consistente fora da amostra nos 3 ativos e que ficou fora da queda de 2022 (0 a 1 trade). Lucra em 2019, 2020, 2021 e 2024.",
+ "applied_params": {
+  "ema_period": 13,
+  "sl_mult": 3.0
+ },
+ "note": "Padrões alterados de 21/2,5 para 13/3,0 depois do walk-forward. O baseline e a tabela por ano foram medidos com 13/3,0; a tabela de walk-forward compara os padrões antigos (21/2,5) com o candidato 13/3,0.",
+ "file_sha256": "c91d29cbc6ae7a7b0410b69624620db0e5e9592e383727f70be1badca748fe19",
  "walkforward": {
   "BTC-USDT": {
    "trials": 80,
-   "oos_trades": 22,
-   "oos_pf": 0.998,
-   "oos_p5": 0.357,
-   "oos_profit": -0.15,
-   "current_trades": 23,
-   "current_pf": 2.07,
-   "current_profit": 94.81,
+   "oos_trades": 18,
+   "oos_pf": 1.536,
+   "oos_p5": 0.342,
+   "oos_profit": 60.77,
+   "current_trades": 24,
+   "current_pf": 1.443,
+   "current_profit": 65.38,
    "folds_positive": 2,
    "folds_total": 3,
-   "plateau": false,
+   "plateau": true,
    "candidate": {
-    "supertrend_factor": 4.0,
-    "commit_buffer": 0.25,
+    "ema_period": 13,
     "sl_mult": 3.0,
-    "tp1_rr": 3.0
+    "tp_rr": 4.0,
+    "max_dist_pct": 0.0,
+    "exit_buffer_pct": 2.0
    }
   },
   "ETH-USDT": {
    "trials": 80,
-   "oos_trades": 37,
-   "oos_pf": 1.841,
-   "oos_p5": 0.926,
-   "oos_profit": 163.77,
-   "current_trades": 20,
-   "current_pf": 1.183,
-   "current_profit": 17.34,
-   "folds_positive": 3,
+   "oos_trades": 16,
+   "oos_pf": 1.849,
+   "oos_p5": 0.161,
+   "oos_profit": 101.87,
+   "current_trades": 26,
+   "current_pf": 1.39,
+   "current_profit": 83.94,
+   "folds_positive": 2,
    "folds_total": 3,
-   "plateau": false,
+   "plateau": true,
    "candidate": {
-    "supertrend_factor": 3.0,
-    "commit_buffer": 0.75,
-    "sl_mult": 1.5,
-    "tp1_rr": 3.0
+    "ema_period": 13,
+    "sl_mult": 3.0,
+    "tp_rr": 3.0,
+    "max_dist_pct": 20.0,
+    "exit_buffer_pct": 0.0
    }
   },
   "SOL-USDT": {
    "trials": 80,
-   "oos_trades": 21,
-   "oos_pf": 1.344,
-   "oos_p5": 0.403,
-   "oos_profit": 52.86,
-   "current_trades": 15,
-   "current_pf": 1.191,
-   "current_profit": 21.92,
-   "folds_positive": 1,
+   "oos_trades": 13,
+   "oos_pf": 3.055,
+   "oos_p5": 0.892,
+   "oos_profit": 197.56,
+   "current_trades": 19,
+   "current_pf": 1.937,
+   "current_profit": 164.69,
+   "folds_positive": 3,
    "folds_total": 3,
    "plateau": false,
    "candidate": {
-    "supertrend_factor": 3.0,
-    "commit_buffer": 0.5,
+    "ema_period": 13,
     "sl_mult": 3.0,
-    "tp1_rr": 1.5
+    "tp_rr": 4.0,
+    "max_dist_pct": 0.0,
+    "exit_buffer_pct": 2.0
    }
   }
  },
@@ -74,100 +80,100 @@
     0
    ],
    "2019": [
-    -18,
-    2
-   ],
-   "2020": [
-    132,
+    74,
     4
    ],
+   "2020": [
+    146,
+    5
+   ],
    "2021": [
-    17,
+    -17,
     3
    ],
    "2022": [
-    -36,
-    4
+    0,
+    0
    ],
    "2023": [
-    12,
-    4
+    4,
+    5
    ],
    "2024": [
-    53,
+    77,
     5
    ],
    "2025": [
-    -1,
-    4
+    -16,
+    3
    ],
    "2026": [
-    5,
-    2
+    -6,
+    1
    ]
   },
   "ETH-USDT": {
    "2018": [
-    -17,
-    1
+    0,
+    0
    ],
    "2019": [
-    -19,
+    42,
     2
    ],
    "2020": [
-    177,
-    4
+    127,
+    6
    ],
    "2021": [
-    41,
-    3
+    193,
+    9
    ],
    "2022": [
-    -18,
-    3
+    -6,
+    1
    ],
    "2023": [
-    13,
-    4
+    23,
+    5
    ],
    "2024": [
-    -4,
-    4
-   ],
-   "2025": [
-    19,
+    -12,
     3
    ],
+   "2025": [
+    9,
+    4
+   ],
    "2026": [
-    -19,
-    2
+    -4,
+    1
    ]
   },
   "SOL-USDT": {
    "2021": [
-    28,
-    3
+    351,
+    7
    ],
    "2022": [
-    -6,
-    2
+    0,
+    0
    ],
    "2023": [
-    111,
-    4
+    174,
+    6
    ],
    "2024": [
-    -45,
-    4
+    10,
+    6
    ],
    "2025": [
-    -15,
-    4
+    8,
+    2
    ],
    "2026": [
-    -18,
-    2
+    0,
+    0
    ]
   }
  },

@@ -31,8 +31,8 @@ class LiquiditySweepStrategy(BaseStrategy):
     def info(cls) -> StrategyInfo:
         """Metadata describing the strategy and its configurable parameters."""
         return StrategyInfo(
-            id="PA005",
-            name="PA005 - Liquidity Sweep – Price Action (Spot)",
+            id="PA005-1H",
+            name="PA005-1H - Liquidity Sweep – Price Action (Spot)",
             description=(
                 "Explora varreduras de liquidez no lado de venda e confirma a "
                 "reversão via Change of Character (CHoCH). Operação sem alavancagem."

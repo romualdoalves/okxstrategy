@@ -1,75 +1,69 @@
 {
- "strategy_id": "TF008",
+ "strategy_id": "TF009-1D",
  "timeframe": "1D",
  "generated_at": "2026-10-30",
  "verdict": "candidate",
  "verdict_label": "Candidata",
- "reason": "Único com ganho consistente fora da amostra nos 3 ativos e que ficou fora da queda de 2022 (0 a 1 trade). Lucra em 2019, 2020, 2021 e 2024.",
- "applied_params": {
-  "ema_period": 13,
-  "sl_mult": 3.0
- },
- "note": "Padrões alterados de 21/2,5 para 13/3,0 depois do walk-forward. O baseline e a tabela por ano foram medidos com 13/3,0; a tabela de walk-forward compara os padrões antigos (21/2,5) com o candidato 13/3,0.",
- "file_sha256": "c91d29cbc6ae7a7b0410b69624620db0e5e9592e383727f70be1badca748fe19",
+ "reason": "Baseline 1D mais robusto (PF fora da amostra 1,53 / 3,94 / 2,45). A otimização piorou fora da amostra, então o padrão foi mantido. Perde em 2022 (-31 a -41).",
+ "applied_params": {},
+ "note": null,
+ "file_sha256": "7efbcc195d777c731e86be1a8f2e54981895f2a15a543b11f6647646b0b97d66",
  "walkforward": {
   "BTC-USDT": {
-   "trials": 80,
-   "oos_trades": 18,
-   "oos_pf": 1.536,
-   "oos_p5": 0.342,
-   "oos_profit": 60.77,
-   "current_trades": 24,
-   "current_pf": 1.443,
-   "current_profit": 65.38,
-   "folds_positive": 2,
-   "folds_total": 3,
-   "plateau": true,
-   "candidate": {
-    "ema_period": 13,
-    "sl_mult": 3.0,
-    "tp_rr": 4.0,
-    "max_dist_pct": 0.0,
-    "exit_buffer_pct": 2.0
-   }
-  },
-  "ETH-USDT": {
-   "trials": 80,
-   "oos_trades": 16,
-   "oos_pf": 1.849,
-   "oos_p5": 0.161,
-   "oos_profit": 101.87,
-   "current_trades": 26,
-   "current_pf": 1.39,
-   "current_profit": 83.94,
-   "folds_positive": 2,
-   "folds_total": 3,
-   "plateau": true,
-   "candidate": {
-    "ema_period": 13,
-    "sl_mult": 3.0,
-    "tp_rr": 3.0,
-    "max_dist_pct": 20.0,
-    "exit_buffer_pct": 0.0
-   }
-  },
-  "SOL-USDT": {
-   "trials": 80,
-   "oos_trades": 13,
-   "oos_pf": 3.055,
-   "oos_p5": 0.892,
-   "oos_profit": 197.56,
-   "current_trades": 19,
-   "current_pf": 1.937,
-   "current_profit": 164.69,
-   "folds_positive": 3,
+   "trials": 54,
+   "oos_trades": 15,
+   "oos_pf": 1.261,
+   "oos_p5": 0.394,
+   "oos_profit": 17.05,
+   "current_trades": 23,
+   "current_pf": 1.285,
+   "current_profit": 23.04,
+   "folds_positive": 1,
    "folds_total": 3,
    "plateau": false,
    "candidate": {
-    "ema_period": 13,
-    "sl_mult": 3.0,
-    "tp_rr": 4.0,
-    "max_dist_pct": 0.0,
-    "exit_buffer_pct": 2.0
+    "fast_ma_period": 10,
+    "slow_ma_period": 89,
+    "ma_type": "ema",
+    "atr_mult_sl": 2.5
+   }
+  },
+  "ETH-USDT": {
+   "trials": 54,
+   "oos_trades": 11,
+   "oos_pf": 0.825,
+   "oos_p5": 0.197,
+   "oos_profit": -12.7,
+   "current_trades": 20,
+   "current_pf": 2.24,
+   "current_profit": 87.38,
+   "folds_positive": 2,
+   "folds_total": 3,
+   "plateau": false,
+   "candidate": {
+    "fast_ma_period": 20,
+    "slow_ma_period": 144,
+    "ma_type": "sma",
+    "atr_mult_sl": 1.5
+   }
+  },
+  "SOL-USDT": {
+   "trials": 54,
+   "oos_trades": 20,
+   "oos_pf": 0.538,
+   "oos_p5": 0.174,
+   "oos_profit": -76.03,
+   "current_trades": 18,
+   "current_pf": 1.294,
+   "current_profit": 34.46,
+   "folds_positive": 0,
+   "folds_total": 3,
+   "plateau": false,
+   "candidate": {
+    "fast_ma_period": 20,
+    "slow_ma_period": 89,
+    "ma_type": "ema",
+    "atr_mult_sl": 2.0
    }
   }
  },
@@ -80,36 +74,36 @@
     0
    ],
    "2019": [
-    74,
+    -27,
     4
    ],
    "2020": [
-    146,
-    5
+    34,
+    4
    ],
    "2021": [
-    -17,
-    3
+    30,
+    2
    ],
    "2022": [
-    0,
-    0
+    -38,
+    5
    ],
    "2023": [
-    4,
-    5
+    13,
+    4
    ],
    "2024": [
-    77,
-    5
+    -12,
+    4
    ],
    "2025": [
-    -16,
-    3
+    22,
+    4
    ],
    "2026": [
-    -6,
-    1
+    9,
+    4
    ]
   },
   "ETH-USDT": {
@@ -118,62 +112,62 @@
     0
    ],
    "2019": [
-    42,
-    2
-   ],
-   "2020": [
-    127,
-    6
-   ],
-   "2021": [
-    193,
-    9
-   ],
-   "2022": [
-    -6,
-    1
-   ],
-   "2023": [
-    23,
-    5
-   ],
-   "2024": [
-    -12,
-    3
-   ],
-   "2025": [
-    9,
+    -23,
     4
    ],
+   "2020": [
+    69,
+    4
+   ],
+   "2021": [
+    38,
+    2
+   ],
+   "2022": [
+    -31,
+    5
+   ],
+   "2023": [
+    25,
+    4
+   ],
+   "2024": [
+    12,
+    4
+   ],
+   "2025": [
+    31,
+    2
+   ],
    "2026": [
-    -4,
-    1
+    13,
+    3
    ]
   },
   "SOL-USDT": {
    "2021": [
-    351,
-    7
-   ],
-   "2022": [
-    0,
-    0
-   ],
-   "2023": [
-    174,
-    6
-   ],
-   "2024": [
-    10,
-    6
-   ],
-   "2025": [
-    8,
+    122,
     2
    ],
+   "2022": [
+    -41,
+    3
+   ],
+   "2023": [
+    58,
+    4
+   ],
+   "2024": [
+    -14,
+    4
+   ],
+   "2025": [
+    19,
+    3
+   ],
    "2026": [
-    0,
-    0
+    -1,
+    5
    ]
   }
  },

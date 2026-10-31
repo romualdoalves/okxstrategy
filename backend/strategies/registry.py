@@ -51,8 +51,31 @@ import re  # noqa: E402
 _load_factory_strategies()
 
 
+def factory_stem(strategy_id: str) -> str:
+    """Nome do arquivo (sem .py) em strategies/factory: o ID sem o timeframe, em minúsculas (TF008-1D -> tf008)."""
+    return strategy_id.split("-")[0].lower()
+
+
+def legacy_ids() -> dict[str, str]:
+    """ID antigo (sem timeframe) -> ID atual. Desde 2026-10-30 o ID carrega o timeframe para o qual a estratégia foi
+    desenhada e validada (TF008 -> TF008-1D); bancos, scripts e links antigos continuam funcionando por este mapa."""
+    return {k.split("-")[0]: k for k in REGISTRY if "-" in k}
+
+
+def resolve_strategy_id(strategy_id: str) -> str:
+    """ID canônico: aceita o atual (qualquer caixa) ou o antigo sem timeframe. Desconhecido volta como veio."""
+    sid = (strategy_id or "").strip()
+    if sid in REGISTRY:
+        return sid
+    for k in REGISTRY:
+        if k.upper() == sid.upper():
+            return k
+    return legacy_ids().get(sid.upper().split("-")[0], sid) if "-" not in sid else sid
+
+
 def get_strategy(strategy_id: str) -> BaseStrategy:
     """Instancia a estratégia pelo ID."""
+    strategy_id = resolve_strategy_id(strategy_id)
     cls = REGISTRY.get(strategy_id)
     if cls is None:
         raise ValueError(f"Estratégia desconhecida: {strategy_id!r}. "

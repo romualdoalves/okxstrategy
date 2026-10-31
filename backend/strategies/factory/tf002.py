@@ -20,8 +20,8 @@ class RsiMaStrategy(BaseStrategy):
     @classmethod
     def info(cls) -> StrategyInfo:
         return StrategyInfo(
-            id="TF002",
-            name="TF002 - RSI + Moving Average",
+            id="TF002-1D",
+            name="TF002-1D - RSI + Moving Average",
             description = (
                 "Entra LONG quando o RSI sobe acima do nível de sobrevenda "
                 "e o preço está acima da média móvel de longo prazo. "

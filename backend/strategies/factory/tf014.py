@@ -1,4 +1,4 @@
-"""Estratégia TF014 - Marty Schwartz Red Light Green Light
+"""Estratégia TF014-1D - Marty Schwartz Red Light Green Light
 Gerado pela Fábrica de Estratégias
 Data de criação: 2024-01-01
 """
@@ -15,8 +15,8 @@ class MartySchwartzRedLightGreenLightStrategy(BaseStrategy):
     @classmethod
     def info(cls) -> StrategyInfo:
         return StrategyInfo(
-            id="TF014",
-            name="TF014 - Marty Schwartz Red Light Green Light",
+            id="TF014-1D",
+            name="TF014-1D - Marty Schwartz Red Light Green Light",
             description="Estratégia de tendência baseada no sistema Red Light Green Light de Marty Schwartz. Utiliza EMA10 em timeframe superior para definir viés (Green Light = compra, Red Light = venda) e EMA50 ou rompimento com volume em timeframe inferior como gatilho de entrada. Gestão de risco com stop curto no candle gatilho e alvo de 2x risco ou trailing stop via ATR.",
             tags=["trend", "multi-tf", "breakout", "volume"],
             recommended_timeframe="15m",

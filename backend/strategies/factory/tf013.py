@@ -23,8 +23,8 @@ class BollingerStrategy(BaseStrategy):
     @classmethod
     def info(cls) -> StrategyInfo:
         return StrategyInfo(
-            id="TF013",
-            name="TF013 - Bollinger Bands Breakout",
+            id="TF013-1D",
+            name="TF013-1D - Bollinger Bands Breakout",
             description = (
                 "Detecta rompimentos das Bandas de Bollinger com confirmação de volume. "
                 "LONG quando o preço fecha acima da banda superior com volume elevado. "

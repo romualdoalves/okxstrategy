@@ -13,7 +13,7 @@ def _bars(price):
 
 
 def test_mr007_uses_epoch_and_signals():
-    s = REGISTRY["MR007"]()
+    s = REGISTRY["MR007-1D"]()
     cheap = s.compute(_bars(1000.0))            # muito abaixo do valor justo -> compra
     assert cheap.signal == Signal.BUY and "tempo ausente" not in cheap.hold_reason
     assert cheap.indicators["days_alive"] > 4000   # ~4 mil dias desde 2009 (epoch em ms convertido para s)

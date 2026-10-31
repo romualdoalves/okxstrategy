@@ -1,4 +1,4 @@
-"""MR007 - Power Law DCA Dinâmico
+"""MR007-1D - Power Law DCA Dinâmico
 Estratégia de reversão à média baseada na Lei de Potência do Bitcoin.
 Gerado pela Fábrica de Estratégias
 """
@@ -15,8 +15,8 @@ class PowerLawDcaDinâmicoStrategy(BaseStrategy):
     @classmethod
     def info(cls) -> StrategyInfo:
         return StrategyInfo(
-            id="MR007",
-            name="MR007 - Power Law DCA Dinâmico",
+            id="MR007-1D",
+            name="MR007-1D - Power Law DCA Dinâmico",
             description="Estratégia de reversão à média baseada na Lei de Potência do Bitcoin. Calcula o preço justo via regressão log10 e opera DCA dinâmico conforme o Z-Score. Compra agressiva abaixo do piso, DCA normal em desconto, pausa na neutra e realiza parcialmente no topo do canal.",
             tags=["mean-reversion", "statistical", "swing", "investment"],
             recommended_timeframe="1d",

@@ -12,7 +12,7 @@ const pagePath = path.join(root, 'src/pages/BatchBacktest.jsx')
 const tmpPage = path.join(root, 'src/pages/.tmp_scanner_state.jsx')
 const outFile = path.join(root, '.tmp_scanner_state.bundle.mjs')
 
-const STRATEGIES = ['TF001', 'TF002', 'TF003', 'MR001', 'MR002', 'MR003', 'MR004', 'MR005', 'PA001', 'PA005', 'IF001'].map(id => ({ id, name: id + ' nome' }))
+const STRATEGIES = ['TF001', 'TF002-1D', 'TF003-1D', 'MR001-15m', 'MR002', 'MR003', 'MR004', 'MR005', 'PA001', 'PA005-1H', 'IF001'].map(id => ({ id, name: id + ' nome' }))
 const BOTS = [{ id: 186, symbol: 'DOT-USDT', strategy_id: 'TF001' }]
 const TOP_ASSETS = { assets: ['BTC-USDT', 'ETH-USDT', 'SOL-USDT', 'HYPE-USDT', 'ZEC-USDT'].map(symbol => ({ symbol })) }
 
@@ -67,7 +67,7 @@ try {
   const h2 = await render('MR', 'BTC-USDT'); const t2 = text(h2)
   check('botão de executar com a contagem de estratégias marcadas', t2.includes('Executar 5 estratégia(s) selecionada(s)'))
   check('sem estimativa nem aviso', !t2.includes('Estimativa grosseira') && !t2.includes('não é permitido'))
-  check('lista as estratégias da categoria com checkbox', t2.includes('MR001') && t2.includes('MR005') && (h2.match(/type="checkbox"/g) || []).length >= 6)
+  check('lista as estratégias da categoria com checkbox', t2.includes('MR001-15m') && t2.includes('MR005') && (h2.match(/type="checkbox"/g) || []).length >= 6)
   check('mostra "5 de 5 selecionadas" e os atalhos', t2.includes('5 de 5 selecionadas') && t2.includes('Selecionar todas') && t2.includes('Limpar'))
 
   console.log('Estado 3: o que foi removido não aparece')
