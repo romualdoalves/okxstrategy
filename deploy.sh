@@ -104,6 +104,12 @@ if [ -d "${DEPLOY_DIR}/.git" ]; then
     echo "[INFO] Updating existing repo..."
     git -C "${DEPLOY_DIR}" fetch origin
     git -C "${DEPLOY_DIR}" reset --hard origin/main || git -C "${DEPLOY_DIR}" reset --hard origin/master
+    # Este script pode ter acabado de ser atualizado pelo reset acima: o bash lê o arquivo aos poucos e rodaria
+    # a versão antiga. Reinicia uma vez a partir do arquivo novo.
+    if [ -z "${DEPLOY_REEXEC:-}" ]; then
+        export DEPLOY_REEXEC=1
+        exec bash "${DEPLOY_DIR}/deploy.sh" "$@"
+    fi
 else
     echo "[INFO] Cloning repository..."
     mkdir -p "${DEPLOY_DIR}"
