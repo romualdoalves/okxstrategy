@@ -268,8 +268,9 @@ export default function BotCard({ bot, liveStatus }) {
               </span>
             )}
             {unrealizedPct !== null && (
-              <span className="text-[9px] font-normal text-muted/70">
-                {pctIsNet ? `líquido · bruto ${fmtSigned(grossPct ?? 0)}` : 'bruto (sem taxas)'}
+              <span className="text-[9px] font-normal text-muted/70"
+                title={feeRate != null ? `Líquido com a taxa que a conta cobra: ${(feeRate * 100).toFixed(2)}% por lado` + (rt.fee_rate_reference != null && rt.fee_rate_reference !== feeRate ? `. Referência de conta real (estudos, Scanner, Meta): ${(rt.fee_rate_reference * 100).toFixed(2)}%.` : '') : undefined}>
+                {pctIsNet ? `líquido (${(feeRate * 100).toFixed(2)}%/lado) · bruto ${fmtSigned(grossPct ?? 0)}` : 'bruto (sem taxas)'}
               </span>
             )}
           </div>

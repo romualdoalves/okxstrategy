@@ -384,7 +384,7 @@ function TabAtividades() {
   const hasDiscrepancy = Math.abs(discrepancy) >= 0.01
   const netDiscrepancy = recon.discrepancy_net ?? 0
   const hasNetDiscrepancy = Math.abs(netDiscrepancy) >= 0.01
-  const feeGap = recon.effective_fee_pct != null && Math.abs(recon.effective_fee_pct - (recon.model_fee_pct ?? 0)) >= 0.02
+  const feeGap = recon.effective_fee_pct != null && Math.abs(recon.effective_fee_pct - (recon.model_fee_pct ?? 0)) >= 0.02   // conta cobra diferente da referência
 
   return (
     <div className="space-y-5">
@@ -485,10 +485,10 @@ function TabAtividades() {
               </div>
               {recon.effective_fee_pct != null && (
                 <p className={`text-xs ${feeGap ? 'text-amber-400' : 'text-muted'}`}>
-                  Taxa efetiva medida nos fills do dia: <strong>{fmt(recon.effective_fee_pct, 2)}% por lado</strong>
-                  {' '}· taxa que o app usa nos cálculos (cards, trava, meta, backtest): <strong>{fmt(recon.model_fee_pct, 2)}% por lado</strong>
-                  {' '}({{ env: 'definida em OKX_FEE_RATE', official: 'taxa oficial da conta, consultada na OKX', fills: 'medida nos fills da conta', default: 'padrão: ainda não confirmada pela OKX' }[recon.fee_source] || recon.fee_source}).
-                  {feeGap && ' Enquanto os dois valores forem diferentes, os números líquidos ficam errados.'}
+                  Taxa <strong>cobrada</strong> nos fills do dia: <strong>{fmt(recon.effective_fee_pct, 2)}% por lado</strong> (é ela que forma o P&L líquido desta tela, do P&L diário e dos cards)
+                  {' '}· taxa de <strong>referência</strong> (conta real; estudos, Scanner, backtests e Meta 1%): <strong>{fmt(recon.model_fee_pct, 2)}% por lado</strong>
+                  {' '}({{ env: 'definida em OKX_FEE_RATE', reference: 'tabela publicada da OKX', official: 'taxa oficial da conta, consultada na OKX', fills: 'medida nos fills da conta', default: 'padrão' }[recon.fee_source] || recon.fee_source}).
+                  {feeGap && recon.effective_fee_pct > recon.model_fee_pct && ' A conta cobra mais que a referência (no demo): o que ela realiza fica abaixo do que o backtest projeta. Em conta real, a taxa cobrada seria a de referência.'}
                 </p>
               )}
               {recon.fee_status?.official_taker != null && (

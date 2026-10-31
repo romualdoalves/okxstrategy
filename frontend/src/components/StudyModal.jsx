@@ -181,15 +181,16 @@ export default function StudyModal({ strategyId, onClose }) {
               </div>
             )}
 
-            {data.fee_outdated && (
-              <div className="mt-3 rounded-lg border border-yellow-400/30 bg-yellow-400/10 p-3">
+            {(data.fee_outdated || data.real_fee_check) && (
+              <div className={`mt-3 rounded-lg border p-3 ${data.fee_outdated ? 'border-yellow-400/30 bg-yellow-400/10' : 'border-white/10 bg-white/[0.03]'}`}>
                 <div className="flex items-start gap-2">
-                  <AlertTriangle size={14} className="mt-0.5 shrink-0 text-yellow-400" />
-                  <p className="text-[11px] text-yellow-100/85">
-                    As tabelas deste estudo foram medidas com taxa de <strong>{(data.fee_rate_assumed * 100).toFixed(2).replace('.', ',')}% por lado</strong>.
-                    A taxa que a conta paga (e que o app usa hoje) é de <strong>{(data.fee_rate_current * 100).toFixed(2).replace('.', ',')}%</strong>:
-                    os números abaixo são otimistas.
-                    {data.real_fee_check ? ' A conferência com a taxa real está logo a seguir.' : ' Esta estratégia ainda não foi reconferida com a taxa real.'}
+                  <AlertTriangle size={14} className={`mt-0.5 shrink-0 ${data.fee_outdated ? 'text-yellow-400' : 'text-muted'}`} />
+                  <p className="text-[11px] text-white/80">
+                    As tabelas deste estudo foram medidas com taxa de <strong>{(data.fee_rate_assumed * 100).toFixed(2).replace('.', ',')}% por lado</strong>
+                    {data.fee_outdated
+                      ? <>, mas a taxa de referência do app hoje é <strong>{(data.fee_rate_current * 100).toFixed(2).replace('.', ',')}%</strong>: os números abaixo estão desatualizados.</>
+                      : <> (a de uma conta real, a mesma usada hoje no Scanner e na Meta 1%).</>}
+                    {data.real_fee_check && <> A conta <strong>demo</strong> cobra <strong>{(data.real_fee_check.fee_rate * 100).toFixed(2).replace('.', ',')}% por lado</strong>; abaixo, o resultado com essa taxa.</>}
                   </p>
                 </div>
                 {data.real_fee_check && (

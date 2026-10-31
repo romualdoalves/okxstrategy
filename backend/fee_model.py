@@ -1,18 +1,16 @@
 """
-fee_model.py — A taxa por lado que o app assume em TODO cálculo líquido (cards, trava de lucro, meta, backtest, Scanner).
+fee_model.py — As DUAS taxas por lado que o app mostra, sempre lado a lado:
 
-Uma única fonte, para nenhuma página mostrar um número calculado com taxa diferente da que a corretora cobra:
+  * REFERÊNCIA (`fee_rate()`): a taxa de uma conta REAL (taker de ordem a mercado). É a que avalia estratégia: estudos, Scanner BT,
+    backtests e Meta 1%. Padrão 0,10% (tabela publicada da OKX: BTC-USDT, DOT-USDT etc., regular user, taker). `OKX_FEE_RATE`
+    a sobrepõe. Com `OKX_DEMO=false` (conta real) ela passa a ser a taxa cobrada de fato.
+  * COBRADA (`charged_rate()`): o que a conta conectada está pagando AGORA, medida nos fills reais (ou a oficial da OKX, ou, sem
+    nada medido, a de referência). Na conta demo os fills mostram 0,40% por lado (Order Center, 29–30/10/2026: ex.: 0,3756205
+    USDT sobre 93,9051 USDT), 4x a referência: o demo cobra a mais. Vale para o dinheiro da conta: P&L diário, circuito de
+    perda, cards, Registros, avisos.
 
-  1. `OKX_FEE_RATE` (fração por lado), se definida: decisão explícita de quem opera;
-  2. a taxa OFICIAL da conta, perguntada à OKX (`/account/trade-fee`, taker: o bot opera a mercado), no mesmo ambiente
-     (demo ou real) em que o app opera;
-  3. a taxa EFETIVA medida nos fills reais (taxa em US$ ÷ valor negociado, só ordens taker) ou a `feeRate` que a OKX grava
-     em cada fill;
-  4. DEFAULT_FEE_RATE, só enquanto nada acima foi medido.
-
-Por que não 0,10%, a tabela pública (VIP 0: 0,08% maker / 0,10% taker)? Porque os fills da conta DEMO mostram 0,40% por lado
-(Order Center, 29–30/10/2026: ex.: 0,3756205 USDT sobre 93,9051 USDT) e a OKX não documenta a taxa do ambiente demo. Os
-0,40% são portanto uma MEDIDA desta conta, não a tabela da corretora; o app confere com a taxa oficial e avisa se divergirem.
+A diferença (`demo_premium`) é exibida, nunca escondida. A decisão de avaliar estratégias pela taxa menor é de quem opera: é a
+que a conta real pagaria. Origem de cada número: `status()` e /api/system/fee-model.
 """
 from __future__ import annotations
 
@@ -22,7 +20,8 @@ import time
 
 log = logging.getLogger("fee_model")
 
-DEFAULT_FEE_RATE = 0.004          # 0,40% por lado: medido nos fills reais da conta (ver docstring)
+REFERENCE_FEE_RATE = 0.001        # 0,10% por lado: taxa taker publicada pela OKX para pares spot de regular user
+DEFAULT_FEE_RATE = REFERENCE_FEE_RATE
 MIN_FILLS_TO_TRUST = 4            # menos fills que isso não bastam para sobrepor o padrão
 REFRESH_SECONDS = 3600
 
@@ -45,22 +44,36 @@ def _env_rate() -> float | None:
         return None
 
 
+def is_demo() -> bool:
+    return os.getenv("OKX_DEMO", "true").lower() in ("1", "true", "yes")
+
+
+def charged_rate() -> float:
+    """O que a conta conectada paga por lado AGORA: medida nos fills > oficial da OKX > referência."""
+    if _observed is not None:
+        return _observed
+    if _official is not None:
+        return _official
+    return REFERENCE_FEE_RATE
+
+
 def fee_rate() -> float:
+    """Taxa de REFERÊNCIA, a que avalia estratégias (estudos, Scanner, meta). Na conta real é a própria cobrada."""
     env = _env_rate()
     if env is not None:
         return env
-    if _official is not None:
-        return _official
-    return _observed if _observed is not None else DEFAULT_FEE_RATE
+    return REFERENCE_FEE_RATE if is_demo() else charged_rate()
 
 
 def source() -> str:
-    """De onde vem a taxa em uso: 'env' | 'official' | 'fills' | 'default'."""
+    """De onde vem a taxa de REFERÊNCIA: 'env' | 'reference' (demo: tabela publicada) | 'official' | 'fills' | 'default' (conta real)."""
     if _env_rate() is not None:
         return "env"
-    if _official is not None:
-        return "official"
-    return "fills" if _observed is not None else "default"
+    if is_demo():
+        return "reference"
+    if _observed is not None:
+        return "fills"
+    return "official" if _official is not None else "default"
 
 
 def observed_rate(fills: list[dict]) -> tuple[float | None, int]:
@@ -106,7 +119,8 @@ def set_official(taker: float | None, maker: float | None = None, level: str = "
 
 def status() -> dict:
     mismatch = (_official is not None and _observed is not None and abs(_official - _observed) > 0.0002)
-    return {"fee_rate": fee_rate(), "source": source(), "official_taker": _official, "official_maker": _official_maker,
+    return {"fee_rate": fee_rate(), "source": source(), "charged_rate": charged_rate(), "demo": is_demo(),
+            "demo_premium": round(charged_rate() - fee_rate(), 6), "official_taker": _official, "official_maker": _official_maker,
             "official_level": _official_level or None, "observed": _observed, "observed_fills": _observed_fills,
             "observed_at": _observed_at or None, "default": DEFAULT_FEE_RATE, "official_raw": _official_raw,
             # a OKX diz uma coisa e os fills mostram outra: o número em uso é o oficial, mas a divergência precisa ser vista

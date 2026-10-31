@@ -111,6 +111,7 @@ async def get_activities(date: Optional[str] = None, db: Session = Depends(get_d
     #    O FIFO roda sobre TODOS os fills (inclui cross-day se earliest_date foi usado); a tela mostra só os de target_date.
     from ..fills import reconcile_fills, summarize
     from ..profit_lock import fee_rate
+    from ..fee_model import charged_rate
 
     def _local_date(f: dict) -> str:
         try:
@@ -198,7 +199,8 @@ async def get_activities(date: Optional[str] = None, db: Session = Depends(get_d
             "discrepancy_net":     round(okx["net"] - app_net, 2),
             # taxa efetiva cobrada pela OKX nos fills do dia contra a que o app assume nos cálculos
             "effective_fee_pct":   okx["effective_fee_pct"],
-            "model_fee_pct":       round(fee_rate() * 100, 4),
+            "model_fee_pct":       round(fee_rate() * 100, 4),          # referência (estudos, Scanner, meta)
+            "charged_fee_pct":     round(charged_rate() * 100, 4),      # o que a conta paga agora
             "fee_source":          fee_model.source(),
             "fee_status":          fee_model.status(),
             "fees_total_day":      okx["fees_total"],

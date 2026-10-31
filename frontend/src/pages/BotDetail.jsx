@@ -14,6 +14,7 @@ import GraphView         from '../components/GraphView'
 import StrategyChecklist from '../components/StrategyChecklist'
 import AssetPriceCard    from '../components/AssetPriceCard'
 import AiUsageNotice     from '../components/AiUsageNotice'
+import FeeNote           from '../components/FeeNote'
 
 const CHART_SUBTITLE = {
   'TF002-1D': 'RSI + MA200',
@@ -343,6 +344,7 @@ export default function BotDetail() {
                 Relatório de Backtest · {backtestResult.strategy_id} {backtestResult.symbol} {backtestResult.timeframe}
                 <span className="ml-2 text-xs font-normal text-muted">{backtestResult.candles_count} velas · motor estrito (taxas, slippage, stop e trailing)</span>
               </h3>
+              <FeeNote className="max-w-md" />
             </div>
             <button 
               onClick={() => setBacktestResult(null)}

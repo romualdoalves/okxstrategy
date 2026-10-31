@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ScanSearch, Play, HelpCircle, ChevronDown, ChevronUp, PlusCircle, CheckSquare, Square, ShieldCheck, AlertTriangle, Clock } from 'lucide-react'
 import BacktestLikert from '../components/BacktestLikert'
+import FeeNote from '../components/FeeNote'
 import { getStrategies, getBots, createBot, getTopAssets } from '../api'
 import { authFetch } from '../auth'
 import { buildBotPayload } from '../botPayload'
@@ -700,6 +701,7 @@ export default function BatchBacktest() {
         <div>
           <h1 className="text-2xl font-bold">Scanner de Backtest</h1>
           <p className="text-sm text-muted">Backtest Estrito + score preditivo: histórico OKX, regime recente, volatilidade, liquidez e momentum</p>
+          <FeeNote className="mt-1" />
         </div>
       </div>
 

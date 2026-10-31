@@ -11,6 +11,7 @@ from datetime import datetime, timedelta, timezone
 
 from ..exchanges.base import BaseExchange
 from ..database import SessionLocal, TradeModel
+from ..fee_model import charged_rate
 from ..notifications import build_exit_msg, build_order_confirmed_msg
 from ..profit_lock import (capped_callback, net_pct_at_stop, net_unrealized, ratchet_stop, step_of_stop,
                            step_pct, steps_view, stop_is_tighter)
@@ -88,7 +89,8 @@ class PositionMixin:
         }
         if self._direction == 0 or self._entry_price <= 0 or last_price <= 0:
             return out
-        usd, pct = net_unrealized(self._entry_price, last_price, abs(float(self._sz or 0.0)), self._direction)
+        usd, pct = net_unrealized(self._entry_price, last_price, abs(float(self._sz or 0.0)), self._direction,
+                                  fee=charged_rate())      # lucro do card: o que a conta paga de verdade
         view = steps_view(self._entry_price, self._sl_price, self._direction, getattr(self, "_lock_events", None))
         out.update(profit_lock=view, unrealized_net_usd=round(usd, 2), unrealized_net_pct=round(pct, 2))
         if self._sl_price > 0 and (self._tp1_done or view.get("reached", 0) >= 1):

@@ -33,8 +33,8 @@ class AccountingMixin:
 
     def _estimated_fees(self) -> float:
         """Taxas estimadas de uma operação completa (compra + venda) no stake fixo, com a taxa real do app."""
-        from ..fee_model import fee_rate
-        return 2.0 * float(self.config.stake_usd or 100.0) * fee_rate()
+        from ..fee_model import charged_rate        # dinheiro da conta: vale o que ela de fato paga
+        return 2.0 * float(self.config.stake_usd or 100.0) * charged_rate()
 
     def _record_pnl(self, pnl: float, fee: float | None = None):
         """Registra o resultado de uma operação fechada. O P&L diário, o circuit breaker e vitórias/derrotas valem

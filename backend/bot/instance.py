@@ -17,6 +17,7 @@ from ..feeds.gex_feed import GexFeed
 from ..feeds.okx_market_players import OkxMarketPlayersFeed
 from ..strategies.base import STRATEGY_WINDOW, Signal
 from ..notifications import TelegramNotifier, build_start_msg
+from ..fee_model import charged_rate
 from ..profit_lock import fee_rate as _fee_rate
 from ..risk import current_day_start_utc as _current_day_start_utc
 from ..exchanges.factory import build_exchange, get_exchange_maintenance, get_exchange_provider, get_public_stream_class, map_timeframe_for_history, map_timeframe_for_ws_channel
@@ -724,7 +725,8 @@ class BotInstance(OrderGateMixin, EntryMixin, PositionMixin, AccountingMixin, Go
             "profit_lock": pv["profit_lock"],
             "trailing": self._trailing_view(last_price),
             "goal": self._goal_view(last_price),
-            "fee_rate": _fee_rate(),          # o card calcula o líquido sobre o preço ao vivo com esta taxa
+            "fee_rate": charged_rate(),       # o card calcula o líquido sobre o preço ao vivo com a taxa que a conta paga
+            "fee_rate_reference": _fee_rate(),  # taxa de referência (conta real): a que avalia estratégias e a meta
             "unrealized_net_usd": pv["unrealized_net_usd"],
             "unrealized_net_pct": pv["unrealized_net_pct"],
             "daily_pnl":   round(self._daily_pnl, 2),

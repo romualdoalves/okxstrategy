@@ -236,8 +236,12 @@ export default function MetaHoje() {
         <p className="mb-1.5 flex items-center gap-2 text-sm font-bold text-yellow-200"><ShieldAlert size={16} /> Leia antes: a meta é agressiva, e é BRUTA</p>
         <ul className="list-disc space-y-1 pl-5 text-xs leading-relaxed text-yellow-100/85">
           <li>
-            <strong>Bruto</strong> é o ganho de preço <em>antes</em> das taxas. Depois de pagar as taxas ({c.fee_rate_pct}% por lado), +{c.target_pct}% bruto
+            <strong>Bruto</strong> é o ganho de preço <em>antes</em> das taxas. Com a taxa de referência de uma conta real ({String(c.fee_rate_pct).replace('.', ',')}% por lado), +{c.target_pct}% bruto
             vira ≈ <strong>+{netEq}% líquido</strong> numa operação só, e menos que isso se forem várias. O dinheiro que sobra é o líquido.
+            {c.charged_fee_pct != null && c.charged_fee_pct > c.fee_rate_pct && (
+              <> <strong>Atenção:</strong> a conta {c.demo ? 'demo ' : ''}está cobrando <strong>{String(c.charged_fee_pct).replace('.', ',')}% por lado</strong>, mais que a referência. Nela, o mesmo +{c.target_pct}% bruto
+              deixa só ≈ <strong>{(c.target_pct - (c.charged_fee_pct / 100) * (200 + c.target_pct)).toFixed(2).replace('.', ',')}% líquido</strong>.</>
+            )}
           </li>
           <li>
             +{c.target_pct}% <strong>por dia</strong>, composto, são ≈ <strong>+{COMPOUND_YEAR.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}% ao ano</strong>

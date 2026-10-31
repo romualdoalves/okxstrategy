@@ -22,7 +22,7 @@ const stubs = {
     const DATA = { strategies: globalThis.__STRATEGIES, bots: globalThis.__BOTS, 'top-assets': globalThis.__TOP_ASSETS }
     export const useQuery = ({ queryKey }) => ({ data: DATA[queryKey[0]], isLoading: false })
     export const useQueryClient = () => ({ invalidateQueries: () => {}, setQueryData: () => {} })`,
-  '../api': `export const getStrategies = () => {}; export const getBots = () => {}; export const createBot = () => {}; export const getTopAssets = () => {}`,
+  '../api': `export const getStrategies = () => {}; export const getBots = () => {}; export const createBot = () => {}; export const getTopAssets = () => {}; export const getFeeModel = () => {}`,
   '../auth': `export const authFetch = () => {}`,
 }
 

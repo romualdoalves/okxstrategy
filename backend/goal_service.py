@@ -21,6 +21,7 @@ from .backtest_worker import run_strict_async
 from .database import BotModel, SessionLocal
 from .exchanges.okx_universe import fetch_top_spot_assets
 from .profit_lock import EXIT_SLIPPAGE_RATE, fee_rate
+from .fee_model import charged_rate, is_demo
 from .strategies.registry import REGISTRY
 from .validation.reports import study_summary, validated_timeframe
 
@@ -224,7 +225,8 @@ def status() -> dict:
         "target_pct": G.TARGET_PCT, "net_equivalent_pct": round(G.net_equivalent_pct(), 2), "window_hours": G.WINDOW_HOURS, "min_trades": G.MIN_TRADES,
         "min_profit_factor": G.MIN_PROFIT_FACTOR, "min_chance_pct": round(100 * G.MIN_CHANCE), "top_n": G.TOP_N,
         "min_independent_windows": G.MIN_INDEPENDENT_WINDOWS,
-        "fee_rate_pct": round(100 * fee_rate(), 3), "exit_slippage_pct": round(100 * EXIT_SLIPPAGE_RATE, 3),
+        "fee_rate_pct": round(100 * fee_rate(), 3), "charged_fee_pct": round(100 * charged_rate(), 3),
+        "demo": is_demo(), "exit_slippage_pct": round(100 * EXIT_SLIPPAGE_RATE, 3),
         "history_cap": HISTORY_CAP, "timeframes": list(G.INTRADAY_TIMEFRAMES),
         "strategies_considered": len(candidate_strategies()), "exit_margin_pct": G.EXIT_MARGIN_PCT,
     }
